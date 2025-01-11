@@ -7,8 +7,8 @@ MyFinance Dashboard is an interactive data visualization and analytics tool for 
 ## Features
 
 - **Supported Banks**:
-- TD
-- AMEX
+  - TD
+  - AMEX
 
 - **Interactive Visualizations**:
   - Spending breakdown by category (pie chart).
