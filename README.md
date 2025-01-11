@@ -49,4 +49,6 @@ Visualizations:
 2. cd my-finance-dashboard
 3. streamlit run Home.py
 
-
+## Usage
+- Upload csv (TD) or xlsx (Amex) statement files using the file uploader module
+- View insights in visualization module
