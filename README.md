@@ -6,9 +6,9 @@ MyFinance Dashboard is an interactive data visualization and analytics tool for 
 
 ## Features
 
-## **Supported Banks**:
-- TD
-- AMEX
+- **Supported Banks**:
+  - TD
+  - AMEX
 
 - **Interactive Visualizations**:
   - Spending breakdown by category (pie chart).
@@ -38,8 +38,5 @@ MyFinance Dashboard is an interactive data visualization and analytics tool for 
 1. Clone the Repository:
 2. cd my-finance-dashboard
 3. streamlit run Home.py
-
-# To Do
-- fix negative transactions are not tracked properly in all_transactions table
 
 
