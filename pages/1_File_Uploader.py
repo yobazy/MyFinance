@@ -2,20 +2,21 @@ import streamlit as st
 import pandas as pd
 import psycopg2
 from psycopg2 import OperationalError
+from db_settings import load_settings
 
-# Function to connect to PostgreSQL
 def connect_to_db():
+    settings = load_settings()  # Load user-configured settings
     try:
         conn = psycopg2.connect(
-            dbname="Finance",
-            user="postgres",
-            password="",
-            host="localhost",
-            port="5432"
+            dbname=settings["db_name"],
+            user=settings["db_user"],
+            password=settings["db_password"],
+            host=settings["db_host"],
+            port=settings["db_port"]
         )
         return conn
     except OperationalError:
-        st.warning("Unable to connect to the PostgreSQL database. Please check your database settings.")
+        st.warning("❌ Unable to connect to the PostgreSQL database. Please check your settings.")
         return None
 
 # Function to fetch the most recent transaction date from the Amex table
@@ -124,6 +125,8 @@ def insert_data_to_amex(df):
         df = clean_numeric_columns(df, ['amount', 'commission', 'exc_rate'])
 
         for row in df.itertuples(index=False):
+            st.write(f"Inserting into Amex: {row}")  # Debugging
+
             cursor.execute("""
                 INSERT INTO amex (date, date_processed, description, cardmember, amount, commission, exc_rate, merchant)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
