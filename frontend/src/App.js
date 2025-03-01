@@ -1,27 +1,40 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { AppBar, Toolbar, Typography, Button, Container } from "@mui/material";
+import Dashboard from "./pages/Dashboard";
+import FileUploader from "./pages/FileUploader";
+import Categorization from "./pages/Categorization";
 
 const App = () => {
-  const [transactions, setTransactions] = useState([]);
-
-  useEffect(() => {
-    axios.get("http://127.0.0.1:8000/api/transactions/")
-      .then(response => setTransactions(response.data))
-      .catch(error => console.error(error));
-  }, []);
-
   return (
-    <div>
-      <h1>MyFinance Dashboard</h1>
-      <BarChart width={600} height={300} data={transactions}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="amount" fill="#82ca9d" />
-      </BarChart>
-    </div>
+    <Router>
+      {/* Navigation Bar */}
+      <AppBar position="static">
+        <Toolbar>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            MyFinance Dashboard
+          </Typography>
+          <Button color="inherit" component={Link} to="/">
+            Home
+          </Button>
+          <Button color="inherit" component={Link} to="/upload">
+            File Uploader
+          </Button>
+          <Button color="inherit" component={Link} to="/categorization">
+            Categorization
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      {/* Page Content */}
+      <Container sx={{ mt: 4 }}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/upload" element={<FileUploader />} />
+          <Route path="/categorization" element={<Categorization />} />
+        </Routes>
+      </Container>
+    </Router>
   );
 };
 
