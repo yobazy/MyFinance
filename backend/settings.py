@@ -44,7 +44,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'corsheaders',  # Enable frontend communication
     'rest_framework',  # Enables API functionality
-    'financeapp',         # Your app
+    'backend',         # Your app
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

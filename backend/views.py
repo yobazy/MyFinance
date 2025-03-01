@@ -1,10 +1,12 @@
 from django.shortcuts import render
-
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.core.files.storage import default_storage
 import pandas as pd
 import os
+
+from backend.models import Transaction  # ✅ Import Transaction model
+from backend.serializers import TransactionSerializer  # ✅ Import Serializer
 
 UPLOAD_DIR = "uploads/"
 
