@@ -4,11 +4,11 @@ import { AppBar, Toolbar, Typography, Button, Container } from "@mui/material";
 import Dashboard from "./pages/Dashboard";
 import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
+import Visualizations from "./pages/Visualizations";
 
 const App = () => {
   return (
     <Router>
-      {/* Navigation Bar */}
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -23,15 +23,18 @@ const App = () => {
           <Button color="inherit" component={Link} to="/categorization">
             Categorization
           </Button>
+          <Button color="inherit" component={Link} to="/visualizations">
+            Visualizations
+          </Button>
         </Toolbar>
       </AppBar>
 
-      {/* Page Content */}
       <Container sx={{ mt: 4 }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/upload" element={<FileUploader />} />
           <Route path="/categorization" element={<Categorization />} />
+          <Route path="/visualizations" element={<Visualizations />} />
         </Routes>
       </Container>
     </Router>

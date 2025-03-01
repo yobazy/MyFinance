@@ -40,3 +40,51 @@ def transactions_missing_categories(request):
     transactions = Transaction.objects.filter(category__isnull=True)
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
+
+from django.http import JsonResponse
+from django.db.models import Sum
+from backend.models import Transaction, Category
+from datetime import datetime
+import numpy as np
+
+def get_visualization_data(request):
+    """API to get transaction data for visualizations"""
+    
+    # Get start & end date from frontend query params (default: year-to-date)
+    start_date = request.GET.get("start_date", f"{datetime.now().year}-01-01")
+    end_date = request.GET.get("end_date", datetime.now().strftime("%Y-%m-%d"))
+
+    # Get all transactions within the date range
+    transactions = Transaction.objects.filter(date__range=[start_date, end_date])
+
+    # Total spending per category
+    category_spending = (
+        transactions.values("category__name")
+        .annotate(total_amount=Sum("amount"))
+        .order_by("-total_amount")
+    )
+
+    # Monthly spending trend
+    monthly_trend = (
+        transactions.extra({"month": "DATE_TRUNC('month', date)"})
+        .values("month")
+        .annotate(total_amount=Sum("amount"))
+        .order_by("month")
+    )
+
+    # Standard deviation per category (spending consistency)
+    category_variance = {}
+    for category in transactions.values_list("category__name", flat=True).distinct():
+        category_transactions = transactions.filter(category__name=category).values_list(
+            "amount", flat=True
+        )
+        category_variance[category] = np.std(category_transactions)
+
+    # Construct JSON response
+    response_data = {
+        "category_spending": list(category_spending),
+        "monthly_trend": list(monthly_trend),
+        "category_variance": category_variance,
+    }
+
+    return JsonResponse(response_data)
