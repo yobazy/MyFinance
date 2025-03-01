@@ -78,15 +78,22 @@ def clean_numeric_columns(df, columns):
 
 
 # Insert Data into the all_transactions table
-def insert_data_to_all_transactions(date, description, amount, source):
+def insert_data_to_all_transactions(date, description, amount, source, merchant=None):
     conn = connect_to_db()
     if conn is not None:
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO all_transactions (source, date, description, amount)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-        """, (source, date, description, amount))
+        if(source == 'TD'):
+            cursor.execute("""
+                INSERT INTO all_transactions (source, date, description, amount)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (source, date, description, amount))
+        if(source == 'Amex'):
+            cursor.execute("""
+                INSERT INTO all_transactions (source, date, description, amount, merchant)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (source, date, description, amount, merchant))
         conn.commit()
         cursor.close()
         conn.close()
