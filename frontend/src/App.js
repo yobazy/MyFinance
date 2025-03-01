@@ -1,25 +1,28 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
-function App() {
+const App = () => {
+  const [transactions, setTransactions] = useState([]);
+
+  useEffect(() => {
+    axios.get("http://127.0.0.1:8000/api/transactions/")
+      .then(response => setTransactions(response.data))
+      .catch(error => console.error(error));
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <h1>MyFinance Dashboard</h1>
+      <BarChart width={600} height={300} data={transactions}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="date" />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="amount" fill="#82ca9d" />
+      </BarChart>
     </div>
   );
-}
+};
 
 export default App;
