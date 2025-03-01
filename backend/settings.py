@@ -21,13 +21,7 @@ if os.path.exists(SETTINGS_FILE):
     with open(SETTINGS_FILE, "r") as f:
         db_config = json.load(f)
 else:
-    db_config = {
-        "db_name": "Finance",
-        "db_user": "postgres",
-        "db_password": "",
-        "db_host": "localhost",
-        "db_port": "5432"
-    }
+    db_config = {"storage_type": "local"}
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -90,17 +84,25 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# Configure database settings dynamically
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': db_config.get("db_name", "Finance"),
-        'USER': db_config.get("db_user", "postgres"),
-        'PASSWORD': db_config.get("db_password", ""),
-        'HOST': db_config.get("db_host", "localhost"),
-        'PORT': db_config.get("db_port", "5432"),
+# Set database configuration based on user choice
+if db_config.get("storage_type") == "local":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(os.path.dirname(os.path.abspath(__file__)), "myfinance.db"),
+        }
     }
-}
+else:  # Hybrid (PostgreSQL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_config.get("db_name"),
+            'USER': db_config.get("db_user"),
+            'PASSWORD': db_config.get("db_password"),
+            'HOST': db_config.get("db_host"),
+            'PORT': db_config.get("db_port"),
+        }
+    }
 
 # Fallback to SQLite if no PostgreSQL settings are provided
 if not db_config.get("db_name"):
@@ -108,7 +110,7 @@ if not db_config.get("db_name"):
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, "db.sqlite3"),
     }
-    
+
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
