@@ -6,35 +6,79 @@ import pandas as pd
 import os
 from django.db.models.functions import TruncMonth
 
-from backend.models import Transaction, Category  # ✅ Import Transaction model
+from backend.models import Transaction, Category, TDTransaction, AmexTransaction  # ✅ Import Transaction model
 from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
 
 UPLOAD_DIR = "uploads/"
 
 @api_view(['POST'])
 def upload_file(request):
-    """Handles file upload (TD CSV or Amex XLS)."""
+    """Handles CSV/XLS file upload and inserts data into the database."""
     uploaded_file = request.FILES.get('file')
     file_type = request.POST.get('file_type')
 
     if not uploaded_file:
         return Response({"error": "No file provided"}, status=400)
 
+    # Save file to local directory
     file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
     default_storage.save(file_path, uploaded_file)
 
-    # Process the file based on type
     df = None
     if file_type == "TD":
         df = pd.read_csv(file_path, names=['date', 'charge_name', 'credit_amt', 'debit_amt', 'balance'])
+        process_td_data(df)
     elif file_type == "Amex":
         df = pd.read_excel(file_path, skiprows=11)
+        df.columns = df.columns.str.lower().str.replace(' ', '_')
+        df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
+        process_amex_data(df)
 
     if df is not None:
-        return Response({"message": f"{file_type} file uploaded successfully", "data": df.head().to_dict()})
-    
+        return Response({"message": f"{file_type} file uploaded successfully", "rows_processed": len(df)})
     return Response({"error": "Unsupported file type"}, status=400)
 
+def process_td_data(df):
+    """Process and insert TD data into the database."""
+    for row in df.itertuples(index=False):
+        amount = -row.debit_amt if not pd.isna(row.debit_amt) else row.credit_amt
+        TDTransaction.objects.create(
+            date=row.date,
+            charge_name=row.charge_name,
+            credit_amt=row.credit_amt,
+            debit_amt=row.debit_amt,
+            balance=row.balance
+        )
+        Transaction.objects.create(
+            date=row.date,
+            description=row.charge_name,
+            amount=amount,
+            source="TD"
+        )
+def process_amex_data(df):
+    """Process and insert Amex data into the database."""
+    df[['amount', 'commission', 'exc_rate']] = df[['amount', 'commission', 'exc_rate']].apply(
+        lambda col: pd.to_numeric(col.astype(str).str.replace('[$,]', '', regex=True), errors='coerce')
+    )
+
+    for row in df.itertuples(index=False):
+        AmexTransaction.objects.create(
+            date=row.date,
+            date_processed=row.date_processed,
+            description=row.description,
+            cardmember=row.cardmember,
+            amount=row.amount,
+            commission=row.commission,
+            exc_rate=row.exc_rate,
+            merchant=row.merchant
+        )
+        Transaction.objects.create(
+            date=row.date,
+            description=row.description,
+            amount=row.amount,
+            source="Amex",
+            merchant=row.merchant
+        )     
 @api_view(['GET'])
 def transactions_missing_categories(request):
     """Fetches transactions that are missing categories."""
@@ -55,7 +99,7 @@ def get_transactions(request):
     transactions = Transaction.objects.all().order_by("-date")  # Order by latest
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
-    
+
 from django.http import JsonResponse
 from django.db.models import Sum
 from backend.models import Transaction, Category
@@ -105,3 +149,18 @@ def get_visualization_data(request):
     }
 
     return JsonResponse(response_data, safe=False)
+
+@api_view(['GET'])
+def get_most_recent_transaction_date(request, table_name):
+    """Fetch the most recent transaction date for a given table."""
+    model_mapping = {
+        "td": TDTransaction,
+        "amex": AmexTransaction
+    }
+    model = model_mapping.get(table_name)
+
+    if model:
+        latest_transaction = model.objects.order_by("-date").first()
+        if latest_transaction:
+            return Response({"date": latest_transaction.date})
+    return Response({"error": "No transactions found"}, status=404)
