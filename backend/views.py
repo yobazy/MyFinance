@@ -5,8 +5,8 @@ from django.core.files.storage import default_storage
 import pandas as pd
 import os
 
-from backend.models import Transaction  # ✅ Import Transaction model
-from backend.serializers import TransactionSerializer  # ✅ Import Serializer
+from backend.models import Transaction, Category  # ✅ Import Transaction model
+from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
 
 UPLOAD_DIR = "uploads/"
 
@@ -41,6 +41,12 @@ def transactions_missing_categories(request):
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
 
+@api_view(['GET'])
+def get_categories(request):
+    """Fetches all categories."""
+    categories = Category.objects.all()
+    serializer = CategorySerializer(categories, many=True)
+    return Response(serializer.data, content_type="application/json")
 from django.http import JsonResponse
 from django.db.models import Sum
 from backend.models import Transaction, Category

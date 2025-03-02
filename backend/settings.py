@@ -133,7 +133,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',  # ✅ Ensures JSON responses
+    ),
+}
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
@@ -159,4 +163,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = False  # 🚨 Keep this False for security
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # 👈 Allow React frontend
+    "http://127.0.0.1:3000",
 ]
