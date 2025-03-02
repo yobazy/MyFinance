@@ -21,6 +21,6 @@ from .views import upload_file, get_visualization_data
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('upload/', upload_file, name="upload_file"),
-    path('api/', include('backend.api_urls')),  # ✅ Make sure this line exists
     path("api/visualizations/", get_visualization_data, name="visualizations"),
+    path('api/', include('backend.api_urls')),  # ✅ Make sure this line exists
 ]

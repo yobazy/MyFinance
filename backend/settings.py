@@ -160,8 +160,17 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = False  # 🚨 Keep this False for security
+CORS_ALLOW_ALL_ORIGINS = True  # 🚨 Keep this False for security
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # 👈 Allow React frontend
     "http://127.0.0.1:3000",
 ]
+
+# ✅ Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+
+# ✅ Allow specific headers (optional)
+CORS_ALLOW_HEADERS = ["*"]
+
+# 🚀 Debugging: Allow frontend to see errors (useful for CORS issues)
+DEBUG = True

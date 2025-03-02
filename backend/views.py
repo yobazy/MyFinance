@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view
 from django.core.files.storage import default_storage
 import pandas as pd
 import os
+from django.db.models.functions import TruncMonth
 
 from backend.models import Transaction, Category  # ✅ Import Transaction model
 from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
@@ -55,7 +56,7 @@ import numpy as np
 
 def get_visualization_data(request):
     """API to get transaction data for visualizations"""
-    
+
     # Get start & end date from frontend query params (default: year-to-date)
     start_date = request.GET.get("start_date", f"{datetime.now().year}-01-01")
     end_date = request.GET.get("end_date", datetime.now().strftime("%Y-%m-%d"))
@@ -70,9 +71,9 @@ def get_visualization_data(request):
         .order_by("-total_amount")
     )
 
-    # Monthly spending trend
+    # Monthly spending trend (SQLite and PostgreSQL compatible)
     monthly_trend = (
-        transactions.extra({"month": "DATE_TRUNC('month', date)"})
+        transactions.annotate(month=TruncMonth("date"))  # ✅ TruncMonth replaces DATE_TRUNC
         .values("month")
         .annotate(total_amount=Sum("amount"))
         .order_by("month")
@@ -80,11 +81,13 @@ def get_visualization_data(request):
 
     # Standard deviation per category (spending consistency)
     category_variance = {}
-    for category in transactions.values_list("category__name", flat=True).distinct():
+    category_names = transactions.values_list("category__name", flat=True).distinct()
+
+    for category in category_names:
         category_transactions = transactions.filter(category__name=category).values_list(
             "amount", flat=True
         )
-        category_variance[category] = np.std(category_transactions)
+        category_variance[category] = float(np.std(list(category_transactions))) if category_transactions else 0
 
     # Construct JSON response
     response_data = {
@@ -93,4 +96,4 @@ def get_visualization_data(request):
         "category_variance": category_variance,
     }
 
-    return JsonResponse(response_data)
+    return JsonResponse(response_data, safe=False)
