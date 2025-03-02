@@ -100,3 +100,6 @@ Desktop.ini
 .python-version
 
 settings.json
+
+# user uploads
+uploads/
