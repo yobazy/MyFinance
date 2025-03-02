@@ -48,6 +48,14 @@ def get_categories(request):
     categories = Category.objects.all()
     serializer = CategorySerializer(categories, many=True)
     return Response(serializer.data, content_type="application/json")
+
+@api_view(['GET'])
+def get_transactions(request):
+    """Fetch all transactions."""
+    transactions = Transaction.objects.all().order_by("-date")  # Order by latest
+    serializer = TransactionSerializer(transactions, many=True)
+    return Response(serializer.data)
+    
 from django.http import JsonResponse
 from django.db.models import Sum
 from backend.models import Transaction, Category

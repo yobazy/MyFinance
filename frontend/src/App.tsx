@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
 import Visualizations from "./pages/Visualizations";
+import Transactions from "./pages/Transactions.tsx";
 
 const App = () => {
   return (
@@ -19,6 +20,9 @@ const App = () => {
           </Button>
           <Button color="inherit" component={Link} to="/upload">
             File Uploader
+          </Button>
+          <Button color="inherit" component={Link} to="/transactions">
+            Transactions
           </Button>
           <Button color="inherit" component={Link} to="/categorization">
             Categorization
@@ -35,6 +39,7 @@ const App = () => {
           <Route path="/upload" element={<FileUploader />} />
           <Route path="/categorization" element={<Categorization />} />
           <Route path="/visualizations" element={<Visualizations />} />
+          <Route path="/transactions" element={<Transactions />} />
         </Routes>
       </Container>
     </Router>

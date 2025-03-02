@@ -16,11 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from .views import upload_file, get_visualization_data
+from .views import upload_file, get_visualization_data, get_transactions
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('upload/', upload_file, name="upload_file"),
     path("api/visualizations/", get_visualization_data, name="visualizations"),
+    path("api/transactions/", get_transactions, name="transactions"),
     path('api/', include('backend.api_urls')),  # ✅ Make sure this line exists
 ]
