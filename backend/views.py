@@ -55,13 +55,33 @@ def process_td_data(df):
             amount=amount,
             source="TD"
         )
-def process_amex_data(df):
-    """Process and insert Amex data into the database."""
-    df[['amount', 'commission', 'exc_rate']] = df[['amount', 'commission', 'exc_rate']].apply(
-        lambda col: pd.to_numeric(col.astype(str).str.replace('[$,]', '', regex=True), errors='coerce')
-    )
+import pandas as pd
+from datetime import datetime
+from .models import AmexTransaction, Transaction
 
+def process_amex_data(df):
+    """Process and insert Amex data into the database, ensuring correct formats."""
+
+    # Convert 'date' and 'date_processed' columns to proper format
+    def convert_date(date_str):
+        try:
+            return datetime.strptime(date_str, "%d %b %Y").strftime("%Y-%m-%d")  # "01 Jan 2025" -> "2025-01-01"
+        except ValueError:
+            return None  # Return None if date conversion fails
+
+    df['date'] = df['date'].astype(str).apply(convert_date)
+    df['date_processed'] = df['date_processed'].astype(str).apply(convert_date)
+
+    # Ensure numeric values are properly formatted and NaN is replaced with 0
+    numeric_columns = ['amount', 'commission', 'exc_rate']
+    for col in numeric_columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)  # Convert to numeric, replace NaN with 0
+
+    # Insert into database
     for row in df.itertuples(index=False):
+        if row.date is None or row.date_processed is None:
+            continue  # Skip rows with invalid dates
+
         AmexTransaction.objects.create(
             date=row.date,
             date_processed=row.date_processed,
@@ -72,13 +92,17 @@ def process_amex_data(df):
             exc_rate=row.exc_rate,
             merchant=row.merchant
         )
+
+        # Insert into the combined transactions table
         Transaction.objects.create(
             date=row.date,
             description=row.description,
             amount=row.amount,
             source="Amex",
             merchant=row.merchant
-        )     
+        )
+
+
 @api_view(['GET'])
 def transactions_missing_categories(request):
     """Fetches transactions that are missing categories."""
