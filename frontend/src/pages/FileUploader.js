@@ -3,8 +3,12 @@ import axios from "axios";
 
 const FileUploader = () => {
   const [file, setFile] = useState(null);
-  const [fileType, setFileType] = useState("TD");
+  const [fileType, setFileType] = useState("csv"); // Default to CSV
   const [message, setMessage] = useState("");
+
+  const handleFileTypeChange = (event) => {
+    setFileType(event.target.value);
+    };
 
   const handleUpload = async () => {
     if (!file) {
@@ -27,11 +31,15 @@ const FileUploader = () => {
   return (
     <div>
       <h2>Upload TD CSV or Amex XLS</h2>
-      <select onChange={(e) => setFileType(e.target.value)}>
+      <select onChange={handleFileTypeChange} value={fileType}>
         <option value="TD">CSV for TD</option>
         <option value="Amex">XLS for Amex</option>
       </select>
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+      {/* File Input (Dynamically Restricts File Types) */}
+      <input
+        type="file"
+        accept={fileType === "csv" ? ".csv" : ".xls,.xlsx"}
+      />
       <button onClick={handleUpload}>Upload</button>
       <p>{message}</p>
     </div>
