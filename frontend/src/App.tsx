@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { AppBar, Toolbar, Typography, Button, Container } from "@mui/material";
 import Dashboard from "./pages/Dashboard";
+import Accounts from "./pages/AccountsPage.js";
 import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
 import Visualizations from "./pages/Visualizations";
@@ -17,6 +18,9 @@ const App = () => {
           </Typography>
           <Button color="inherit" component={Link} to="/">
             Home
+          </Button>
+          <Button color="inherit" component={Link} to="/accounts">
+            Accounts
           </Button>
           <Button color="inherit" component={Link} to="/upload">
             File Uploader

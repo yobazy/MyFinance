@@ -1,10 +1,12 @@
 from django.shortcuts import render
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, csrf_exempt
 from django.core.files.storage import default_storage
 import pandas as pd
 import os
+import json
 from django.db.models.functions import TruncMonth
+from .models import Account
 
 from backend.models import Transaction, Category, TDTransaction, AmexTransaction  # ✅ Import Transaction model
 from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
@@ -102,6 +104,36 @@ def process_amex_data(df):
             merchant=row.merchant
         )
 
+@csrf_exempt
+def manage_accounts(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            bank = data.get("bank")
+            name = data.get("name")
+
+            if not bank or not name:
+                return JsonResponse({"error": "Both bank and account name are required"}, status=400)
+
+            # Ensure account is unique for the bank
+            account, created = Account.objects.get_or_create(bank=bank, name=name)
+
+            if created:
+                return JsonResponse({"message": f"Account '{name}' added successfully!"}, status=201)
+            else:
+                return JsonResponse({"error": "Account already exists for this bank."}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    elif request.method == "GET":
+        bank = request.GET.get("bank")
+        if not bank:
+            return JsonResponse({"error": "Bank parameter is required"}, status=400)
+
+        accounts = Account.objects.filter(bank=bank).values("id", "name")
+        return JsonResponse({"accounts": list(accounts)}, status=200)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @api_view(['GET'])
 def transactions_missing_categories(request):
