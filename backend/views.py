@@ -117,6 +117,14 @@ def get_categories(request):
     serializer = CategorySerializer(categories, many=True)
     return Response(serializer.data, content_type="application/json")
 
+def get_accounts(request):
+    bank = request.GET.get("bank")  # Get bank parameter from request
+    if not bank:
+        return JsonResponse({"error": "Bank parameter is required"}, status=400)
+
+    accounts = Account.objects.filter(bank=bank).values("id", "name")
+    return JsonResponse({"accounts": list(accounts)})
+
 @api_view(['GET'])
 def get_transactions(request):
     """Fetch all transactions."""

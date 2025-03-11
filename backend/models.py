@@ -5,16 +5,26 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
-        
+
+class Account(models.Model):
+    bank = models.CharField(max_length=100)  # e.g., TD, Amex
+    name = models.CharField(max_length=100)  # e.g., "Credit Card 1", "Debit Card"
+    
+    class Meta:
+        unique_together = ("bank", "name")  # Ensures each account is unique per bank
+
+    def __str__(self):
+        return f"{self.bank} - {self.name}"
+       
 class Transaction(models.Model):
     date = models.DateField()
     description = models.TextField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    source = models.CharField(max_length=10)
-    merchant = models.TextField(null=True, blank=True)
+    source = models.CharField(max_length=50)  # e.g., TD, Amex
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)  # Link to Account
 
-    class Meta:
-        db_table = 'all_transactions'
+    def __str__(self):
+        return f"{self.date} - {self.description} - {self.amount}"
 
 class TDTransaction(models.Model):
     date = models.DateField()
