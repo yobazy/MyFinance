@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { AppBar, Toolbar, Typography, Button, Container } from "@mui/material";
 import Dashboard from "./pages/Dashboard";
-import Accounts from "./pages/AccountsPage.js";
+import AccountsPage from "./pages/AccountsPage";
 import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
 import Visualizations from "./pages/Visualizations";
@@ -41,6 +41,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/upload" element={<FileUploader />} />
+          <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/categorization" element={<Categorization />} />
           <Route path="/visualizations" element={<Visualizations />} />
           <Route path="/transactions" element={<Transactions />} />
