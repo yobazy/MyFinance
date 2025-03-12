@@ -1,12 +1,13 @@
 from django.shortcuts import render
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, csrf_exempt
+from rest_framework.decorators import api_view
 from django.core.files.storage import default_storage
 import pandas as pd
 import os
 import json
 from django.db.models.functions import TruncMonth
 from .models import Account
+from django.views.decorators.csrf import csrf_exempt
 
 from backend.models import Transaction, Category, TDTransaction, AmexTransaction  # ✅ Import Transaction model
 from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
@@ -149,10 +150,33 @@ def get_categories(request):
     serializer = CategorySerializer(categories, many=True)
     return Response(serializer.data, content_type="application/json")
 
+@csrf_exempt
+def create_account(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            bank = data.get("bank")
+            name = data.get("name")
+
+            if not bank or not name:
+                return JsonResponse({"error": "Bank and account name are required."}, status=400)
+
+            # Ensure the account is unique per bank
+            if Account.objects.filter(bank=bank, name=name).exists():
+                return JsonResponse({"error": "This account already exists for the selected bank."}, status=400)
+
+            account = Account.objects.create(bank=bank, name=name)
+            return JsonResponse({"message": "Account created successfully!", "account": {"id": account.id, "name": account.name}})
+        
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format."}, status=400)
+
+@csrf_exempt
 def get_accounts(request):
-    bank = request.GET.get("bank")  # Get bank parameter from request
+    """ Fetch all accounts for a specific bank """
+    bank = request.GET.get("bank")
     if not bank:
-        return JsonResponse({"error": "Bank parameter is required"}, status=400)
+        return JsonResponse({"error": "Bank parameter is required."}, status=400)
 
     accounts = Account.objects.filter(bank=bank).values("id", "name")
     return JsonResponse({"accounts": list(accounts)})
@@ -164,6 +188,20 @@ def get_transactions(request):
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
 
+@api_view(["POST"])
+def reset_database(request):
+    """Deletes all transactions and accounts, then runs migrations."""
+    try:
+        Transaction.objects.all().delete()
+        Account.objects.all().delete()
+
+        # Run migrations
+        os.system("python manage.py makemigrations && python manage.py migrate")
+
+        return JsonResponse({"message": "Database reset and migrations applied!"})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
 from django.http import JsonResponse
 from django.db.models import Sum
 from backend.models import Transaction, Category

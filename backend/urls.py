@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from .views import upload_file, get_visualization_data, get_transactions, get_accounts
+from .views import upload_file, get_visualization_data, get_transactions, get_accounts, create_account
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,5 +24,6 @@ urlpatterns = [
     path("api/visualizations/", get_visualization_data, name="visualizations"),
     path("api/transactions/", get_transactions, name="transactions"),
     path("api/accounts/", get_accounts, name="get_accounts"),
+    path("api/accounts/create/", create_account, name="create_account"),
     path('api/', include('backend.api_urls')),  # ✅ Make sure this line exists
 ]
