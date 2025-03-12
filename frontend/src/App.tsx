@@ -7,7 +7,7 @@ import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
 import Visualizations from "./pages/Visualizations";
 import Transactions from "./pages/Transactions.tsx";
-
+import UserSettings from "./pages/UserSettings";
 const App = () => {
   return (
     <Router>
@@ -34,6 +34,9 @@ const App = () => {
           <Button color="inherit" component={Link} to="/visualizations">
             Visualizations
           </Button>
+          <Button color="inherit" component={Link} to="/user-settings">
+            User Settings
+          </Button>
         </Toolbar>
       </AppBar>
 
@@ -45,6 +48,7 @@ const App = () => {
           <Route path="/categorization" element={<Categorization />} />
           <Route path="/visualizations" element={<Visualizations />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/user-settings" element={<UserSettings />} />
         </Routes>
       </Container>
     </Router>
