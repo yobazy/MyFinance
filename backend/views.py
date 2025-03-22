@@ -377,6 +377,7 @@ def delete_account(request, account_id):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 
+@api_view(['GET'])
 def get_dashboard_data(request):
     try:
         # Get total balance across all accounts
@@ -396,10 +397,10 @@ def get_dashboard_data(request):
             amount__lt=0  # Only count expenses
         ).aggregate(total=Sum('amount'))['total'] or 0
 
-        return JsonResponse({
+        return Response({
             'totalBalance': float(total_balance),
             'recentTransactions': list(recent_transactions),
             'monthlySpending': abs(float(monthly_spending))  # Convert to positive number
         })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=500)

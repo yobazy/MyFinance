@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from .views import upload_file, get_visualization_data, get_transactions, get_accounts, create_account, reset_database, update_account, delete_account
+from .views import upload_file, get_visualization_data, get_transactions, get_accounts, create_account, reset_database, update_account, delete_account, get_dashboard_data
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,7 +30,8 @@ urlpatterns = [
     path("api/accounts/create/", create_account, name="create_account"),
     path("api/accounts/<int:account_id>/", update_account, name="update_account"),
     path("api/accounts/<int:account_id>/delete/", delete_account, name="delete_account"),
-
+    # DASHBOARD
+    path("api/dashboard/", get_dashboard_data, name="dashboard"),
     # DATABASE
     path("api/reset-database/", reset_database, name="reset-database"),
 
