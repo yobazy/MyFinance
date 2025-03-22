@@ -266,3 +266,50 @@ def get_most_recent_transaction_date(request, table_name):
         if latest_transaction:
             return Response({"date": latest_transaction.date})
     return Response({"error": "No transactions found"}, status=404)
+
+@api_view(['POST'])
+def create_category(request):
+    """Creates a new category."""
+    serializer = CategorySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+
+@api_view(['PUT'])
+def update_category(request, category_id):
+    """Updates an existing category."""
+    try:
+        category = Category.objects.get(id=category_id)
+        serializer = CategorySerializer(category, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=404)
+
+@api_view(['DELETE'])
+def delete_category(request, category_id):
+    """Deletes a category."""
+    try:
+        category = Category.objects.get(id=category_id)
+        category.delete()
+        return Response(status=204)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=404)
+
+@api_view(['PUT'])
+def update_transaction_category(request, transaction_id):
+    """Updates a transaction's category."""
+    try:
+        transaction = Transaction.objects.get(id=transaction_id)
+        category_id = request.data.get('category')
+        category = Category.objects.get(id=category_id)
+        transaction.category = category
+        transaction.save()
+        return Response(TransactionSerializer(transaction).data)
+    except Transaction.DoesNotExist:
+        return Response({'error': 'Transaction not found'}, status=404)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=400)

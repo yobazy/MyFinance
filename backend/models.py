@@ -22,6 +22,8 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     source = models.CharField(max_length=50)  # e.g., TD, Amex
     account = models.ForeignKey(Account, on_delete=models.CASCADE)  # Link to Account
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)  # Optional category
+
 
     def __str__(self):
         return f"{self.date} - {self.description} - {self.amount}"
