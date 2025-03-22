@@ -21,10 +21,17 @@ from .views import upload_file, get_visualization_data, get_transactions, get_ac
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('upload/', upload_file, name="upload_file"),
+    # VISUALIZATIONS
     path("api/visualizations/", get_visualization_data, name="visualizations"),
+    # TRANSACTIONS
     path("api/transactions/", get_transactions, name="transactions"),
+    # ACCOUNTS
     path("api/accounts/", get_accounts, name="get_accounts"),
     path("api/accounts/create/", create_account, name="create_account"),
+
+    # DATABASE
     path("api/reset-database/", reset_database, name="reset-database"),
-    path('api/', include('backend.api_urls')),  # ✅ Make sure this line exists
+
+    # EXTERNAL API ROUTES, SEE api_urls.py
+    path('api/', include('backend.api_urls')),  
 ]
