@@ -10,7 +10,8 @@ import {
   Menu,
   MenuItem,
   useTheme,
-  useMediaQuery 
+  useMediaQuery,
+  Box
 } from "@mui/material";
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -27,11 +28,24 @@ import Categorization from "./pages/Categorization";
 import Visualizations from "./pages/Visualizations";
 import Transactions from "./pages/Transactions.tsx";
 import UserSettings from "./pages/UserSettings";
+import { ThemeProvider } from "@mui/material/styles";
+import { getTheme } from "./theme";
+import { CssBaseline } from "@mui/material";
 
 const App = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const theme = useTheme();
+  const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'light');
+  const theme = React.useMemo(() => getTheme(mode), [mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  React.useEffect(() => {
+    const handleThemeChange = (event) => {
+      setMode(event.detail);
+    };
+
+    window.addEventListener('themeChange', handleThemeChange);
+    return () => window.removeEventListener('themeChange', handleThemeChange);
+  }, []);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -64,71 +78,74 @@ const App = () => {
   ];
 
   return (
-    <Router>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: isMobile ? 0 : 1 }}>
-            MyFinance
-          </Typography>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <AppBar position="static">
+          <Toolbar>
+            <Typography variant="h6" sx={{ flexGrow: isMobile ? 0 : 1 }}>
+              MyFinance
+            </Typography>
 
-          {isMobile ? (
-            <>
-              <IconButton
-                size="large"
-                edge="end"
-                color="inherit"
-                aria-label="menu"
-                onClick={handleMenu}
-                sx={{ ml: 'auto' }}
-              >
-                <MenuIcon />
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-              >
+            {isMobile ? (
+              <>
+                <IconButton
+                  size="large"
+                  edge="end"
+                  color="inherit"
+                  aria-label="menu"
+                  onClick={handleMenu}
+                  sx={{ ml: 'auto' }}
+                >
+                  <MenuIcon />
+                </IconButton>
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleClose}
+                >
+                  {navItems.map((item) => (
+                    <MenuItem 
+                      key={item.to} 
+                      component={Link} 
+                      to={item.to}
+                      onClick={handleClose}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
+            ) : (
+              <Box sx={{ display: 'flex' }}>
                 {navItems.map((item) => (
-                  <MenuItem 
-                    key={item.to} 
-                    component={Link} 
+                  <NavButton
+                    key={item.to}
                     to={item.to}
-                    onClick={handleClose}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </MenuItem>
+                    icon={item.icon}
+                    label={item.label}
+                  />
                 ))}
-              </Menu>
-            </>
-          ) : (
-            <div sx={{ display: 'flex' }}>
-              {navItems.map((item) => (
-                <NavButton
-                  key={item.to}
-                  to={item.to}
-                  icon={item.icon}
-                  label={item.label}
-                />
-              ))}
-            </div>
-          )}
-        </Toolbar>
-      </AppBar>
+              </Box>
+            )}
+          </Toolbar>
+        </AppBar>
 
-      <Container sx={{ mt: 4 }}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/upload" element={<FileUploader />} />
-          <Route path="/accounts" element={<AccountsPage />} />
-          <Route path="/categorization" element={<Categorization />} />
-          <Route path="/visualizations" element={<Visualizations />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/user-settings" element={<UserSettings />} />
-        </Routes>
-      </Container>
-    </Router>
+        <Container sx={{ mt: 4 }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/upload" element={<FileUploader />} />
+            <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/categorization" element={<Categorization />} />
+            <Route path="/visualizations" element={<Visualizations />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/user-settings" element={<UserSettings />} />
+          </Routes>
+        </Container>
+      </Router>
+    </ThemeProvider>
   );
 };
 
