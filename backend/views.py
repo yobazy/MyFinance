@@ -157,29 +157,52 @@ def create_account(request):
             data = json.loads(request.body)
             bank = data.get("bank")
             name = data.get("name")
+            account_type = data.get("type", "checking")
 
             if not bank or not name:
-                return JsonResponse({"error": "Bank and account name are required."}, status=400)
+                return JsonResponse({"error": "Bank and account name are required"}, status=400)
 
-            # Ensure the account is unique per bank
-            if Account.objects.filter(bank=bank, name=name).exists():
-                return JsonResponse({"error": "This account already exists for the selected bank."}, status=400)
+            account = Account.objects.create(
+                bank=bank,
+                name=name,
+                type=account_type,
+                balance=0
+            )
 
-            account = Account.objects.create(bank=bank, name=name)
-            return JsonResponse({"message": "Account created successfully!", "account": {"id": account.id, "name": account.name}})
-        
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON format."}, status=400)
+            return JsonResponse({
+                "message": "Account created successfully",
+                "account": {
+                    "id": account.id,
+                    "name": account.name,
+                    "bank": account.bank,
+                    "type": account.type,
+                    "balance": float(account.balance),
+                    "lastUpdated": account.last_updated.isoformat()
+                }
+            }, status=201)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
 def get_accounts(request):
-    """ Fetch all accounts for a specific bank """
-    bank = request.GET.get("bank")
-    if not bank:
-        return JsonResponse({"error": "Bank parameter is required."}, status=400)
+    try:
+        bank = request.GET.get("bank")
+        accounts = Account.objects.all()
+        if bank:
+            accounts = accounts.filter(bank=bank)
 
-    accounts = Account.objects.filter(bank=bank).values("id", "name")
-    return JsonResponse({"accounts": list(accounts)})
+        return JsonResponse({
+            "accounts": [{
+                "id": account.id,
+                "name": account.name,
+                "bank": account.bank,
+                "type": account.type,
+                "balance": float(account.balance),
+                "lastUpdated": account.last_updated.isoformat()
+            } for account in accounts]
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 def get_transactions(request):
@@ -313,3 +336,43 @@ def update_transaction_category(request, transaction_id):
         return Response({'error': 'Transaction not found'}, status=404)
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=400)
+
+@csrf_exempt
+def update_account(request, account_id):
+    if request.method == "PUT":
+        try:
+            data = json.loads(request.body)
+            account = Account.objects.get(id=account_id)
+            
+            account.name = data.get("name", account.name)
+            account.bank = data.get("bank", account.bank)
+            account.type = data.get("type", account.type)
+            account.save()
+
+            return JsonResponse({
+                "message": "Account updated successfully",
+                "account": {
+                    "id": account.id,
+                    "name": account.name,
+                    "bank": account.bank,
+                    "type": account.type,
+                    "balance": float(account.balance),
+                    "lastUpdated": account.last_updated.isoformat()
+                }
+            })
+        except Account.DoesNotExist:
+            return JsonResponse({"error": "Account not found"}, status=404)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+def delete_account(request, account_id):
+    if request.method == "DELETE":
+        try:
+            account = Account.objects.get(id=account_id)
+            account.delete()
+            return JsonResponse({"message": "Account deleted successfully"})
+        except Account.DoesNotExist:
+            return JsonResponse({"error": "Account not found"}, status=404)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)

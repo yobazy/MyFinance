@@ -21,7 +21,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Dashboard from "./pages/Dashboard.tsx";
-import AccountsPage from "./pages/AccountsPage";
+import AccountsPage from "./pages/AccountsPage.tsx";
 import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
 import Visualizations from "./pages/Visualizations";

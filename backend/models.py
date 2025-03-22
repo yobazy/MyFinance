@@ -7,11 +7,20 @@ class Category(models.Model):
         return self.name
 
 class Account(models.Model):
-    bank = models.CharField(max_length=100)  # e.g., TD, Amex
-    name = models.CharField(max_length=100)  # e.g., "Credit Card 1", "Debit Card"
+    ACCOUNT_TYPES = [
+        ('checking', 'Checking'),
+        ('savings', 'Savings'),
+        ('credit', 'Credit'),
+    ]
     
+    name = models.CharField(max_length=100)
+    bank = models.CharField(max_length=50)
+    type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='checking')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    last_updated = models.DateTimeField(auto_now=True)
+
     class Meta:
-        unique_together = ("bank", "name")  # Ensures each account is unique per bank
+        unique_together = ['bank', 'name']
 
     def __str__(self):
         return f"{self.bank} - {self.name}"
