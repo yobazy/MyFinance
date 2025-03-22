@@ -41,7 +41,8 @@ const FileUploader = () => {
 
     const handleBankChange = (event) => {
         setBank(event.target.value);
-      };
+        setAccount(""); // Clear the selected account when bank changes
+    };
 
     const handleAccountChange = (event) => {
     setAccount(event.target.value);
@@ -107,10 +108,12 @@ const FileUploader = () => {
 
             <FormControl fullWidth>
               <InputLabel>Account</InputLabel>
-              <Select value={account} onChange={(e) => setAccount(e.target.value)}>
-                <MenuItem value="checking">Checking</MenuItem>
-                <MenuItem value="savings">Savings</MenuItem>
-                <MenuItem value="credit">Credit Card</MenuItem>
+              <Select value={account} onChange={handleAccountChange}>
+                {accounts.map((account) => (
+                  <MenuItem key={account.id} value={account.name}>
+                    {account.name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
