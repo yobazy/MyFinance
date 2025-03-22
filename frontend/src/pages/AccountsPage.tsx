@@ -75,7 +75,7 @@ const AccountsPage = () => {
     }
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/accounts/create/", {
+      await axios.post("http://127.0.0.1:8000/api/accounts/", {
         bank,
         name: accountName,
         type: accountType,

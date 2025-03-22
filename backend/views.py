@@ -376,3 +376,30 @@ def delete_account(request, account_id):
             return JsonResponse({"error": "Account not found"}, status=404)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+def get_dashboard_data(request):
+    try:
+        # Get total balance across all accounts
+        total_balance = Account.objects.aggregate(total=Sum('balance'))['total'] or 0
+
+        # Get recent transactions
+        recent_transactions = Transaction.objects.all().order_by('-date')[:5].values(
+            'date', 'description', 'amount', 'category__name'
+        )
+
+        # Calculate monthly spending
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        monthly_spending = Transaction.objects.filter(
+            date__month=current_month,
+            date__year=current_year,
+            amount__lt=0  # Only count expenses
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        return JsonResponse({
+            'totalBalance': float(total_balance),
+            'recentTransactions': list(recent_transactions),
+            'monthlySpending': abs(float(monthly_spending))  # Convert to positive number
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

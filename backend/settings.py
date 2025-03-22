@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 import os
 import json
+from corsheaders.middleware import CorsMiddleware
 
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../settings.json")
 
@@ -160,11 +161,8 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = True  # 🚨 Keep this False for security
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # 👈 Allow React frontend
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_CREDENTIALS = True
 
 # ✅ Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
