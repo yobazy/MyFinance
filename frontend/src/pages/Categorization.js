@@ -1,22 +1,47 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Container, Typography, Card, CardContent, Button, Box } from "@mui/material";
+import { 
+  Container, 
+  Typography, 
+  Card, 
+  CardContent, 
+  Button, 
+  Box,
+  CircularProgress,
+  Alert 
+} from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useNavigate } from 'react-router-dom';
 
 const Categorization = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/api/missing-categories/")
-      .then(response => setTransactions(response.data));
+    const fetchData = async () => {
+      try {
+        // Get uncategorized transactions instead of "missing categories"
+        const transactionsResponse = await axios.get("http://127.0.0.1:8000/api/transactions/?uncategorized=true");
+        setTransactions(transactionsResponse.data);
 
-    axios.get("http://127.0.0.1:8000/api/categories/")
-      .then(response => setCategories(response.data));
+        const categoriesResponse = await axios.get("http://127.0.0.1:8000/api/categories/");
+        setCategories(categoriesResponse.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError("Failed to load transactions and categories");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const handleAddCategory = async () => {
@@ -66,6 +91,27 @@ const Categorization = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container sx={{ mt: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </Container>
+    );
+  }
+
   if (transactions.length === 0) {
     return (
       <Container sx={{ mt: 4 }}>
@@ -79,7 +125,7 @@ const Categorization = () => {
             flexDirection: 'column', 
             justifyContent: 'center', 
             alignItems: 'center',
-            backgroundColor: '#f8f9fa',
+            backgroundColor: theme.palette.background.paper,
             cursor: 'pointer',
             transition: 'transform 0.2s, box-shadow 0.2s',
             '&:hover': {
@@ -92,7 +138,7 @@ const Categorization = () => {
           <CardContent sx={{ textAlign: 'center' }}>
             <UploadFileIcon sx={{ 
               fontSize: 80, 
-              color: '#8884d8', 
+              color: theme.palette.primary.main,
               mb: 2,
               transition: 'transform 0.2s',
               '&:hover': {
@@ -111,12 +157,6 @@ const Categorization = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 navigate('/upload');
-              }}
-              sx={{
-                backgroundColor: '#8884d8',
-                '&:hover': {
-                  backgroundColor: '#7673c0',
-                }
               }}
             >
               Upload Statements

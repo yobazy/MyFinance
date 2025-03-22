@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from "@mui/material/styles";
 
 interface Transaction {
   id: number;
@@ -30,6 +31,7 @@ const Transactions = () => {
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const theme = useTheme();
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/transactions/")
@@ -65,12 +67,12 @@ const Transactions = () => {
             flexDirection: 'column', 
             justifyContent: 'center', 
             alignItems: 'center',
-            backgroundColor: '#f8f9fa',
+            backgroundColor: theme.palette.background.paper,
             cursor: 'pointer',
             transition: 'transform 0.2s, box-shadow 0.2s',
             '&:hover': {
               transform: 'translateY(-4px)',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[4],
             }
           }}
           onClick={() => navigate('/upload')}
@@ -78,7 +80,7 @@ const Transactions = () => {
           <CardContent sx={{ textAlign: 'center' }}>
             <UploadFileIcon sx={{ 
               fontSize: 80, 
-              color: '#8884d8', 
+              color: theme.palette.primary.main,
               mb: 2,
               transition: 'transform 0.2s',
               '&:hover': {
@@ -97,12 +99,6 @@ const Transactions = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 navigate('/upload');
-              }}
-              sx={{
-                backgroundColor: '#8884d8',
-                '&:hover': {
-                  backgroundColor: '#7673c0',
-                }
               }}
             >
               Upload Your First Statement

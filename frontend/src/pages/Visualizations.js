@@ -4,13 +4,13 @@ import { Container, Typography, Card, CardContent, CircularProgress, Box, Button
 import { PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer } from "recharts";
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
-
-const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff6b6b", "#a29bfe"];
+import { useTheme } from "@mui/material/styles";
 
 const Visualizations = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const theme = useTheme();
 
   useEffect(() => {
     axios.get("http://127.0.0.1:8000/api/visualizations/")
@@ -50,12 +50,12 @@ const Visualizations = () => {
             flexDirection: 'column', 
             justifyContent: 'center', 
             alignItems: 'center',
-            backgroundColor: '#f8f9fa',
+            backgroundColor: theme.palette.background.paper,
             cursor: 'pointer',
             transition: 'transform 0.2s, box-shadow 0.2s',
             '&:hover': {
               transform: 'translateY(-4px)',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[4],
             }
           }}
           onClick={() => navigate('/upload')}
@@ -63,7 +63,7 @@ const Visualizations = () => {
           <CardContent sx={{ textAlign: 'center' }}>
             <AddCircleOutlineIcon sx={{ 
               fontSize: 80, 
-              color: '#8884d8', 
+              color: theme.palette.primary.main,
               mb: 2,
               transition: 'transform 0.2s',
               '&:hover': {
@@ -83,12 +83,6 @@ const Visualizations = () => {
                 e.stopPropagation();
                 navigate('/upload');
               }}
-              sx={{
-                backgroundColor: '#8884d8',
-                '&:hover': {
-                  backgroundColor: '#7673c0',
-                }
-              }}
             >
               Upload Your First Statement
             </Button>
@@ -97,6 +91,14 @@ const Visualizations = () => {
       </Container>
     );
   }
+
+  const COLORS = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.success.main,
+    theme.palette.warning.main,
+    theme.palette.error.main,
+  ];
 
   return (
     <Container sx={{ mt: 4 }}>
@@ -117,7 +119,7 @@ const Visualizations = () => {
                 cx="50%" 
                 cy="50%" 
                 outerRadius={100} 
-                fill="#8884d8" 
+                fill={COLORS[0]} 
                 label
               >
                 {data.category_spending.map((_, index) => (
@@ -143,9 +145,9 @@ const Visualizations = () => {
               <Line 
                 type="monotone" 
                 dataKey="total_amount" 
-                stroke="#82ca9d"
+                stroke={COLORS[1]}
                 strokeWidth={2}
-                dot={{ fill: '#82ca9d' }}
+                dot={{ fill: COLORS[1] }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -162,7 +164,7 @@ const Visualizations = () => {
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="std_dev" fill="#ffc658" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="std_dev" fill={COLORS[2]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

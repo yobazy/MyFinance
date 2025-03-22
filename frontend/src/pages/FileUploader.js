@@ -14,8 +14,10 @@ import {
   Alert
 } from "@mui/material";
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { useTheme } from "@mui/material/styles";
 
 const FileUploader = () => {
+    const theme = useTheme();
     const [file, setFile] = useState(null);
     const [fileType, setFileType] = useState("TD");
     const [bank, setBank] = useState("");
@@ -92,50 +94,49 @@ const FileUploader = () => {
       <Typography variant="h4" gutterBottom>
         Upload Statements 📄
       </Typography>
-      <Card sx={{ 
-        backgroundColor: '#f8f9fa',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
+      <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <FormControl fullWidth>
               <InputLabel>Bank</InputLabel>
-              <Select
-                value={bank}
-                onChange={handleBankChange}
-                label="Bank"
-              >
-                <MenuItem value="">Select a Bank</MenuItem>
-                <MenuItem value="TD">Toronto-Dominion Bank</MenuItem>
+              <Select value={bank} onChange={(e) => setBank(e.target.value)}>
+                <MenuItem value="TD">TD Bank</MenuItem>
                 <MenuItem value="AMEX">American Express</MenuItem>
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel>Account</InputLabel>
-              <Select
-                value={account}
-                onChange={handleAccountChange}
-                disabled={!bank}
-                label="Account"
-              >
-                <MenuItem value="">Select an account</MenuItem>
-                {accounts.map((acc) => (
-                  <MenuItem key={acc.id} value={acc.name}>
-                    {acc.name}
-                  </MenuItem>
-                ))}
+              <Select value={account} onChange={(e) => setAccount(e.target.value)}>
+                <MenuItem value="checking">Checking</MenuItem>
+                <MenuItem value="savings">Savings</MenuItem>
+                <MenuItem value="credit">Credit Card</MenuItem>
               </Select>
             </FormControl>
 
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                File Requirements:
+              </Typography>
+              <ul style={{ 
+                marginTop: 0,
+                paddingLeft: '1.5rem',
+                color: theme.palette.text.secondary 
+              }}>
+                <li>File must be in {bank === "TD" ? "CSV" : "XLS/XLSX"} format</li>
+                <li>Must contain transaction date, description, and amount</li>
+                <li>No header modifications</li>
+              </ul>
+            </Box>
+
             <Box sx={{ 
-              border: '2px dashed #8884d8', 
+              border: '2px dashed #2563eb', 
               borderRadius: 1, 
               p: 3, 
               textAlign: 'center',
               cursor: 'pointer',
               '&:hover': {
-                backgroundColor: '#f0f0f0'
+                backgroundColor: 'rgba(37, 99, 235, 0.04)'
               }
             }}>
               <input
@@ -146,7 +147,11 @@ const FileUploader = () => {
                 id="file-input"
               />
               <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
-                <CloudUploadIcon sx={{ fontSize: 48, color: '#8884d8', mb: 1 }} />
+                <CloudUploadIcon sx={{ 
+                  fontSize: 48, 
+                  color: '#2563eb', 
+                  mb: 1 
+                }} />
                 <Typography variant="body1" gutterBottom>
                   {file ? file.name : 'Drag and drop or click to select file'}
                 </Typography>
@@ -160,15 +165,7 @@ const FileUploader = () => {
               variant="contained"
               onClick={handleUpload}
               disabled={!file || !bank || !account}
-              sx={{
-                backgroundColor: '#8884d8',
-                '&:hover': {
-                  backgroundColor: '#7673c0',
-                },
-                '&.Mui-disabled': {
-                  backgroundColor: '#e0e0e0',
-                }
-              }}
+              fullWidth
             >
               Upload Statement
             </Button>
@@ -178,14 +175,6 @@ const FileUploader = () => {
                 {message}
               </Alert>
             )}
-
-            <Typography variant="body2" color="text.secondary">
-              File Types:
-              <ul>
-                <li>TD: CSV format</li>
-                <li>Amex: XLS, XLSX format</li>
-              </ul>
-            </Typography>
           </Box>
         </CardContent>
       </Card>
