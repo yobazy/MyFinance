@@ -24,7 +24,7 @@ interface DashboardData {
   totalBalance: number;
   recentTransactions: Array<{
     date: string;
-    charge_name: string;
+    description: string;
     amount: number;
     category?: string;
   }>;
@@ -199,10 +199,10 @@ const Dashboard = () => {
                   <Box display="flex" justifyContent="space-between" py={1}>
                     <Box flex={1}>
                       <Typography variant="body1" fontWeight="medium" mb={0.5}>
-                        {transaction.charge_name}
+                        {transaction.description}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {new Date(transaction.date).toLocaleDateString()} • {transaction.category || 'Uncategorized'}
+                        {new Date(transaction.date).toLocaleDateString()} • {transaction.category__name || 'Uncategorized'}
                       </Typography>
                     </Box>
                     <Typography variant="body1" fontWeight="medium" sx={{ 

@@ -22,7 +22,7 @@ import { useTheme } from "@mui/material/styles";
 interface Transaction {
   id: number;
   date: string;
-  charge_name: string;
+  description: string;
   amount: number;
   category?: string | null;
 }
@@ -119,7 +119,7 @@ const Transactions = () => {
           <TableHead>
             <TableRow>
               <TableCell>Date</TableCell>
-              <TableCell>Charge Name</TableCell>
+              <TableCell>Description</TableCell>
               <TableCell>Amount</TableCell>
               <TableCell>Category</TableCell>
             </TableRow>
@@ -128,7 +128,7 @@ const Transactions = () => {
             {transactions.map((transaction) => (
               <TableRow key={transaction.id}>
                 <TableCell>{transaction.date}</TableCell>
-                <TableCell>{transaction.charge_name}</TableCell>
+                <TableCell>{transaction.description}</TableCell>
                 <TableCell>${parseFloat(transaction.amount).toFixed(2)}</TableCell>
                 <TableCell>{transaction.category || "Uncategorized"}</TableCell>
               </TableRow>
