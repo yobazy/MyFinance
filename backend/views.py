@@ -404,8 +404,10 @@ def delete_account(request, account_id):
 @api_view(['GET'])
 def get_dashboard_data(request):
     try:
-        # Get total balance across all accounts
-        total_balance = Account.objects.aggregate(total=Sum('balance'))['total'] or 0
+        # Calculate total balance from transactions instead of account balance field
+        total_balance = Transaction.objects.aggregate(
+            total=Sum('amount')
+        )['total'] or 0
 
         # Get recent transactions
         recent_transactions = Transaction.objects.all().order_by('-date')[:5].values(
