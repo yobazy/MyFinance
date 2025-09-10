@@ -23,7 +23,10 @@ interface Transaction {
   id: number;
   date: string;
   description: string;
-  amount: number;
+  amount: string;  // Change from number to string
+  source: string;
+  account: number;
+  account_name: string;
   category?: string | null;
 }
 
@@ -121,6 +124,8 @@ const Transactions = () => {
               <TableCell>Date</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Amount</TableCell>
+              <TableCell>Source</TableCell>
+              <TableCell>Account</TableCell>
               <TableCell>Category</TableCell>
             </TableRow>
           </TableHead>
@@ -130,6 +135,8 @@ const Transactions = () => {
                 <TableCell>{transaction.date}</TableCell>
                 <TableCell>{transaction.description}</TableCell>
                 <TableCell>${parseFloat(transaction.amount).toFixed(2)}</TableCell>
+                <TableCell>{transaction.source}</TableCell>
+                <TableCell>{transaction.account_name}</TableCell>
                 <TableCell>{transaction.category || "Uncategorized"}</TableCell>
               </TableRow>
             ))}

@@ -231,7 +231,7 @@ def get_accounts(request):
 @api_view(['GET'])
 def get_transactions(request):
     """Fetch all transactions."""
-    transactions = Transaction.objects.all().order_by("-date")  # Order by latest
+    transactions = Transaction.objects.select_related('account').all().order_by("-date")  # Order by latest
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
 

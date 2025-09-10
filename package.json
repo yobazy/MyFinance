@@ -1,5 +1,15 @@
 {
   "dependencies": {
     "@mui/icons-material": "^6.4.8"
-  }
+  },
+  "name": "myfinance",
+  "version": "1.0.0",
+  "description": "MyFinance Dashboard is a comprehensive personal finance management application built with **React** frontend and **Django** backend. This modern web application allows users to upload bank statements, categorize transactions, and generate detailed financial insights and visualizations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
