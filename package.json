@@ -1,15 +1,17 @@
 {
-  "dependencies": {
-    "@mui/icons-material": "^6.4.8"
-  },
-  "name": "myfinance",
+  "name": "my-finance-dash",
   "version": "1.0.0",
-  "description": "MyFinance Dashboard is a comprehensive personal finance management application built with **React** frontend and **Django** backend. This modern web application allows users to upload bank statements, categorize transactions, and generate detailed financial insights and visualizations.",
-  "main": "index.js",
+  "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "screenshots": "node scripts/screenshot-automation.js",
+    "screenshots:update": "node scripts/screenshot-automation.js --update",
+    "screenshots:all": "node scripts/screenshot-automation.js --all",
+    "screenshots:help": "echo 'Available commands: npm run screenshots, npm run screenshots:update, npm run screenshots:all'"
   },
-  "keywords": [],
+  "devDependencies": {
+    "playwright": "^1.40.0"
+  },
+  "keywords": ["finance", "dashboard", "automation", "screenshots"],
   "author": "",
   "license": "ISC"
 }
