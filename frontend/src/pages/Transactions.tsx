@@ -129,7 +129,7 @@ const Transactions = () => {
               <TableRow key={transaction.id}>
                 <TableCell>{transaction.date}</TableCell>
                 <TableCell>{transaction.charge_name}</TableCell>
-                <TableCell>${transaction.amount.toFixed(2)}</TableCell>
+                <TableCell>${parseFloat(transaction.amount).toFixed(2)}</TableCell>
                 <TableCell>{transaction.category || "Uncategorized"}</TableCell>
               </TableRow>
             ))}
