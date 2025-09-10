@@ -197,18 +197,18 @@ const Dashboard = () => {
               {dashboardData.recentTransactions.map((transaction, index) => (
                 <React.Fragment key={index}>
                   <Box display="flex" justifyContent="space-between" py={1}>
-                    <Box>
-                      <Typography variant="body1">
+                    <Box flex={1}>
+                      <Typography variant="body1" fontWeight="medium" mb={0.5}>
                         {transaction.charge_name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {new Date(transaction.date).toLocaleDateString()} • {transaction.category || 'Uncategorized'}
                       </Typography>
                     </Box>
-                    <Typography variant="body1" sx={{ 
-                      color: transaction.amount < 0 ? 'error.main' : 'success.main' 
+                    <Typography variant="body1" fontWeight="medium" sx={{ 
+                      color: transaction.amount > 0 ? 'error.main' : 'success.main' 
                     }}>
-                      ${Math.abs(transaction.amount).toLocaleString()}
+                      {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
                     </Typography>
                   </Box>
                   {index < dashboardData.recentTransactions.length - 1 && <Divider />}

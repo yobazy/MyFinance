@@ -20,7 +20,7 @@ from .views import upload_file, get_visualization_data, get_transactions, get_ac
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('upload/', upload_file, name="upload_file"),
+    path("api/upload/", upload_file, name="upload_file"),
     # VISUALIZATIONS
     path("api/visualizations/", get_visualization_data, name="visualizations"),
     # TRANSACTIONS

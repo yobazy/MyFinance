@@ -19,51 +19,75 @@ def upload_file(request):
     """Handles CSV/XLS file upload and inserts data into the database."""
     uploaded_file = request.FILES.get('file')
     file_type = request.POST.get('file_type')
+    bank = request.POST.get('bank')
+    account_name = request.POST.get('account')
 
     if not uploaded_file:
         return Response({"error": "No file provided"}, status=400)
+
+    if not bank or not account_name:
+        return Response({"error": "Bank and account are required"}, status=400)
+
+    # Get or create the account
+    try:
+        account = Account.objects.get(bank=bank, name=account_name)
+    except Account.DoesNotExist:
+        return Response({"error": f"Account '{account_name}' not found for bank '{bank}'"}, status=400)
 
     # Save file to local directory
     file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
     default_storage.save(file_path, uploaded_file)
 
     df = None
-    if file_type == "TD":
-        df = pd.read_csv(file_path, names=['date', 'charge_name', 'credit_amt', 'debit_amt', 'balance'])
-        process_td_data(df)
-    elif file_type == "Amex":
-        df = pd.read_excel(file_path, skiprows=11)
-        df.columns = df.columns.str.lower().str.replace(' ', '_')
-        df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
-        process_amex_data(df)
+    try:
+        if file_type == "TD":
+            df = pd.read_csv(file_path, names=['date', 'charge_name', 'credit_amt', 'debit_amt', 'balance'])
+            process_td_data(df, account)
+        elif file_type == "Amex":
+            df = pd.read_excel(file_path, skiprows=11)
+            df.columns = df.columns.str.lower().str.replace(' ', '_')
+            df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
+            process_amex_data(df, account)
+        else:
+            return Response({"error": "Unsupported file type"}, status=400)
 
-    if df is not None:
-        return Response({"message": f"{file_type} file uploaded successfully", "rows_processed": len(df)})
-    return Response({"error": "Unsupported file type"}, status=400)
+        if df is not None:
+            return Response({"message": f"{file_type} file uploaded successfully", "rows_processed": len(df)})
+    except Exception as e:
+        return Response({"error": f"Error processing file: {str(e)}"}, status=500)
+    finally:
+        # Clean up the uploaded file
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
-def process_td_data(df):
+    return Response({"error": "Failed to process file"}, status=500)
+
+def process_td_data(df, account):
     """Process and insert TD data into the database."""
     for row in df.itertuples(index=False):
-        amount = -row.debit_amt if not pd.isna(row.debit_amt) else row.credit_amt
+        # Handle empty values properly
+        credit_amt = row.credit_amt if not pd.isna(row.credit_amt) and row.credit_amt != '' else None
+        debit_amt = row.debit_amt if not pd.isna(row.debit_amt) and row.debit_amt != '' else None
+        
+        amount = -debit_amt if debit_amt is not None else credit_amt
+        
         TDTransaction.objects.create(
             date=row.date,
             charge_name=row.charge_name,
-            credit_amt=row.credit_amt,
-            debit_amt=row.debit_amt,
+            credit_amt=credit_amt,
+            debit_amt=debit_amt,
             balance=row.balance
         )
         Transaction.objects.create(
             date=row.date,
             description=row.charge_name,
             amount=amount,
-            source="TD"
+            source="TD",
+            account=account
         )
-import pandas as pd
-from datetime import datetime
-from .models import AmexTransaction, Transaction
-
-def process_amex_data(df):
+def process_amex_data(df, account):
     """Process and insert Amex data into the database, ensuring correct formats."""
+    from datetime import datetime
 
     # Convert 'date' and 'date_processed' columns to proper format
     def convert_date(date_str):
@@ -102,9 +126,8 @@ def process_amex_data(df):
             description=row.description,
             amount=row.amount,
             source="Amex",
-            merchant=row.merchant
+            account=account
         )
-
 @csrf_exempt
 def manage_accounts(request):
     if request.method == "POST":
