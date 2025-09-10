@@ -182,7 +182,8 @@ def create_account(request):
             }, status=201)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
-
+    else:
+        return JsonResponse({"error": "Method not allowed. Use POST to create accounts."}, status=405)
 @csrf_exempt
 def get_accounts(request):
     try:

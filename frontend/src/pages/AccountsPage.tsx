@@ -56,7 +56,7 @@ const AccountsPage = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/accounts/create/");
+      const response = await axios.get("http://127.0.0.1:8000/api/accounts/");
       setAccounts(response.data.accounts);
     } catch (error) {
       showMessage("Failed to fetch accounts", "error");
@@ -94,7 +94,7 @@ const AccountsPage = () => {
 
   const handleDeleteAccount = async (accountId: number) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/accounts/create/${accountId}/`);
+      await axios.delete(`http://127.0.0.1:8000/api/accounts/${accountId}/delete/`);
       await fetchAccounts();
       showMessage("Account deleted successfully!");
     } catch (error) {

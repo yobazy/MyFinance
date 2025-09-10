@@ -29,7 +29,7 @@ const FileUploader = () => {
     useEffect(() => {
         if (bank) {
         axios
-            .get(`http://127.0.0.1:8000/api/accounts/create/?bank=${bank}`)
+            .get(`http://127.0.0.1:8000/api/accounts/?bank=${bank}`)
             .then((response) => {
             setAccounts(response.data.accounts);
             })
