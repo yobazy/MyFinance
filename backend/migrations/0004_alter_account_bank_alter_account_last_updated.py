@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('backend', '0003_merge_0002_transaction_category_new_account_fields'),
+        ('backend', '0002_new_account_fields'),
     ]
 
     operations = [

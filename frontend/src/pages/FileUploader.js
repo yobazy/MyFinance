@@ -29,7 +29,7 @@ const FileUploader = () => {
     useEffect(() => {
         if (bank) {
         axios
-            .get(`http://127.0.0.1:8000/api/accounts/?bank=${bank}`)
+            .get(`http://127.0.0.1:8000/api/accounts/create/?bank=${bank}`)
             .then((response) => {
             setAccounts(response.data.accounts);
             })
@@ -55,7 +55,7 @@ const FileUploader = () => {
         }
     
         try {
-          const response = await axios.post("http://127.0.0.1:8000/api/accounts/", { bank, name: account });
+          const response = await axios.post("http://127.0.0.1:8000/api/accounts/create/", { bank, name: account });
           setMessage(`Account "${account}" created successfully!`);
         } catch (error) {
           setMessage("Failed to create account.");
