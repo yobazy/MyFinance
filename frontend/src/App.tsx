@@ -34,7 +34,7 @@ import { CssBaseline } from "@mui/material";
 
 const App = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'light');
+  const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
   const theme = React.useMemo(() => getTheme(mode), [mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   

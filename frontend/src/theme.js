@@ -78,4 +78,4 @@ export const getTheme = (mode) => createTheme({
   },
 });
 
-export default getTheme('light');
+export default getTheme('dark');
