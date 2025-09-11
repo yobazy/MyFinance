@@ -13,6 +13,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -59,12 +61,114 @@ jobs:
     - name: Capture screenshots
       run: npm run screenshots
     
-    - name: Upload screenshots
+    - name: Upload screenshots to GitHub
       uses: actions/upload-artifact@v4
       with:
         name: screenshots
         path: screenshots/
         retention-days: 30
+    
+    - name: Upload screenshots to repository
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+      run: |
+        # Create screenshots directory in repo
+        mkdir -p docs/screenshots
+        
+        # Copy screenshots to docs directory
+        cp screenshots/*.png docs/screenshots/ 2>/dev/null || true
+        
+        # Add and commit screenshots
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add docs/screenshots/
+        git commit -m "Update screenshots [skip ci]" || exit 0
+        git push
+    
+    - name: Update README with screenshots
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read current README
+          const readmePath = './README.md';
+          let readmeContent = fs.readFileSync(readmePath, 'utf8');
+          
+          // Screenshot definitions
+          const screenshots = [
+            {
+              name: 'home-dashboard',
+              title: 'Main Dashboard',
+              description: 'Financial overview with key metrics and quick actions'
+            },
+            {
+              name: 'file-upload',
+              title: 'File Upload',
+              description: 'Drag-and-drop interface for bank statement uploads'
+            },
+            {
+              name: 'transactions-list',
+              title: 'Transactions',
+              description: 'Comprehensive transaction management and categorization'
+            },
+            {
+              name: 'analytics-visualizations',
+              title: 'Analytics',
+              description: 'Interactive charts and spending insights'
+            },
+            {
+              name: 'accounts-management',
+              title: 'Account Management',
+              description: 'Multi-bank account setup and management'
+            },
+            {
+              name: 'settings-page',
+              title: 'Settings',
+              description: 'Application preferences and configuration'
+            }
+          ];
+          
+          // Generate screenshots section
+          let screenshotsSection = '## 📸 Screenshots\n\n';
+          screenshotsSection += 'Here are the latest screenshots of the MyFinance Dashboard:\n\n';
+          
+          screenshots.forEach(screenshot => {
+            const imageUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${context.sha}/docs/screenshots/${screenshot.name}.png`;
+            screenshotsSection += `### ${screenshot.title}\n`;
+            screenshotsSection += `*${screenshot.description}*\n\n`;
+            screenshotsSection += `![${screenshot.title}](${imageUrl})\n\n`;
+          });
+          
+          // Check if screenshots section already exists
+          const screenshotsRegex = /## 📸 Screenshots[\s\S]*?(?=## |$)/;
+          if (screenshotsRegex.test(readmeContent)) {
+            // Replace existing screenshots section
+            readmeContent = readmeContent.replace(screenshotsRegex, screenshotsSection);
+          } else {
+            // Add screenshots section after the main description
+            const insertPoint = readmeContent.indexOf('---\n\n## Features');
+            if (insertPoint !== -1) {
+              readmeContent = readmeContent.slice(0, insertPoint) + 
+                            screenshotsSection + 
+                            readmeContent.slice(insertPoint);
+            } else {
+              // Fallback: add at the end
+              readmeContent += '\n\n' + screenshotsSection;
+            }
+          }
+          
+          // Write updated README
+          fs.writeFileSync(readmePath, readmeContent);
+          
+          // Commit the changes
+          const { execSync } = require('child_process');
+          execSync('git config --local user.email "action@github.com"');
+          execSync('git config --local user.name "GitHub Action"');
+          execSync('git add README.md');
+          execSync('git commit -m "Update README with latest screenshots [skip ci]" || exit 0');
+          execSync('git push');
     
     - name: Comment PR with screenshots
       if: github.event_name == 'pull_request'
