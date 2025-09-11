@@ -404,20 +404,34 @@ def delete_account(request, account_id):
 @api_view(['GET'])
 def get_dashboard_data(request):
     try:
-        # Calculate total balance from transactions instead of account balance field
-        total_balance = Transaction.objects.aggregate(
+        # Get account_id from query parameters (optional)
+        account_id = request.GET.get('account_id')
+        
+        # Build base queryset
+        transactions_queryset = Transaction.objects.all()
+        
+        # Filter by account if specified
+        if account_id and account_id != 'all':
+            try:
+                account_id = int(account_id)
+                transactions_queryset = transactions_queryset.filter(account_id=account_id)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid account_id parameter'}, status=400)
+        
+        # Calculate total balance from filtered transactions
+        total_balance = transactions_queryset.aggregate(
             total=Sum('amount')
         )['total'] or 0
 
-        # Get recent transactions
-        recent_transactions = Transaction.objects.all().order_by('-date')[:5].values(
-            'date', 'description', 'amount', 'category__name'
+        # Get recent transactions (filtered)
+        recent_transactions = transactions_queryset.order_by('-date')[:5].values(
+            'date', 'description', 'amount', 'category__name', 'account__name', 'account__bank'
         )
 
-        # Calculate monthly spending
+        # Calculate monthly spending (filtered)
         current_month = datetime.now().month
         current_year = datetime.now().year
-        monthly_spending = Transaction.objects.filter(
+        monthly_spending = transactions_queryset.filter(
             date__month=current_month,
             date__year=current_year,
             amount__lt=0  # Only count expenses

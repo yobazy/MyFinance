@@ -10,6 +10,11 @@ import {
   Divider,
   CircularProgress,
   Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from "@mui/material";
 import {
   AccountBalance as AccountIcon,
@@ -20,17 +25,24 @@ import {
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+interface Account {
+  id: number;
+  name: string;
+  bank: string;
+  type: string;
+  balance: number;
+  lastUpdated: string;
+}
+
 interface DashboardData {
   totalBalance: number;
   recentTransactions: Array<{
     date: string;
     description: string;
     amount: number;
-    category?: string;
-  }>;
-  topCategories: Array<{
-    category: string;
-    amount: number;
+    category__name?: string;
+    account__name?: string;
+    account__bank?: string;
   }>;
   monthlySpending: number;
 }
@@ -39,11 +51,29 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const response = await axios.get("http://127.0.0.1:8000/api/accounts/");
+        setAccounts(response.data.accounts || []);
+      } catch (error) {
+        console.error("Error fetching accounts:", error);
+        setAccounts([]);
+      }
+    };
+
+    fetchAccounts();
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/api/dashboard/");
+        setLoading(true);
+        const params = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
+        const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/${params}`);
         setDashboardData(response.data);
         setLoading(false);
       } catch (error) {
@@ -53,7 +83,11 @@ const Dashboard = () => {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [selectedAccountId]);
+
+  const handleAccountChange = (event: SelectChangeEvent) => {
+    setSelectedAccountId(event.target.value);
+  };
 
   const QuickActionCard = ({ icon, title, description, path }) => (
     <Card 
@@ -118,15 +152,30 @@ const Dashboard = () => {
   ];
 
   return (
-    <Container>
-      {/* Welcome Section */}
-      <Box mb={4}>
-        <Typography variant="h4" gutterBottom>
-          Welcome to MyFinance! 👋
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Financial Dashboard
         </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Track, analyze, and optimize your financial health
-        </Typography>
+        
+        {/* Account Filter */}
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel id="account-filter-label">Filter by Account</InputLabel>
+          <Select
+            labelId="account-filter-label"
+            id="account-filter"
+            value={selectedAccountId}
+            label="Filter by Account"
+            onChange={handleAccountChange}
+          >
+            <MenuItem value="all">All Accounts</MenuItem>
+            {accounts.map((account) => (
+              <MenuItem key={account.id} value={account.id.toString()}>
+                {account.bank} - {account.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Box>
 
       {/* Financial Overview */}
@@ -136,7 +185,7 @@ const Dashboard = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Total Balance
+                  Total Balance {selectedAccountId !== 'all' && '(Filtered)'}
                 </Typography>
                 <Typography variant="h3">
                   ${dashboardData.totalBalance.toLocaleString()}
@@ -148,7 +197,7 @@ const Dashboard = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Monthly Spending
+                  Monthly Spending {selectedAccountId !== 'all' && '(Filtered)'}
                 </Typography>
                 <Typography variant="h3">
                   ${dashboardData.monthlySpending.toLocaleString()}
@@ -190,7 +239,7 @@ const Dashboard = () => {
       {dashboardData?.recentTransactions && dashboardData.recentTransactions.length > 0 && (
         <>
           <Typography variant="h5" gutterBottom mb={2}>
-            Recent Transactions
+            Recent Transactions {selectedAccountId !== 'all' && '(Filtered)'}
           </Typography>
           <Card>
             <CardContent>
@@ -203,6 +252,9 @@ const Dashboard = () => {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {new Date(transaction.date).toLocaleDateString()} • {transaction.category__name || 'Uncategorized'}
+                        {transaction.account__bank && transaction.account__name && (
+                          ` • ${transaction.account__bank} - ${transaction.account__name}`
+                        )}
                       </Typography>
                     </Box>
                     <Typography variant="body1" fontWeight="medium" sx={{ 
