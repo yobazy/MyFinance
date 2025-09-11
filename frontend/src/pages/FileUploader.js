@@ -85,7 +85,12 @@ const FileUploader = () => {
       const response = await axios.post("http://127.0.0.1:8000/api/upload/", formData);
       setMessage(response.data.message);
     } catch (error) {
-      setMessage("Upload failed.");
+      console.error("Upload error:", error);
+      if (error.response && error.response.data && error.response.data.error) {
+        setMessage(`Upload failed: ${error.response.data.error}`);
+      } else {
+        setMessage(`Upload failed: ${error.message}`);
+      }
     }
   };
 
