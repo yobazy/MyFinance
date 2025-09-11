@@ -26,11 +26,18 @@ const Visualizations = () => {
     // Get all unique months
     const allMonths = new Set([...spendingMap.keys(), ...incomeMap.keys()]);
     
-    const result = Array.from(allMonths).map(month => ({
-      month,
-      spending: spendingMap.get(month) || 0,
-      income: incomeMap.get(month) || 0
-    })).sort((a, b) => new Date(a.month) - new Date(b.month));
+    const result = Array.from(allMonths).map(month => {
+      const spending = parseFloat(spendingMap.get(month) || 0);
+      const income = parseFloat(incomeMap.get(month) || 0);
+      const balance = income - spending; // Income minus expenses = net balance
+      
+      return {
+        month,
+        spending,
+        income,
+        balance
+      };
+    }).sort((a, b) => new Date(a.month) - new Date(b.month));
     
     console.log('Combined data:', result);
     return result;
@@ -202,7 +209,7 @@ const Visualizations = () => {
       {/* Monthly Spending & Income Trend (Line Chart) */}
       <Card sx={{ mb: 3, ...chartStyle }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Monthly Spending & Income Trend</Typography>
+          <Typography variant="h6" gutterBottom>Monthly Spending, Income & Balance Trend</Typography>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={combinedMonthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
@@ -241,6 +248,16 @@ const Visualizations = () => {
                 dot={{ fill: theme.palette.success.main, strokeWidth: 2, r: 4 }}
                 activeDot={{ r: 6, stroke: theme.palette.success.main, strokeWidth: 2 }}
                 name="Income"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="balance" 
+                stroke={theme.palette.info.main}
+                strokeWidth={3}
+                dot={{ fill: theme.palette.info.main, strokeWidth: 2, r: 5 }}
+                activeDot={{ r: 7, stroke: theme.palette.info.main, strokeWidth: 2 }}
+                name="Balance"
+                strokeDasharray="5 5"
               />
             </LineChart>
           </ResponsiveContainer>
