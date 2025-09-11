@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "MyFinance",
+  "name": "MyFinance Dashboard - Personal Finance Management",
+  "description": "A comprehensive personal finance management application for tracking expenses, categorizing transactions, and generating financial insights.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +21,8 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "categories": ["finance", "productivity", "utilities"],
+  "lang": "en"
 }
