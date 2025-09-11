@@ -12,6 +12,30 @@ const Visualizations = () => {
   const navigate = useNavigate();
   const theme = useTheme();
 
+  // Combine monthly spending and income data for the chart
+  const combinedMonthlyData = React.useMemo(() => {
+    console.log('Data received:', data);
+    console.log('Monthly trend:', data?.monthly_trend);
+    console.log('Monthly income:', data?.monthly_income);
+    
+    if (!data?.monthly_trend) return [];
+    
+    const spendingMap = new Map(data.monthly_trend.map(item => [item.month, item.total_amount]));
+    const incomeMap = new Map((data?.monthly_income || []).map(item => [item.month, item.total_amount]));
+    
+    // Get all unique months
+    const allMonths = new Set([...spendingMap.keys(), ...incomeMap.keys()]);
+    
+    const result = Array.from(allMonths).map(month => ({
+      month,
+      spending: spendingMap.get(month) || 0,
+      income: incomeMap.get(month) || 0
+    })).sort((a, b) => new Date(a.month) - new Date(b.month));
+    
+    console.log('Combined data:', result);
+    return result;
+  }, [data?.monthly_trend, data?.monthly_income]);
+
   useEffect(() => {
     axios.get("http://127.0.0.1:8000/api/visualizations/")
       .then(response => {
@@ -33,9 +57,9 @@ const Visualizations = () => {
   }
 
   const hasTransactions = data && 
-    data.category_spending?.length > 0 && 
-    data.monthly_trend?.length > 0 && 
-    Object.keys(data.category_variance || {}).length > 0;
+    (data.category_spending?.length > 0 || 
+     data.monthly_trend?.length > 0 || 
+     Object.keys(data.category_variance || {}).length > 0);
 
   if (!hasTransactions) {
     return (
@@ -175,12 +199,12 @@ const Visualizations = () => {
         </CardContent>
       </Card>
 
-      {/* Monthly Spending Trend (Line Chart) */}
+      {/* Monthly Spending & Income Trend (Line Chart) */}
       <Card sx={{ mb: 3, ...chartStyle }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Monthly Spending Trend</Typography>
+          <Typography variant="h6" gutterBottom>Monthly Spending & Income Trend</Typography>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.monthly_trend} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+            <LineChart data={combinedMonthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
               <XAxis 
                 dataKey="month" 
@@ -197,16 +221,26 @@ const Visualizations = () => {
               />
               <Tooltip 
                 contentStyle={tooltipStyle}
-                formatter={(value) => [formatCurrency(value), 'Amount']}
+                formatter={(value, name) => [formatCurrency(value), name]}
                 labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               />
               <Line 
                 type="monotone" 
-                dataKey="total_amount" 
+                dataKey="spending" 
                 stroke={COLORS[1]}
                 strokeWidth={2}
                 dot={{ fill: COLORS[1], strokeWidth: 2, r: 4 }}
                 activeDot={{ r: 6, stroke: COLORS[1], strokeWidth: 2 }}
+                name="Spending"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="income" 
+                stroke={theme.palette.success.main}
+                strokeWidth={2}
+                dot={{ fill: theme.palette.success.main, strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, stroke: theme.palette.success.main, strokeWidth: 2 }}
+                name="Income"
               />
             </LineChart>
           </ResponsiveContainer>

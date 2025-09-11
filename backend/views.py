@@ -319,6 +319,15 @@ def get_visualization_data(request):
         .order_by("month")
     )
 
+    # Monthly income trend (sum of negative amounts by month, converted to positive)
+    income = transactions.filter(amount__lt=0)
+    monthly_income = (
+        income.annotate(month=TruncMonth("date"))
+        .values("month")
+        .annotate(total_amount=Abs(Sum("amount")))
+        .order_by("month")
+    )
+
     # Standard deviation per category (spending consistency)
     category_variance = {}
     category_names = transactions.values_list("category__name", flat=True).distinct()
@@ -333,6 +342,7 @@ def get_visualization_data(request):
     response_data = {
         "category_spending": list(category_spending),
         "monthly_trend": list(monthly_trend),
+        "monthly_income": list(monthly_income),
         "category_variance": category_variance,
     }
 
