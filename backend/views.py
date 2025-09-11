@@ -304,16 +304,16 @@ def get_visualization_data(request):
     transactions = Transaction.objects.filter(date__range=[start_date, end_date])
 
     # Only expenses for category pie (positive values for charting)
-    expenses = transactions.filter(amount__lt=0)
+    expenses = transactions.filter(amount__gt=0)
     category_spending = (
         expenses.values("category__name")
-        .annotate(total_amount=Abs(Sum("amount")))
+        .annotate(total_amount=Sum("amount"))
         .order_by("-total_amount")
     )
 
-    # Monthly spending trend (sum of amounts by month)
+    # Monthly spending trend (sum of expenses by month)
     monthly_trend = (
-        transactions.annotate(month=TruncMonth("date"))
+        expenses.annotate(month=TruncMonth("date"))
         .values("month")
         .annotate(total_amount=Sum("amount"))
         .order_by("month")
