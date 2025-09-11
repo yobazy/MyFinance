@@ -17,10 +17,19 @@ UPLOAD_DIR = "uploads/"
 @api_view(['POST'])
 def upload_file(request):
     """Handles CSV/XLS file upload and inserts data into the database."""
+    print(f"DEBUG: Request method: {request.method}")
+    print(f"DEBUG: Request FILES: {request.FILES}")
+    print(f"DEBUG: Request POST: {request.POST}")
+    
     uploaded_file = request.FILES.get('file')
     file_type = request.POST.get('file_type')
     bank = request.POST.get('bank')
     account_name = request.POST.get('account')
+    
+    print(f"DEBUG: uploaded_file: {uploaded_file}")
+    print(f"DEBUG: file_type: {file_type}")
+    print(f"DEBUG: bank: {bank}")
+    print(f"DEBUG: account_name: {account_name}")
 
     if not uploaded_file:
         return Response({"error": "No file provided"}, status=400)
@@ -41,7 +50,10 @@ def upload_file(request):
     df = None
     try:
         if file_type == "TD":
-            df = pd.read_csv(file_path, names=['date', 'charge_name', 'credit_amt', 'debit_amt', 'balance'])
+            # Read TD CSV with proper headers
+            df = pd.read_csv(file_path)
+            # Clean column names
+            df.columns = df.columns.str.strip()
             process_td_data(df, account)
         elif file_type == "Amex":
             df = pd.read_excel(file_path, skiprows=11)
@@ -64,23 +76,42 @@ def upload_file(request):
 
 def process_td_data(df, account):
     """Process and insert TD data into the database."""
+    from datetime import datetime
+    
+    # Convert date column to proper format
+    def convert_date(date_str):
+        try:
+            return datetime.strptime(date_str, "%d %b %Y").strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+    
+    df['Date'] = df['Date'].astype(str).apply(convert_date)
+    
+    # Process each row
     for row in df.itertuples(index=False):
-        # Handle empty values properly
-        credit_amt = row.credit_amt if not pd.isna(row.credit_amt) and row.credit_amt != '' else None
-        debit_amt = row.debit_amt if not pd.isna(row.debit_amt) and row.debit_amt != '' else None
+        if row.Date is None:
+            continue  # Skip rows with invalid dates
+            
+        # Handle amount - TD files have a single Amount column
+        amount_str = str(row.Amount).replace('$', '').replace(',', '')
+        try:
+            amount = float(amount_str) if amount_str != 'nan' else 0.0
+        except ValueError:
+            amount = 0.0
         
-        amount = -debit_amt if debit_amt is not None else credit_amt
-        
+        # Create TDTransaction record
         TDTransaction.objects.create(
-            date=row.date,
-            charge_name=row.charge_name,
-            credit_amt=credit_amt,
-            debit_amt=debit_amt,
-            balance=row.balance
+            date=row.Date,
+            charge_name=row.Description,
+            credit_amt=amount if amount > 0 else None,
+            debit_amt=abs(amount) if amount < 0 else None,
+            balance=None  # Not available in this format
         )
+        
+        # Create Transaction record
         Transaction.objects.create(
-            date=row.date,
-            description=row.charge_name,
+            date=row.Date,
+            description=row.Description,
             amount=amount,
             source="TD",
             account=account

@@ -42,7 +42,7 @@ class TDTransaction(models.Model):
     charge_name = models.TextField()
     credit_amt = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     debit_amt = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
         db_table = 'td'
