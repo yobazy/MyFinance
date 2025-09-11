@@ -36,9 +36,16 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install --with-deps
     
+    - name: Setup Django database
+      run: |
+        # Use --run-syncdb to create tables without migrations
+        python manage.py migrate --run-syncdb
+        
+        # Then apply any remaining migrations
+        python manage.py migrate --fake-initial || python manage.py migrate
+    
     - name: Start Django backend
       run: |
-        python manage.py migrate
         python manage.py runserver &
         sleep 10
     
