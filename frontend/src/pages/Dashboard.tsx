@@ -260,7 +260,7 @@ const Dashboard = () => {
                     <Typography variant="body1" fontWeight="medium" sx={{ 
                       color: transaction.amount > 0 ? 'error.main' : 'success.main' 
                     }}>
-                      {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
+                      {transaction.amount > 0 ? '-' : ''}${Math.abs(transaction.amount).toLocaleString()}
                     </Typography>
                   </Box>
                   {index < dashboardData.recentTransactions.length - 1 && <Divider />}
