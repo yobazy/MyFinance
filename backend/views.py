@@ -285,27 +285,35 @@ from django.db.models import Sum
 from backend.models import Transaction, Category
 from datetime import datetime
 import numpy as np
+from django.db.models.functions import Abs
+
 
 def get_visualization_data(request):
     """API to get transaction data for visualizations"""
 
-    # Get start & end date from frontend query params (default: year-to-date)
-    start_date = request.GET.get("start_date", f"{datetime.now().year}-01-01")
-    end_date = request.GET.get("end_date", datetime.now().strftime("%Y-%m-%d"))
+    # Determine sensible defaults: from earliest transaction date (if any) to today
+    first_txn = Transaction.objects.order_by('date').values_list('date', flat=True).first()
+    default_start = first_txn.strftime("%Y-%m-%d") if first_txn else f"{datetime.now().year}-01-01"
+    default_end = datetime.now().strftime("%Y-%m-%d")
+
+    # Get start & end date from frontend query params (default: use computed defaults)
+    start_date = request.GET.get("start_date", default_start)
+    end_date = request.GET.get("end_date", default_end)
 
     # Get all transactions within the date range
     transactions = Transaction.objects.filter(date__range=[start_date, end_date])
 
-    # Total spending per category
+    # Only expenses for category pie (positive values for charting)
+    expenses = transactions.filter(amount__lt=0)
     category_spending = (
-        transactions.values("category__name")
-        .annotate(total_amount=Sum("amount"))
+        expenses.values("category__name")
+        .annotate(total_amount=Abs(Sum("amount")))
         .order_by("-total_amount")
     )
 
-    # Monthly spending trend (SQLite and PostgreSQL compatible)
+    # Monthly spending trend (sum of amounts by month)
     monthly_trend = (
-        transactions.annotate(month=TruncMonth("date"))  # ✅ TruncMonth replaces DATE_TRUNC
+        transactions.annotate(month=TruncMonth("date"))
         .values("month")
         .annotate(total_amount=Sum("amount"))
         .order_by("month")
