@@ -23,7 +23,11 @@ import {
   MenuItem,
   Divider,
   Paper,
-  Pagination
+  Pagination,
+  Checkbox,
+  FormGroup,
+  FormControlLabel,
+  Collapse
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -33,6 +37,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CategoryIcon from '@mui/icons-material/Category';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import StarIcon from '@mui/icons-material/Star';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useNavigate } from 'react-router-dom';
 
 const Categorization = () => {
@@ -52,9 +59,87 @@ const Categorization = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
+
+  // Default categories state
+  const [showDefaultCategories, setShowDefaultCategories] = useState(false);
+  const [selectedDefaultCategories, setSelectedDefaultCategories] = useState(new Set());
+  const [openDefaultDialog, setOpenDefaultDialog] = useState(false);
+  const [creatingDefaultCategories, setCreatingDefaultCategories] = useState(false);
   
   const ITEMS_PER_PAGE = 10;
   const INITIAL_LOAD = 20; // Load first 20 transactions initially
+
+  // Predefined default categories organized by type
+  const defaultCategories = useMemo(() => [
+    // Essential Expenses
+    { name: "Housing & Rent", category: "Housing" },
+    { name: "Utilities", category: "Housing" },
+    { name: "Groceries", category: "Food" },
+    { name: "Transportation", category: "Transportation" },
+    { name: "Gas & Fuel", category: "Transportation" },
+    { name: "Insurance", category: "Insurance" },
+    { name: "Healthcare", category: "Healthcare" },
+    { name: "Phone & Internet", category: "Utilities" },
+    
+    // Lifestyle & Entertainment
+    { name: "Dining Out", category: "Food" },
+    { name: "Entertainment", category: "Entertainment" },
+    { name: "Shopping", category: "Shopping" },
+    { name: "Clothing", category: "Shopping" },
+    { name: "Subscriptions", category: "Entertainment" },
+    { name: "Fitness & Gym", category: "Health" },
+    
+    // Financial
+    { name: "Savings", category: "Savings" },
+    { name: "Investments", category: "Investments" },
+    { name: "Debt Payments", category: "Debt" },
+    { name: "Credit Card", category: "Debt" },
+    { name: "Bank Fees", category: "Fees" },
+    
+    // Income
+    { name: "Salary", category: "Income" },
+    { name: "Freelance", category: "Income" },
+    { name: "Interest", category: "Income" },
+    { name: "Refunds", category: "Income" },
+    
+    // Other
+    { name: "Education", category: "Education" },
+    { name: "Travel", category: "Travel" },
+    { name: "Gifts", category: "Gifts" },
+    { name: "Charity", category: "Charity" },
+    { name: "Pet Care", category: "Pets" },
+    { name: "Home Improvement", category: "Home" },
+    { name: "Personal Care", category: "Personal" },
+    { name: "Books & Learning", category: "Education" },
+    { name: "Technology", category: "Technology" },
+    { name: "Miscellaneous", category: "Other" }
+  ], []);
+
+  // Group default categories by category type
+  const groupedDefaultCategories = useMemo(() => {
+    const groups = {};
+    defaultCategories.forEach(cat => {
+      if (!groups[cat.category]) {
+        groups[cat.category] = [];
+      }
+      groups[cat.category].push(cat.name);
+    });
+    return groups;
+  }, [defaultCategories]);
+
+  // Check if category already exists
+  const existingCategoryNames = useMemo(() => 
+    new Set(categories.map(cat => cat.name.toLowerCase())), 
+    [categories]
+  );
+
+  // Filter out categories that already exist
+  const availableDefaultCategories = useMemo(() => 
+    defaultCategories.filter(cat => 
+      !existingCategoryNames.has(cat.name.toLowerCase())
+    ),
+    [defaultCategories, existingCategoryNames]
+  );
 
   // Load initial batch of transactions
   const fetchInitialData = useCallback(async () => {
@@ -180,6 +265,65 @@ const Categorization = () => {
       setOpenDialog(false);
     }
   }, [editingCategory, editingCategoryName, handleUpdateCategory]);
+
+  // Default categories handlers
+  const handleDefaultCategoryToggle = useCallback((categoryName) => {
+    setSelectedDefaultCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryName)) {
+        newSet.delete(categoryName);
+      } else {
+        newSet.add(categoryName);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSelectAllInGroup = useCallback((groupCategories) => {
+    setSelectedDefaultCategories(prev => {
+      const newSet = new Set(prev);
+      groupCategories.forEach(catName => {
+        if (availableDefaultCategories.some(cat => cat.name === catName)) {
+          newSet.add(catName);
+        }
+      });
+      return newSet;
+    });
+  }, [availableDefaultCategories]);
+
+  const handleCreateSelectedCategories = useCallback(async () => {
+    if (selectedDefaultCategories.size === 0) return;
+
+    try {
+      setCreatingDefaultCategories(true);
+      
+      // Create categories sequentially to avoid rate limiting issues
+      const createdCategories = [];
+      for (const categoryName of selectedDefaultCategories) {
+        try {
+          const response = await axios.post("http://127.0.0.1:8000/api/categories/", {
+            name: categoryName
+          });
+          createdCategories.push(response.data);
+        } catch (error) {
+          console.error(`Error creating category "${categoryName}":`, error);
+          // Continue creating other categories even if one fails
+        }
+      }
+
+      // Update the categories list
+      setCategories(prev => [...prev, ...createdCategories]);
+      
+      // Clear selections and close dialog
+      setSelectedDefaultCategories(new Set());
+      setOpenDefaultDialog(false);
+      
+    } catch (error) {
+      console.error("Error creating default categories:", error);
+    } finally {
+      setCreatingDefaultCategories(false);
+    }
+  }, [selectedDefaultCategories]);
 
   // Memoize the category chips to prevent unnecessary re-renders
   const categoryChips = useMemo(() => {
@@ -356,7 +500,58 @@ const Categorization = () => {
             >
               Add Category
             </Button>
+            {availableDefaultCategories.length > 0 && (
+              <Button 
+                variant="outlined" 
+                color="secondary"
+                startIcon={<StarIcon />}
+                onClick={() => setOpenDefaultDialog(true)}
+              >
+                Add Defaults
+              </Button>
+            )}
           </Box>
+
+          {/* Default Categories Preview */}
+          {availableDefaultCategories.length > 0 && (
+            <Box mb={2}>
+              <Button
+                onClick={() => setShowDefaultCategories(!showDefaultCategories)}
+                startIcon={showDefaultCategories ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ mb: 1 }}
+                size="small"
+              >
+                {showDefaultCategories ? 'Hide' : 'Show'} Available Default Categories ({availableDefaultCategories.length})
+              </Button>
+              
+              <Collapse in={showDefaultCategories}>
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Common categories you can add instantly:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {availableDefaultCategories.slice(0, 10).map((cat) => (
+                      <Chip 
+                        key={cat.name} 
+                        label={cat.name} 
+                        size="small" 
+                        variant="outlined"
+                        color="secondary"
+                      />
+                    ))}
+                    {availableDefaultCategories.length > 10 && (
+                      <Chip 
+                        label={`+${availableDefaultCategories.length - 10} more`} 
+                        size="small" 
+                        variant="outlined"
+                        color="secondary"
+                      />
+                    )}
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
+          )}
 
           <Divider sx={{ mb: 2 }} />
 
@@ -436,6 +631,84 @@ const Categorization = () => {
             disabled={!editingCategoryName.trim()}
           >
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Default Categories Dialog */}
+      <Dialog 
+        open={openDefaultDialog} 
+        onClose={() => setOpenDefaultDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <StarIcon color="primary" sx={{ mr: 1 }} />
+            Add Default Categories
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Select from our curated list of common financial categories. You can add them instantly to get started with categorizing your transactions.
+          </Typography>
+          
+          {Object.entries(groupedDefaultCategories).map(([groupName, groupCategories]) => {
+            const availableInGroup = groupCategories.filter(catName => 
+              availableDefaultCategories.some(cat => cat.name === catName)
+            );
+            
+            if (availableInGroup.length === 0) return null;
+            
+            return (
+              <Box key={groupName} sx={{ mb: 3 }}>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                  <Typography variant="h6" color="primary">
+                    {groupName}
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => handleSelectAllInGroup(availableInGroup)}
+                    disabled={availableInGroup.every(catName => selectedDefaultCategories.has(catName))}
+                  >
+                    Select All
+                  </Button>
+                </Box>
+                <FormGroup row>
+                  {availableInGroup.map((catName) => (
+                    <FormControlLabel
+                      key={catName}
+                      control={
+                        <Checkbox
+                          checked={selectedDefaultCategories.has(catName)}
+                          onChange={() => handleDefaultCategoryToggle(catName)}
+                          color="primary"
+                        />
+                      }
+                      label={catName}
+                      sx={{ minWidth: '200px', mb: 1 }}
+                    />
+                  ))}
+                </FormGroup>
+                <Divider />
+              </Box>
+            );
+          })}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDefaultDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateSelectedCategories}
+            variant="contained"
+            disabled={selectedDefaultCategories.size === 0 || creatingDefaultCategories}
+            startIcon={creatingDefaultCategories ? <CircularProgress size={20} /> : <AddIcon />}
+          >
+            {creatingDefaultCategories 
+              ? 'Creating...' 
+              : `Add Selected (${selectedDefaultCategories.size})`
+            }
           </Button>
         </DialogActions>
       </Dialog>
