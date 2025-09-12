@@ -67,13 +67,13 @@ const App = () => {
     </Button>
   );
 
-  const navItems = [
+const navItems = [
     { to: "/", icon: <DashboardIcon />, label: "Dashboard" },
     { to: "/accounts", icon: <AccountBalanceIcon />, label: "Accounts" },
     { to: "/upload", icon: <UploadFileIcon />, label: "Upload" },
     { to: "/transactions", icon: <ReceiptIcon />, label: "Transactions" },
     { to: "/categorization", icon: <CategoryIcon />, label: "Categories" },
-    { to: "/visualizations", icon: <BarChartIcon />, label: "Analytics" },
+
     { to: "/user-settings", icon: <SettingsIcon />, label: "Settings" },
   ];
 
@@ -82,10 +82,25 @@ const App = () => {
       <CssBaseline />
       <Router>
         <AppBar position="static">
-          <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: isMobile ? 0 : 1 }}>
-              MyFinance
-            </Typography>
+          <Toolbar sx={{ minHeight: '56px', py: 0, overflow: 'visible' }}>
+            <Box sx={{ flexGrow: isMobile ? 0 : 1, display: 'flex', alignItems: 'center' }}>
+              <img 
+                src={mode === 'dark' ? '/logo_dark.svg' : '/logo_light.svg'} 
+                alt="MyFinance" 
+                style={{ 
+                  height: '120px', 
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                  clipPath: 'inset(40% 0 40% 0)',
+                  // border: '2px solid white', // for debugging
+                  marginTop: '-30px',
+                  marginBottom: '-30px'
+                }}
+                onClick={() => window.location.href = '/'}
+              />
+            </Box>
 
             {isMobile ? (
               <>
