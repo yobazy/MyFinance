@@ -83,10 +83,6 @@ const Categorization = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   
-  // Add collapsible state for sections
-  const [showAutoCategorization, setShowAutoCategorization] = useState(true);
-  const [showCategoryManagement, setShowCategoryManagement] = useState(true);
-  
   const ITEMS_PER_PAGE = 10;
   const INITIAL_LOAD = 20; // Load first 20 transactions initially
 
@@ -601,93 +597,83 @@ const Categorization = () => {
       {/* Auto Categorization Section */}
       <Card sx={{ mb: 3, boxShadow: theme.shadows[2] }}>
         <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-            <Box display="flex" alignItems="center">
-              <SmartToyIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Smart Auto-Categorization</Typography>
-            </Box>
-            <IconButton
-              onClick={() => setShowAutoCategorization(!showAutoCategorization)}
-              size="small"
-            >
-              {showAutoCategorization ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
+          <Box display="flex" alignItems="center" mb={3}>
+            <SmartToyIcon color="primary" sx={{ mr: 1 }} />
+            <Typography variant="h6">Smart Auto-Categorization</Typography>
           </Box>
           
-          <Collapse in={showAutoCategorization}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-              <Box>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={autoCategorizationEnabled}
-                      onChange={handleAutoCategorizationToggle}
-                      color="primary"
-                    />
-                  }
-                  label="Enable Auto-Categorization"
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoCategorizationEnabled}
+                    onChange={handleAutoCategorizationToggle}
+                    color="primary"
+                  />
+                }
+                label="Enable Auto-Categorization"
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+                Automatically categorize transactions using AI-powered pattern recognition
+              </Typography>
+            </Box>
+          </Box>
+
+          {autoCategorizationEnabled && (
+            <>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" gutterBottom>
+                  Confidence Threshold: {Math.round(confidenceThreshold * 100)}%
+                </Typography>
+                <Slider
+                  value={confidenceThreshold}
+                  onChange={(e, value) => setConfidenceThreshold(value)}
+                  min={0.3}
+                  max={0.9}
+                  step={0.1}
+                  marks={[
+                    { value: 0.3, label: '30%' },
+                    { value: 0.6, label: '60%' },
+                    { value: 0.9, label: '90%' }
+                  ]}
+                  sx={{ maxWidth: 300 }}
                 />
-                <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
-                  Automatically categorize transactions using AI-powered pattern recognition
+                <Typography variant="caption" color="text.secondary">
+                  Higher threshold = more accurate but fewer auto-categorizations
                 </Typography>
               </Box>
-            </Box>
 
-            {autoCategorizationEnabled && (
-              <>
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="body2" gutterBottom>
-                    Confidence Threshold: {Math.round(confidenceThreshold * 100)}%
-                  </Typography>
-                  <Slider
-                    value={confidenceThreshold}
-                    onChange={(e, value) => setConfidenceThreshold(value)}
-                    min={0.3}
-                    max={0.9}
-                    step={0.1}
-                    marks={[
-                      { value: 0.3, label: '30%' },
-                      { value: 0.6, label: '60%' },
-                      { value: 0.9, label: '90%' }
-                    ]}
-                    sx={{ maxWidth: 300 }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Higher threshold = more accurate but fewer auto-categorizations
+              <Box display="flex" gap={2} alignItems="center">
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={autoCategorizing ? <CircularProgress size={20} /> : <AutorenewIcon />}
+                  onClick={handleAutoCategorizeBulk}
+                  disabled={autoCategorizing || allTransactions.length === 0}
+                >
+                  {autoCategorizing ? 'Auto-Categorizing...' : `Auto-Categorize All (${allTransactions.length})`}
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  startIcon={<AssessmentIcon />}
+                  onClick={handleViewStats}
+                >
+                  View Stats
+                </Button>
+              </Box>
+
+              {autoCategorizing && (
+                <Box sx={{ mt: 2 }}>
+                  <LinearProgress />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Analyzing transaction patterns and applying categorization rules...
                   </Typography>
                 </Box>
-
-                <Box display="flex" gap={2} alignItems="center">
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={autoCategorizing ? <CircularProgress size={20} /> : <AutorenewIcon />}
-                    onClick={handleAutoCategorizeBulk}
-                    disabled={autoCategorizing || allTransactions.length === 0}
-                  >
-                    {autoCategorizing ? 'Auto-Categorizing...' : `Auto-Categorize All (${allTransactions.length})`}
-                  </Button>
-                  
-                  <Button
-                    variant="outlined"
-                    startIcon={<AssessmentIcon />}
-                    onClick={handleViewStats}
-                  >
-                    View Stats
-                  </Button>
-                </Box>
-
-                {autoCategorizing && (
-                  <Box sx={{ mt: 2 }}>
-                    <LinearProgress />
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Analyzing transaction patterns and applying categorization rules...
-                    </Typography>
-                  </Box>
-                )}
-              </>
-            )}
-          </Collapse>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -772,125 +758,115 @@ const Categorization = () => {
       {/* Category Management Section */}
       <Card sx={{ mb: 3, boxShadow: theme.shadows[2] }}>
         <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-            <Box display="flex" alignItems="center">
-              <CategoryIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Manage Categories</Typography>
-            </Box>
-            <IconButton
-              onClick={() => setShowCategoryManagement(!showCategoryManagement)}
-              size="small"
-            >
-              {showCategoryManagement ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
+          <Box display="flex" alignItems="center" mb={3}>
+            <CategoryIcon color="primary" sx={{ mr: 1 }} />
+            <Typography variant="h6">Manage Categories</Typography>
           </Box>
           
-          <Collapse in={showCategoryManagement}>
-            <Box display="flex" gap={2} mb={3}>
-              <TextField
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                placeholder="New category name"
-                variant="outlined"
-                size="small"
-                sx={{ flexGrow: 1 }}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
-              />
+          <Box display="flex" gap={2} mb={3}>
+            <TextField
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="New category name"
+              variant="outlined"
+              size="small"
+              sx={{ flexGrow: 1 }}
+              onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+            />
+            <Button 
+              variant="contained" 
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleAddCategory}
+              disabled={!newCategory.trim()}
+            >
+              Add Category
+            </Button>
+            {availableDefaultCategories.length > 0 && (
               <Button 
-                variant="contained" 
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={handleAddCategory}
-                disabled={!newCategory.trim()}
+                variant="outlined" 
+                color="secondary"
+                startIcon={<StarIcon />}
+                onClick={() => setOpenDefaultDialog(true)}
               >
-                Add Category
+                Add Defaults
               </Button>
-              {availableDefaultCategories.length > 0 && (
-                <Button 
-                  variant="outlined" 
-                  color="secondary"
-                  startIcon={<StarIcon />}
-                  onClick={() => setOpenDefaultDialog(true)}
-                >
-                  Add Defaults
-                </Button>
+            )}
+          </Box>
+
+          {/* Default Categories Preview */}
+          {availableDefaultCategories.length > 0 && (
+            <Box mb={2}>
+              <Button
+                onClick={() => setShowDefaultCategories(!showDefaultCategories)}
+                startIcon={showDefaultCategories ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ mb: 1 }}
+                size="small"
+              >
+                {showDefaultCategories ? 'Hide' : 'Show'} Available Default Categories ({availableDefaultCategories.length})
+              </Button>
+              
+              <Collapse in={showDefaultCategories}>
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Common categories you can add instantly:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {availableDefaultCategories.slice(0, 10).map((cat) => (
+                      <Chip 
+                        key={cat.name} 
+                        label={cat.name} 
+                        size="small" 
+                        variant="outlined"
+                        color="secondary"
+                      />
+                    ))}
+                    {availableDefaultCategories.length > 10 && (
+                      <Chip 
+                        label={`+${availableDefaultCategories.length - 10} more`} 
+                        size="small" 
+                        variant="outlined"
+                        color="secondary"
+                      />
+                    )}
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
+          )}
+
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Debug: Current Categories Display */}
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+            <Typography variant="h6" color="info.contrastText" sx={{ mb: 1 }}>
+              Debug: Current Categories ({categories.length})
+            </Typography>
+            <Typography variant="body2" color="info.contrastText" sx={{ mb: 1 }}>
+              These are the categories currently available for transactions:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: '100px', overflowY: 'auto' }}>
+              {categories.map((category) => (
+                <Chip 
+                  key={category.id} 
+                  label={`${category.name} (ID: ${category.id})`} 
+                  size="small" 
+                  variant="filled"
+                  color="primary"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              ))}
+              {categories.length === 0 && (
+                <Typography variant="body2" color="info.contrastText" sx={{ fontStyle: 'italic' }}>
+                  No categories available
+                </Typography>
               )}
             </Box>
+          </Box>
 
-            {/* Default Categories Preview */}
-            {availableDefaultCategories.length > 0 && (
-              <Box mb={2}>
-                <Button
-                  onClick={() => setShowDefaultCategories(!showDefaultCategories)}
-                  startIcon={showDefaultCategories ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  sx={{ mb: 1 }}
-                  size="small"
-                >
-                  {showDefaultCategories ? 'Hide' : 'Show'} Available Default Categories ({availableDefaultCategories.length})
-                </Button>
-                
-                <Collapse in={showDefaultCategories}>
-                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Common categories you can add instantly:
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {availableDefaultCategories.slice(0, 10).map((cat) => (
-                        <Chip 
-                          key={cat.name} 
-                          label={cat.name} 
-                          size="small" 
-                          variant="outlined"
-                          color="secondary"
-                        />
-                      ))}
-                      {availableDefaultCategories.length > 10 && (
-                        <Chip 
-                          label={`+${availableDefaultCategories.length - 10} more`} 
-                          size="small" 
-                          variant="outlined"
-                          color="secondary"
-                        />
-                      )}
-                    </Box>
-                  </Box>
-                </Collapse>
-              </Box>
-            )}
-
-            <Divider sx={{ mb: 2 }} />
-
-            {/* Debug: Current Categories Display */}
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-              <Typography variant="h6" color="info.contrastText" sx={{ mb: 1 }}>
-                Debug: Current Categories ({categories.length})
-              </Typography>
-              <Typography variant="body2" color="info.contrastText" sx={{ mb: 1 }}>
-                These are the categories currently available for transactions:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: '100px', overflowY: 'auto' }}>
-                {categories.map((category) => (
-                  <Chip 
-                    key={category.id} 
-                    label={`${category.name} (ID: ${category.id})`} 
-                    size="small" 
-                    variant="filled"
-                    color="primary"
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {categories.length === 0 && (
-                  <Typography variant="body2" color="info.contrastText" sx={{ fontStyle: 'italic' }}>
-                    No categories available
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-
-            <Grid container spacing={1}>
-              {categoryChips}
-            </Grid>
-          </Collapse>
+          <Grid container spacing={1}>
+            {categoryChips}
+          </Grid>
         </CardContent>
       </Card>
 
