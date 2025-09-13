@@ -7,9 +7,8 @@ const CONFIG = {
   baseUrl: 'http://localhost:3000',
   backendUrl: 'http://localhost:8000',
   screenshotsDir: './screenshots',
-  viewport: { width: 1600, height: 900 }, // Reduced from 1920x1080 for better zoom
-  zoom: 1.2, // 120% zoom
-  waitTime: 3000, // Increased wait time for better loading
+  viewport: { width: 1920, height: 1080 },
+  waitTime: 2000, // Wait time for page load
   retryAttempts: 3
 };
 
@@ -30,21 +29,14 @@ const SCREENSHOTS = [
   {
     name: 'transactions-list',
     path: '/transactions',
-    description: 'Transactions list and management (first 20 results)',
-    waitFor: '.transactions-container, .MuiTableContainer-root',
-    customAction: 'limitTransactions' // Custom action to limit transactions
-  },
-  {
-    name: 'categories-management',
-    path: '/categorization',
-    description: 'Transaction categorization and management',
-    waitFor: '.categorization-container, .MuiCard-root, .MuiContainer-root'
+    description: 'Transactions list and management',
+    waitFor: '.transactions-container, .MuiTableContainer-root'
   },
   {
     name: 'analytics-visualizations',
-    path: '/visualizations', // Fixed: was /analytics
+    path: '/analytics',
     description: 'Analytics and data visualizations',
-    waitFor: '.analytics-container, .recharts-wrapper, .MuiContainer-root'
+    waitFor: '.analytics-container, .recharts-wrapper'
   },
   {
     name: 'accounts-management',
@@ -54,9 +46,9 @@ const SCREENSHOTS = [
   },
   {
     name: 'settings-page',
-    path: '/user-settings', // Fixed: was /settings
+    path: '/settings',
     description: 'Application settings and preferences',
-    waitFor: '.settings-container, .MuiFormControl-root, .MuiBox-root'
+    waitFor: '.settings-container, .MuiFormControl-root'
   }
 ];
 
@@ -83,11 +75,6 @@ class ScreenshotAutomation {
     
     this.page = await this.browser.newPage();
     await this.page.setViewportSize(CONFIG.viewport);
-    
-    // Set zoom level
-    await this.page.evaluate((zoom) => {
-      document.body.style.zoom = zoom;
-    }, CONFIG.zoom);
     
     console.log('✅ Browser initialized');
   }
@@ -126,63 +113,8 @@ class ScreenshotAutomation {
     }
   }
 
-  async limitTransactions() {
-    // Custom action to limit transactions to first 20 for initial state
-    try {
-      console.log('🔧 Limiting transactions to first 20 for initial state...');
-      
-      // Wait for the page to load and try multiple selectors
-      const selectors = [
-        '.MuiTableBody-root .MuiTableRow-root',
-        'tbody tr',
-        '.MuiTable-root tbody tr',
-        '[role="rowgroup"] tr'
-      ];
-      
-      let transactionRows = [];
-      for (const selector of selectors) {
-        try {
-          await this.page.waitForSelector(selector, { timeout: 5000 });
-          transactionRows = await this.page.$$(selector);
-          if (transactionRows.length > 0) break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (transactionRows.length > 20) {
-        // Hide rows beyond the first 20
-        await this.page.evaluate(() => {
-          const selectors = [
-            '.MuiTableBody-root .MuiTableRow-root',
-            'tbody tr',
-            '.MuiTable-root tbody tr',
-            '[role="rowgroup"] tr'
-          ];
-          
-          for (const selector of selectors) {
-            const rows = document.querySelectorAll(selector);
-            if (rows.length > 20) {
-              for (let i = 20; i < rows.length; i++) {
-                rows[i].style.display = 'none';
-              }
-              console.log(`Limited ${rows.length} transactions to first 20`);
-              break;
-            }
-          }
-        });
-        
-        console.log(`✅ Limited transactions display to first 20 (${transactionRows.length} total available)`);
-      } else {
-        console.log(`✅ Transactions already limited to ${transactionRows.length} items`);
-      }
-    } catch (error) {
-      console.log('⚠️  Could not limit transactions:', error.message);
-    }
-  }
-
   async captureScreenshot(screenshot) {
-    const { name, path: urlPath, description, waitFor, customAction } = screenshot;
+    const { name, path: urlPath, description, waitFor } = screenshot;
     const fullUrl = `${CONFIG.baseUrl}${urlPath}`;
     
     console.log(`📸 Capturing: ${name} (${description})`);
@@ -201,11 +133,6 @@ class ScreenshotAutomation {
         } catch (error) {
           console.log(`⚠️  Could not find selector ${waitFor}, proceeding anyway...`);
         }
-      }
-      
-      // Execute custom actions if specified
-      if (customAction === 'limitTransactions') {
-        await this.limitTransactions();
       }
       
       // Additional wait for animations/loading
