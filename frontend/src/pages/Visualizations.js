@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Container, Typography, Card, CardContent, CircularProgress, Box, Button, FormControlLabel, Checkbox } from "@mui/material";
-import { PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer } from "recharts";
+import { Container, Typography, Card, CardContent, CircularProgress, Box, Button, FormControlLabel, Checkbox, Tooltip, IconButton } from "@mui/material";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer } from "recharts";
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import InfoIcon from '@mui/icons-material/Info';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from "@mui/material/styles";
 
@@ -189,7 +190,18 @@ const Visualizations = () => {
       <Card sx={{ mb: 3, ...chartStyle }}>
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">Spending Breakdown by Category</Typography>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography variant="h6">Spending Breakdown by Category</Typography>
+              <Tooltip 
+                title="This pie chart shows how your spending is distributed across different categories. Each slice represents the percentage and dollar amount spent in that category. Use the checkbox to include or exclude uncategorized transactions."
+                arrow
+                placement="top"
+              >
+                <IconButton size="small" color="primary">
+                  <InfoIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
             <FormControlLabel
               control={
                 <Checkbox
@@ -235,7 +247,7 @@ const Visualizations = () => {
                         );
                       })}
                   </Pie>
-                  <Tooltip 
+                  <RechartsTooltip 
                     contentStyle={tooltipStyle}
                     formatter={(value, name) => [formatCurrency(value), name]}
                   />
@@ -255,7 +267,18 @@ const Visualizations = () => {
       {/* Monthly Spending & Income Trend (Line Chart) */}
       <Card sx={{ mb: 3, ...chartStyle }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Monthly Spending, Income & Balance Trend</Typography>
+          <Box display="flex" alignItems="center" gap={1} mb={2}>
+            <Typography variant="h6">Monthly Spending, Income & Balance Trend</Typography>
+            <Tooltip 
+              title="This line chart tracks your monthly spending (red), income (green), and net balance (blue dashed) over time. The balance line shows your net financial position each month (income minus expenses). Positive values indicate you saved money that month."
+              arrow
+              placement="top"
+            >
+              <IconButton size="small" color="primary">
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={combinedMonthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
@@ -272,7 +295,7 @@ const Visualizations = () => {
                 tickLine={axisStyle}
                 tickFormatter={formatCurrencyShort}
               />
-              <Tooltip 
+              <RechartsTooltip 
                 contentStyle={tooltipStyle}
                 formatter={(value, name) => [formatCurrency(value), name]}
                 labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -313,7 +336,18 @@ const Visualizations = () => {
       {/* Spending Consistency (Bar Chart) */}
       <Card sx={{ mb: 3, ...chartStyle }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Spending Consistency by Category</Typography>
+          <Box display="flex" alignItems="center" gap={1} mb={2}>
+            <Typography variant="h6">Spending Consistency by Category</Typography>
+            <Tooltip 
+              title="This bar chart shows the standard deviation of spending in each category. Lower values indicate more consistent spending patterns, while higher values suggest more variable spending. This helps identify which categories have the most unpredictable spending."
+              arrow
+              placement="top"
+            >
+              <IconButton size="small" color="primary">
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={Object.entries(data.category_variance).map(([name, std_dev]) => ({ name, std_dev }))} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
@@ -332,7 +366,7 @@ const Visualizations = () => {
                 tickLine={axisStyle}
                 tickFormatter={formatCurrencyShort}
               />
-              <Tooltip 
+              <RechartsTooltip 
                 contentStyle={tooltipStyle}
                 formatter={(value) => [formatCurrency(value), 'Standard Deviation']}
               />
