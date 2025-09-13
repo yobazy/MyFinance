@@ -206,9 +206,11 @@ const Categorization = () => {
   const handleAddCategory = useCallback(async () => {
     if (!newCategory.trim()) return;
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/categories/", {
+      console.log('Creating manual category:', newCategory);
+      const response = await axios.post("http://127.0.0.1:8000/api/categories/create/", {
         name: newCategory
       });
+      console.log('Manual category created successfully:', response.data);
       setCategories(prev => [...prev, response.data]);
       setNewCategory("");
     } catch (error) {
@@ -233,7 +235,7 @@ const Categorization = () => {
 
   const handleDeleteCategory = useCallback(async (categoryId) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/categories/${categoryId}/`);
+      await axios.delete(`http://127.0.0.1:8000/api/categories/${categoryId}/delete/`);
       setCategories(prev => prev.filter(c => c.id !== categoryId));
     } catch (error) {
       console.error("Error deleting category:", error);
@@ -297,33 +299,58 @@ const Categorization = () => {
     try {
       setCreatingDefaultCategories(true);
       
-      // Create categories sequentially to avoid rate limiting issues
-      const createdCategories = [];
-      for (const categoryName of selectedDefaultCategories) {
+      const selectedCategoriesArray = Array.from(selectedDefaultCategories);
+      console.log('=== CREATING DEFAULT CATEGORIES ===');
+      console.log('Selected categories to create:', selectedCategoriesArray);
+      console.log('Current categories before creation:', categories);
+      
+      // Create categories one by one and immediately update state
+      for (const categoryName of selectedCategoriesArray) {
         try {
-          const response = await axios.post("http://127.0.0.1:8000/api/categories/", {
+          console.log(`Creating category: ${categoryName}`);
+          const response = await axios.post("http://127.0.0.1:8000/api/categories/create/", {
             name: categoryName
           });
-          createdCategories.push(response.data);
+          
+          console.log('Category created successfully:', response.data);
+          
+          // Immediately add to categories state
+          setCategories(prev => {
+            console.log('Previous categories state:', prev);
+            // Check if category already exists to avoid duplicates
+            const exists = prev.some(cat => cat.id === response.data.id || cat.name === response.data.name);
+            if (exists) {
+              console.log(`Category ${categoryName} already exists in state, skipping`);
+              return prev;
+            }
+            console.log(`Adding category ${categoryName} to state`);
+            const newState = [...prev, response.data];
+            console.log('New categories state:', newState);
+            return newState;
+          });
+          
+          // Small delay to ensure state updates
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
         } catch (error) {
           console.error(`Error creating category "${categoryName}":`, error);
           // Continue creating other categories even if one fails
         }
       }
-
-      // Update the categories list
-      setCategories(prev => [...prev, ...createdCategories]);
       
       // Clear selections and close dialog
       setSelectedDefaultCategories(new Set());
       setOpenDefaultDialog(false);
+      
+      console.log('Category creation process completed');
+      console.log('Final categories state should be updated');
       
     } catch (error) {
       console.error("Error creating default categories:", error);
     } finally {
       setCreatingDefaultCategories(false);
     }
-  }, [selectedDefaultCategories]);
+  }, [selectedDefaultCategories, categories]);
 
   // Memoize the category chips to prevent unnecessary re-renders
   const categoryChips = useMemo(() => {
@@ -345,6 +372,11 @@ const Categorization = () => {
 
   // Memoize transaction items to prevent unnecessary re-renders
   const transactionItems = useMemo(() => {
+    console.log('=== RENDERING TRANSACTION ITEMS ===');
+    console.log('Current categories state:', categories);
+    console.log('Categories count:', categories.length);
+    console.log('Categories for dropdown:', categories.map(cat => ({ id: cat.id, name: cat.name })));
+    
     return transactions.map((transaction) => (
       <Grid item xs={12} key={transaction.id}>
         <Paper 
@@ -376,14 +408,20 @@ const Categorization = () => {
             <InputLabel>Select Category</InputLabel>
             <Select
               value=""
-              onChange={(e) => handleUpdateTransaction(transaction.id, e.target.value)}
+              onChange={(e) => {
+                console.log('Category selected:', e.target.value);
+                handleUpdateTransaction(transaction.id, e.target.value);
+              }}
               label="Select Category"
             >
-              {categories.map((category) => (
-                <MenuItem key={category.id} value={category.id}>
-                  {category.name}
-                </MenuItem>
-              ))}
+              {categories.map((category) => {
+                console.log('Rendering category option:', category);
+                return (
+                  <MenuItem key={category.id} value={category.id}>
+                    {category.name}
+                  </MenuItem>
+                );
+              })}
             </Select>
           </FormControl>
         </Paper>
@@ -554,6 +592,33 @@ const Categorization = () => {
           )}
 
           <Divider sx={{ mb: 2 }} />
+
+          {/* Debug: Current Categories Display */}
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+            <Typography variant="h6" color="info.contrastText" sx={{ mb: 1 }}>
+              Debug: Current Categories ({categories.length})
+            </Typography>
+            <Typography variant="body2" color="info.contrastText" sx={{ mb: 1 }}>
+              These are the categories currently available for transactions:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: '100px', overflowY: 'auto' }}>
+              {categories.map((category) => (
+                <Chip 
+                  key={category.id} 
+                  label={`${category.name} (ID: ${category.id})`} 
+                  size="small" 
+                  variant="filled"
+                  color="primary"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              ))}
+              {categories.length === 0 && (
+                <Typography variant="body2" color="info.contrastText" sx={{ fontStyle: 'italic' }}>
+                  No categories available
+                </Typography>
+              )}
+            </Box>
+          </Box>
 
           <Grid container spacing={1}>
             {categoryChips}
