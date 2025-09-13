@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Container, Typography, Card, CardContent, CircularProgress, Box, Button } from "@mui/material";
+import { Container, Typography, Card, CardContent, CircularProgress, Box, Button, FormControlLabel, Checkbox } from "@mui/material";
 import { PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, ResponsiveContainer } from "recharts";
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { useTheme } from "@mui/material/styles";
 const Visualizations = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [includeUncategorized, setIncludeUncategorized] = useState(true);
   const navigate = useNavigate();
   const theme = useTheme();
 
@@ -17,6 +18,14 @@ const Visualizations = () => {
     console.log('Data received:', data);
     console.log('Monthly trend:', data?.monthly_trend);
     console.log('Monthly income:', data?.monthly_income);
+    console.log('Category spending:', data?.category_spending);
+    
+    // Add detailed debugging for category spending
+    if (data?.category_spending) {
+      console.log('Category spending details:', data.category_spending);
+      console.log('First category item:', data.category_spending[0]);
+      console.log('Category spending length:', data.category_spending.length);
+    }
     
     if (!data?.monthly_trend) return [];
     
@@ -179,30 +188,67 @@ const Visualizations = () => {
       {/* Category Spending Breakdown (Pie Chart) */}
       <Card sx={{ mb: 3, ...chartStyle }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Spending Breakdown by Category</Typography>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie 
-                data={data.category_spending} 
-                dataKey="total_amount" 
-                nameKey="category__name" 
-                cx="50%" 
-                cy="50%" 
-                outerRadius={100} 
-                fill={COLORS[0]} 
-                label={({ name, percent }) => `${name} ${formatPercentage(percent)}`}
-                labelLine={false}
-              >
-                {data.category_spending.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={tooltipStyle}
-                formatter={(value, name) => [formatCurrency(value), name]}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">Spending Breakdown by Category</Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={includeUncategorized}
+                  onChange={(e) => setIncludeUncategorized(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Include Uncategorized"
+            />
+          </Box>
+          {data?.category_spending && data.category_spending.length > 0 ? (
+            <div>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Debug: {data.category_spending.length} categories found
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie 
+                    data={data.category_spending
+                      .filter(item => includeUncategorized || item.category__name !== null)
+                      .map(item => ({
+                        ...item,
+                        category__name: item.category__name || 'Uncategorized',
+                        total_amount: parseFloat(item.total_amount) || 0
+                      }))
+                    } 
+                    dataKey="total_amount" 
+                    nameKey="category__name" 
+                    cx="50%" 
+                    cy="50%" 
+                    outerRadius={100} 
+                    fill={COLORS[0]} 
+                    label={({ name, percent }) => `${name} ${formatPercentage(percent)}`}
+                    labelLine={false}
+                  >
+                    {data.category_spending
+                      .filter(item => includeUncategorized || item.category__name !== null)
+                      .map((item, index) => {
+                        console.log(`Category ${index}:`, item);
+                        return (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        );
+                      })}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={tooltipStyle}
+                    formatter={(value, name) => [formatCurrency(value), name]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <Box display="flex" justifyContent="center" alignItems="center" height={300}>
+              <Typography variant="body1" color="text.secondary">
+                No spending data available for the selected period
+              </Typography>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
