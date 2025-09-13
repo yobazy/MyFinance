@@ -49,6 +49,38 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 
 ---
 
+## 📸 Screenshots
+
+### Home Dashboard
+![Home Dashboard](screenshots/home-dashboard.png)
+*Main dashboard with financial overview and quick action buttons*
+
+### File Upload
+![File Upload](screenshots/file-upload.png)
+*Drag-and-drop interface for uploading bank statements (CSV/XLSX)*
+
+### Transactions List
+![Transactions List](screenshots/transactions-list.png)
+*Comprehensive transaction management with search and filtering capabilities*
+
+### Categories Management
+![Categories Management](screenshots/categories-management.png)
+*Transaction categorization interface with bulk operations and custom categories*
+
+### Analytics & Visualizations
+![Analytics & Visualizations](screenshots/analytics-visualizations.png)
+*Interactive charts showing spending patterns, trends, and financial insights*
+
+### Accounts Management
+![Accounts Management](screenshots/accounts-management.png)
+*Bank account management with support for multiple institutions*
+
+### Settings Page
+![Settings Page](screenshots/settings-page.png)
+*User preferences including theme customization and database management*
+
+---
+
 ## Installation & Setup
 
 ### Prerequisites
