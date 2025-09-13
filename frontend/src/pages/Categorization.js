@@ -398,7 +398,7 @@ const Categorization = () => {
             </Typography>
             <Typography 
               variant="body2" 
-              color={transaction.amount >= 0 ? "success.main" : "error.main"}
+              color={transaction.amount >= 0 ? "error.main" : "success.main"}
               fontWeight="bold"
             >
               ${Math.abs(transaction.amount).toFixed(2)}
