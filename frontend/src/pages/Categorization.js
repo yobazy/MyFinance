@@ -27,7 +27,11 @@ import {
   Checkbox,
   FormGroup,
   FormControlLabel,
-  Collapse
+  Collapse,
+  Switch,
+  Snackbar,
+  Slider,
+  LinearProgress
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -40,6 +44,10 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import StarIcon from '@mui/icons-material/Star';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import { useNavigate } from 'react-router-dom';
 
 const Categorization = () => {
@@ -65,6 +73,15 @@ const Categorization = () => {
   const [selectedDefaultCategories, setSelectedDefaultCategories] = useState(new Set());
   const [openDefaultDialog, setOpenDefaultDialog] = useState(false);
   const [creatingDefaultCategories, setCreatingDefaultCategories] = useState(false);
+  
+  // Auto categorization state
+  const [autoCategorizationEnabled, setAutoCategorizationEnabled] = useState(true);
+  const [autoCategorizing, setAutoCategorizing] = useState(false);
+  const [autoCategorizationStats, setAutoCategorizationStats] = useState(null);
+  const [showAutoStats, setShowAutoStats] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.6);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
   
   const ITEMS_PER_PAGE = 10;
   const INITIAL_LOAD = 20; // Load first 20 transactions initially
@@ -141,6 +158,59 @@ const Categorization = () => {
     [defaultCategories, existingCategoryNames]
   );
 
+  // Auto categorization handlers
+  const handleAutoCategorizationToggle = useCallback((event) => {
+    setAutoCategorizationEnabled(event.target.checked);
+    localStorage.setItem('autoCategorizationEnabled', event.target.checked);
+  }, []);
+
+  const handleAutoCategorizeBulk = useCallback(async () => {
+    if (!autoCategorizationEnabled || allTransactions.length === 0) return;
+    
+    try {
+      setAutoCategorizing(true);
+      setSuccessMessage("");
+      
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/auto-categorize/", {
+        confidence_threshold: confidenceThreshold
+      });
+      
+      if (response.data.success) {
+        const stats = response.data.stats;
+        setAutoCategorizationStats(stats);
+        setShowAutoStats(true);
+        
+        // Show success message
+        setSuccessMessage(
+          `Auto-categorization complete! Categorized ${stats.auto_categorized} out of ${stats.total_processed} transactions.`
+        );
+        setShowSuccess(true);
+        
+        // Refresh transactions list to remove auto-categorized ones
+        await fetchInitialData();
+      }
+    } catch (error) {
+      console.error("Error during auto categorization:", error);
+      setError("Failed to auto-categorize transactions");
+    } finally {
+      setAutoCategorizing(false);
+    }
+  }, [autoCategorizationEnabled, allTransactions.length, confidenceThreshold]);
+
+  const fetchCategorizationStats = useCallback(async () => {
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/api/auto-categorization/stats/");
+      setAutoCategorizationStats(response.data);
+    } catch (error) {
+      console.error("Error fetching categorization stats:", error);
+    }
+  }, []);
+
+  const handleViewStats = useCallback(() => {
+    fetchCategorizationStats();
+    setShowAutoStats(true);
+  }, [fetchCategorizationStats]);
+
   // Load initial batch of transactions
   const fetchInitialData = useCallback(async () => {
     try {
@@ -160,6 +230,12 @@ const Categorization = () => {
       setAllTransactions(allFetchedTransactions);
       setTotalPages(Math.ceil(allFetchedTransactions.length / ITEMS_PER_PAGE));
       setHasMoreTransactions(allFetchedTransactions.length > INITIAL_LOAD);
+      
+      // Load auto categorization settings
+      const savedEnabled = localStorage.getItem('autoCategorizationEnabled');
+      if (savedEnabled !== null) {
+        setAutoCategorizationEnabled(savedEnabled === 'true');
+      }
       
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -387,15 +463,26 @@ const Categorization = () => {
             alignItems: 'center', 
             gap: 2,
             transition: 'box-shadow 0.2s',
+            borderLeft: transaction.auto_categorized ? '4px solid #4caf50' : 'none',
             '&:hover': {
               boxShadow: theme.shadows[2],
             }
           }}
         >
           <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="body1" fontWeight="medium">
-              {transaction.description}
-            </Typography>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography variant="body1" fontWeight="medium">
+                {transaction.description}
+              </Typography>
+              {transaction.auto_categorized && (
+                <Chip 
+                  label={`Auto (${Math.round(transaction.confidence_score * 100)}%)`}
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                />
+              )}
+            </Box>
             <Typography 
               variant="body2" 
               color={transaction.amount >= 0 ? "error.main" : "success.main"}
@@ -409,19 +496,15 @@ const Categorization = () => {
             <Select
               value=""
               onChange={(e) => {
-                console.log('Category selected:', e.target.value);
                 handleUpdateTransaction(transaction.id, e.target.value);
               }}
               label="Select Category"
             >
-              {categories.map((category) => {
-                console.log('Rendering category option:', category);
-                return (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                );
-              })}
+              {categories.map((category) => (
+                <MenuItem key={category.id} value={category.id}>
+                  {category.name}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Paper>
@@ -510,6 +593,167 @@ const Categorization = () => {
       <Typography variant="h4" gutterBottom>
         Transaction Categories 🏷️
       </Typography>
+
+      {/* Auto Categorization Section */}
+      <Card sx={{ mb: 3, boxShadow: theme.shadows[2] }}>
+        <CardContent>
+          <Box display="flex" alignItems="center" mb={3}>
+            <SmartToyIcon color="primary" sx={{ mr: 1 }} />
+            <Typography variant="h6">Smart Auto-Categorization</Typography>
+          </Box>
+          
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoCategorizationEnabled}
+                    onChange={handleAutoCategorizationToggle}
+                    color="primary"
+                  />
+                }
+                label="Enable Auto-Categorization"
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+                Automatically categorize transactions using AI-powered pattern recognition
+              </Typography>
+            </Box>
+          </Box>
+
+          {autoCategorizationEnabled && (
+            <>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" gutterBottom>
+                  Confidence Threshold: {Math.round(confidenceThreshold * 100)}%
+                </Typography>
+                <Slider
+                  value={confidenceThreshold}
+                  onChange={(e, value) => setConfidenceThreshold(value)}
+                  min={0.3}
+                  max={0.9}
+                  step={0.1}
+                  marks={[
+                    { value: 0.3, label: '30%' },
+                    { value: 0.6, label: '60%' },
+                    { value: 0.9, label: '90%' }
+                  ]}
+                  sx={{ maxWidth: 300 }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Higher threshold = more accurate but fewer auto-categorizations
+                </Typography>
+              </Box>
+
+              <Box display="flex" gap={2} alignItems="center">
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={autoCategorizing ? <CircularProgress size={20} /> : <AutorenewIcon />}
+                  onClick={handleAutoCategorizeBulk}
+                  disabled={autoCategorizing || allTransactions.length === 0}
+                >
+                  {autoCategorizing ? 'Auto-Categorizing...' : `Auto-Categorize All (${allTransactions.length})`}
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  startIcon={<AssessmentIcon />}
+                  onClick={handleViewStats}
+                >
+                  View Stats
+                </Button>
+              </Box>
+
+              {autoCategorizing && (
+                <Box sx={{ mt: 2 }}>
+                  <LinearProgress />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Analyzing transaction patterns and applying categorization rules...
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Auto-Categorization Stats Dialog */}
+      <Dialog 
+        open={showAutoStats} 
+        onClose={() => setShowAutoStats(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <AssessmentIcon color="primary" sx={{ mr: 1 }} />
+            Auto-Categorization Statistics
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {autoCategorizationStats ? (
+            <Box>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                    <Typography variant="h4">{autoCategorizationStats.total_processed}</Typography>
+                    <Typography variant="body2">Total Processed</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                    <Typography variant="h4">{autoCategorizationStats.auto_categorized}</Typography>
+                    <Typography variant="body2">Auto-Categorized</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                    <Typography variant="h4">{autoCategorizationStats.needs_review}</Typography>
+                    <Typography variant="body2">Needs Review</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText' }}>
+                    <Typography variant="h4">{autoCategorizationStats.no_match}</Typography>
+                    <Typography variant="body2">No Match</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+              
+              {autoCategorizationStats.total_processed > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Success Rate</Typography>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={(autoCategorizationStats.auto_categorized / autoCategorizationStats.total_processed) * 100}
+                    sx={{ height: 10, borderRadius: 5 }}
+                  />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    {Math.round((autoCategorizationStats.auto_categorized / autoCategorizationStats.total_processed) * 100)}% of transactions auto-categorized
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <Typography>Loading statistics...</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAutoStats(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={6000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setShowSuccess(false)} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
 
       {/* Category Management Section */}
       <Card sx={{ mb: 3, boxShadow: theme.shadows[2] }}>

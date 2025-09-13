@@ -32,10 +32,37 @@ class Transaction(models.Model):
     source = models.CharField(max_length=50)  # e.g., TD, Amex
     account = models.ForeignKey(Account, on_delete=models.CASCADE)  # Link to Account
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)  # Optional category
-
+    # New fields for auto-categorization
+    auto_categorized = models.BooleanField(default=False)  # Track if auto-categorized
+    confidence_score = models.FloatField(null=True, blank=True)  # Confidence in categorization
 
     def __str__(self):
         return f"{self.date} - {self.description} - {self.amount}"
+
+# New model for categorization rules
+class CategorizationRule(models.Model):
+    RULE_TYPES = [
+        ('keyword', 'Keyword Match'),
+        ('contains', 'Description Contains'),
+        ('exact', 'Exact Match'),
+        ('amount_range', 'Amount Range'),
+        ('recurring', 'Recurring Payment'),
+    ]
+    
+    name = models.CharField(max_length=255)
+    rule_type = models.CharField(max_length=20, choices=RULE_TYPES)
+    pattern = models.TextField()  # The pattern to match (keywords, regex, etc.)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    priority = models.IntegerField(default=1)  # Higher number = higher priority
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-priority', 'name']
+    
+    def __str__(self):
+        return f"{self.name} -> {self.category.name}"
 
 class TDTransaction(models.Model):
     date = models.DateField()
