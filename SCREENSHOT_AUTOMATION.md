@@ -1,30 +1,24 @@
-# 📸 Automated Screenshot System
+# 📸 Screenshot Automation Tool
 
-This project includes an automated screenshot system that captures high-quality screenshots of your MyFinance Dashboard application for documentation, GitHub README, and visual testing purposes.
+This project includes an automated screenshot tool that captures high-quality screenshots of all major application pages for documentation, testing, and presentation purposes.
 
 ## 🚀 Quick Start
 
-### 1. Setup (One-time)
-```bash
-# Run the setup script
-./scripts/setup-screenshots.sh
+### Prerequisites
+- Node.js (v16 or higher)
+- Playwright installed
+- Both frontend and backend servers running
 
-# Or manually:
+### Installation
+```bash
+# Install dependencies
 npm install
-npx playwright install
+
+# Install Playwright browsers
+npx playwright install chromium
 ```
 
-### 2. Start Your Application
-```bash
-# Terminal 1: Start Django backend
-python manage.py runserver
-
-# Terminal 2: Start React frontend
-cd frontend
-npm start
-```
-
-### 3. Capture Screenshots
+### Running Screenshots
 ```bash
 # Capture all screenshots
 npm run screenshots
@@ -34,144 +28,148 @@ npm run screenshots:update
 
 # Capture comprehensive set
 npm run screenshots:all
+
+# Show help
+npm run screenshots:help
 ```
 
 ## 📋 Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run screenshots` | Capture all configured screenshots |
+| `npm run screenshots` | Capture all screenshots |
 | `npm run screenshots:update` | Update existing screenshots |
-| `npm run screenshots:all` | Capture comprehensive screenshot set |
+| `npm run screenshots:all` | Capture comprehensive set |
 | `npm run screenshots:help` | Show available commands |
 
-## 🎯 What Gets Captured
+## 🖼️ Screenshots Captured
 
-The automation captures screenshots of these key pages:
+The tool captures screenshots of the following pages:
 
-1. **Home Dashboard** (`/`) - Main financial overview
-2. **File Upload** (`/upload`) - Bank statement upload interface
-3. **Transactions List** (`/transactions`) - Transaction management
-4. **Analytics** (`/analytics`) - Data visualizations and charts
-5. **Accounts Management** (`/accounts`) - Bank account management
-6. **Settings** (`/settings`) - Application preferences
-
-## 📁 Output
-
-- **Screenshots**: Saved to `./screenshots/` directory
-- **Report**: Generated as `./screenshots/screenshot-report.md`
-- **Format**: High-resolution PNG files (1920x1080)
-- **Naming**: Descriptive names (e.g., `home-dashboard.png`)
+1. **Home Dashboard** (`/`) - Main dashboard with financial overview
+2. **File Upload** (`/upload`) - File upload interface for bank statements
+3. **Transactions List** (`/transactions`) - Transactions list (limited to first 20 results)
+4. **Categories Management** (`/categorization`) - Transaction categorization and management
+5. **Analytics & Visualizations** (`/visualizations`) - Analytics and data visualizations
+6. **Accounts Management** (`/accounts`) - Bank accounts management
+7. **Settings Page** (`/user-settings`) - Application settings and preferences
 
 ## ⚙️ Configuration
 
-The automation can be customized by editing `scripts/screenshot-automation.js`:
+### Viewport Settings
+- **Width**: 1600px
+- **Height**: 900px
+- **Zoom**: 120% for better readability
 
-```javascript
-const CONFIG = {
-  baseUrl: 'http://localhost:3000',        // Frontend URL
-  backendUrl: 'http://localhost:8000',     // Backend URL
-  screenshotsDir: './screenshots',         // Output directory
-  viewport: { width: 1920, height: 1080 }, // Screenshot resolution
-  waitTime: 2000,                          // Wait time for page load
-  retryAttempts: 3                         // Retry attempts on failure
-};
-```
+### Wait Times
+- **Page Load**: 3 seconds
+- **Element Wait**: 10 seconds
+- **Between Screenshots**: 1 second
 
-## 🔧 Adding New Screenshots
+### Custom Actions
+- **Transaction Limiting**: Automatically limits transaction list to first 20 items for cleaner screenshots
 
-To add new screenshots, edit the `SCREENSHOTS` array in `scripts/screenshot-automation.js`:
+## 📁 Output
+
+Screenshots are saved to the `./screenshots/` directory with descriptive filenames:
+- `home-dashboard.png`
+- `file-upload.png`
+- `transactions-list.png`
+- `categories-management.png`
+- `analytics-visualizations.png`
+- `accounts-management.png`
+- `settings-page.png`
+
+A detailed report is generated at `./screenshots/screenshot-report.md` with:
+- Summary of successful/failed captures
+- URLs and descriptions for each screenshot
+- Error details for any failures
+
+## �� Customization
+
+### Adding New Pages
+Edit `scripts/screenshot-automation.js` and add new entries to the `SCREENSHOTS` array:
 
 ```javascript
 {
   name: 'new-page',
   path: '/new-page',
   description: 'Description of the new page',
-  waitFor: '.specific-selector' // Optional: wait for specific element
+  waitFor: '.selector-for-page-content'
 }
+```
+
+### Modifying Settings
+Update the `CONFIG` object in `scripts/screenshot-automation.js`:
+
+```javascript
+const CONFIG = {
+  baseUrl: 'http://localhost:3000',
+  backendUrl: 'http://localhost:8000',
+  screenshotsDir: './screenshots',
+  viewport: { width: 1600, height: 900 },
+  zoom: 1.2,
+  waitTime: 3000,
+  retryAttempts: 3
+};
 ```
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **Servers not running**
+1. **Server Not Running**
    ```
    Error: Server health check failed
-   Solution: Make sure both frontend and backend servers are running
+   ```
+   **Solution**: Ensure both frontend and backend servers are running:
+   ```bash
+   # Frontend
+   cd frontend && npm start
+   
+   # Backend
+   python manage.py runserver
    ```
 
-2. **Page not loading**
+2. **Screenshots Not Capturing**
    ```
-   Error: Navigation timeout
-   Solution: Check if the page URL is correct and accessible
+   Error: Could not find selector
    ```
+   **Solution**: Check if the page is loading correctly and update the `waitFor` selector
 
-3. **Element not found**
+3. **Timeout Errors**
    ```
-   Warning: Could not find selector
-   Solution: Update the waitFor selector or remove it
+   Error: Timeout 10000ms exceeded
    ```
+   **Solution**: Increase `waitTime` in the CONFIG or check page loading performance
 
 ### Debug Mode
-
-Run with debug output:
+Run with debug logging to see detailed information:
 ```bash
 DEBUG=pw:api npm run screenshots
 ```
 
-## 🤖 GitHub Actions Integration
-
-The project includes a GitHub Actions workflow (`.github/workflows/screenshots.yml`) that automatically captures screenshots on:
-- Push to main/develop branches
-- Pull requests
-- Manual workflow dispatch
-
-Screenshots are uploaded as artifacts and can be used in PR comments.
-
 ## 📊 Features
 
 - ✅ **Automated**: No manual screenshot taking required
-- ✅ **High Quality**: 1920x1080 resolution screenshots
+- ✅ **High Quality**: 1600x900 resolution with 120% zoom
 - ✅ **Comprehensive**: Covers all major application pages
 - ✅ **Configurable**: Easy to add new pages or modify settings
-- ✅ **CI/CD Ready**: GitHub Actions integration
 - ✅ **Error Handling**: Robust error handling and retry logic
 - ✅ **Reporting**: Generates detailed reports
-- ✅ **Cross-platform**: Works on macOS, Linux, and Windows
+- ✅ **Custom Actions**: Smart features like transaction limiting
 
-## 🎨 Best Practices
+## 🎯 Use Cases
 
-1. **Keep servers running**: Always ensure both frontend and backend are running
-2. **Test data**: Use consistent test data for predictable screenshots
-3. **Wait for loading**: The script includes wait times, but you may need to adjust them
-4. **Clean state**: Start with a clean application state for consistent results
-5. **Regular updates**: Run screenshots regularly to keep documentation current
+- **Documentation**: Generate visual documentation for your application
+- **Testing**: Verify UI changes across different pages
+- **Presentations**: Create visual materials for demos and presentations
+- **Quality Assurance**: Ensure consistent UI across all pages
+- **Onboarding**: Help new team members understand the application structure
 
-## 📝 Integration with README
+## 📝 Notes
 
-You can easily integrate screenshots into your README:
-
-```markdown
-## Screenshots
-
-### Dashboard
-![Dashboard](screenshots/home-dashboard.png)
-
-### File Upload
-![File Upload](screenshots/file-upload.png)
-
-### Analytics
-![Analytics](screenshots/analytics-visualizations.png)
-```
-
-## 🔄 Maintenance
-
-- **Regular updates**: Run `npm run screenshots:update` when you make UI changes
-- **New features**: Add new screenshots when you add new pages
-- **Dependencies**: Keep Playwright updated: `npx playwright install`
-- **Testing**: Test the automation after major UI changes
-
----
-
-*This automation system saves you time and ensures your documentation always has up-to-date screenshots!* 🎉
+- Screenshots are captured in headless mode for consistency
+- The tool automatically handles page loading and element waiting
+- Failed screenshots are logged with detailed error information
+- All screenshots are full-page captures for complete page visibility
