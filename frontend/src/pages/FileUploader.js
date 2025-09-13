@@ -40,8 +40,16 @@ const FileUploader = () => {
     }, [bank]);
 
     const handleBankChange = (event) => {
-        setBank(event.target.value);
+        const selectedBank = event.target.value;
+        setBank(selectedBank);
         setAccount(""); // Clear the selected account when bank changes
+        
+        // Automatically set file type based on bank selection
+        if (selectedBank === "AMEX") {
+            setFileType("Amex");
+        } else if (selectedBank === "TD") {
+            setFileType("TD");
+        }
     };
 
     const handleAccountChange = (event) => {
@@ -105,7 +113,7 @@ const FileUploader = () => {
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <FormControl fullWidth>
               <InputLabel>Bank</InputLabel>
-              <Select value={bank} onChange={(e) => setBank(e.target.value)}>
+              <Select value={bank} onChange={handleBankChange}>
                 <MenuItem value="TD">TD Bank</MenuItem>
                 <MenuItem value="AMEX">American Express</MenuItem>
               </Select>

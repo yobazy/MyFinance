@@ -56,7 +56,20 @@ def upload_file(request):
             df.columns = df.columns.str.strip()
             process_td_data(df, account)
         elif file_type == "Amex":
-            df = pd.read_excel(file_path, skiprows=11)
+            # Try different encodings for Amex files
+            try:
+                df = pd.read_excel(file_path, skiprows=11)
+            except (UnicodeDecodeError, Exception) as e:
+                # If Excel reading fails due to encoding, try reading as CSV with different encodings
+                print(f"Excel read failed: {e}, trying CSV with different encodings")
+                try:
+                    df = pd.read_csv(file_path, skiprows=11, encoding='latin-1')
+                except UnicodeDecodeError:
+                    try:
+                        df = pd.read_csv(file_path, skiprows=11, encoding='cp1252')
+                    except UnicodeDecodeError:
+                        df = pd.read_csv(file_path, skiprows=11, encoding='iso-8859-1')
+            
             df.columns = df.columns.str.lower().str.replace(' ', '_')
             df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
             process_amex_data(df, account)
@@ -127,11 +140,25 @@ def process_amex_data(df, account):
         except ValueError:
             return None  # Return None if date conversion fails
 
+    def clean_amount(amount_str):
+        """Clean amount string by removing dollar signs, commas, and converting to float."""
+        if pd.isna(amount_str) or amount_str == '':
+            return 0.0
+        try:
+            # Remove dollar signs, commas, and any whitespace
+            cleaned = str(amount_str).replace('$', '').replace(',', '').strip()
+            return float(cleaned)
+        except (ValueError, TypeError):
+            return 0.0
+
     df['date'] = df['date'].astype(str).apply(convert_date)
     df['date_processed'] = df['date_processed'].astype(str).apply(convert_date)
 
-    # Ensure numeric values are properly formatted and NaN is replaced with 0
-    numeric_columns = ['amount', 'commission', 'exc_rate']
+    # Clean and convert amount column
+    df['amount'] = df['amount'].apply(clean_amount)
+    
+    # Ensure other numeric values are properly formatted and NaN is replaced with 0
+    numeric_columns = ['commission', 'exc_rate']
     for col in numeric_columns:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)  # Convert to numeric, replace NaN with 0
 
