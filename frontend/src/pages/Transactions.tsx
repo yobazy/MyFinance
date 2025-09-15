@@ -56,6 +56,7 @@ interface Transaction {
   account: number;
   account_name: string;
   category?: string | null;
+  category_name?: string | null;
 }
 
 interface Filters {
@@ -113,7 +114,7 @@ const Transactions = () => {
   );
   
   const uniqueCategories = useMemo(() => 
-    [...new Set(allTransactions.map(t => t.category).filter((cat): cat is string => Boolean(cat)))].sort(),
+    [...new Set(allTransactions.map(t => t.category_name).filter((cat): cat is string => Boolean(cat)))].sort(),
     [allTransactions]
   );
 
@@ -154,10 +155,10 @@ const Transactions = () => {
       
       // Category filter
       if (filters.category) {
-        if (filters.category === 'uncategorized' && transaction.category) {
+        if (filters.category === 'uncategorized' && transaction.category_name) {
           return false;
         }
-        if (filters.category !== 'uncategorized' && transaction.category !== filters.category) {
+        if (filters.category !== 'uncategorized' && transaction.category_name !== filters.category) {
           return false;
         }
       }
@@ -200,8 +201,8 @@ const Transactions = () => {
           bValue = b.description.toLowerCase();
           break;
         case 'category':
-          aValue = String(a.category ?? 'zzz_uncategorized').toLowerCase();
-          bValue = String(b.category ?? 'zzz_uncategorized').toLowerCase();
+          aValue = String(a.category_name ?? 'zzz_uncategorized').toLowerCase();
+          bValue = String(b.category_name ?? 'zzz_uncategorized').toLowerCase();
           break;
         default:
           return 0;
@@ -231,7 +232,7 @@ const Transactions = () => {
       .filter(t => parseFloat(t.amount) > 0)
       .reduce((sum, t) => sum + parseFloat(t.amount), 0);
     const netAmount = totalIncome - totalExpenses;
-    const uncategorized = filteredAndSortedTransactions.filter(t => !t.category).length;
+    const uncategorized = filteredAndSortedTransactions.filter(t => !t.category_name).length;
     
     return {
       totalTransactions,
@@ -287,7 +288,7 @@ const Transactions = () => {
         t.amount,
         t.source,
         t.account_name,
-        t.category || 'Uncategorized'
+        t.category_name || 'Uncategorized'
       ].join(','))
     ].join('\n');
 
@@ -755,9 +756,9 @@ const Transactions = () => {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    {transaction.category ? (
+                    {transaction.category_name ? (
                       <Chip 
-                        label={transaction.category} 
+                        label={transaction.category_name} 
                         size="small" 
                         color="secondary"
                         variant="filled"
