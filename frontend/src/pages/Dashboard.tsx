@@ -207,7 +207,7 @@ const Dashboard = () => {
           </Grid>
         </Grid>
       ) : (
-        <Paper sx={{ p: 3, mb: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
+        <Paper sx={{ p: 3, mb: 4, textAlign: 'center' }}>
           <Typography variant="h6" gutterBottom>
             No financial data yet
           </Typography>
