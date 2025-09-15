@@ -243,6 +243,14 @@ const Transactions = () => {
     };
   }, [filteredAndSortedTransactions]);
 
+  // Helper function to format currency with commas
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
   // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -434,7 +442,7 @@ const Transactions = () => {
               <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
                 <TrendingDownIcon color="success" />
                 <Typography variant="h6" color="success.main">
-                  ${summaryStats.totalIncome.toFixed(2)}
+                  ${formatCurrency(summaryStats.totalIncome)}
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
@@ -449,7 +457,7 @@ const Transactions = () => {
               <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
                 <TrendingUpIcon color="error" />
                 <Typography variant="h6" color="error.main">
-                  ${summaryStats.totalExpenses.toFixed(2)}
+                  ${formatCurrency(summaryStats.totalExpenses)}
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
@@ -465,7 +473,7 @@ const Transactions = () => {
                 variant="h6" 
                 color={summaryStats.netAmount >= 0 ? "success.main" : "error.main"}
               >
-                ${summaryStats.netAmount.toFixed(2)}
+                ${formatCurrency(summaryStats.netAmount)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Net Amount
@@ -736,7 +744,7 @@ const Transactions = () => {
                       fontWeight="medium"
                       color={isExpense ? "error.main" : "success.main"}
                     >
-                      {isExpense ? '+' : ''}${Math.abs(amount).toFixed(2)}
+                      {isExpense ? '+' : ''}${formatCurrency(Math.abs(amount))}
                     </Typography>
                   </TableCell>
                   <TableCell>
