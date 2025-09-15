@@ -200,8 +200,8 @@ const Transactions = () => {
           bValue = b.description.toLowerCase();
           break;
         case 'category':
-          aValue = (a.category || 'zzz_uncategorized').toLowerCase();
-          bValue = (b.category || 'zzz_uncategorized').toLowerCase();
+          aValue = String(a.category ?? 'zzz_uncategorized').toLowerCase();
+          bValue = String(b.category ?? 'zzz_uncategorized').toLowerCase();
           break;
         default:
           return 0;
