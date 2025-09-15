@@ -113,7 +113,7 @@ const Transactions = () => {
   );
   
   const uniqueCategories = useMemo(() => 
-    [...new Set(allTransactions.map(t => t.category).filter(Boolean))].sort(),
+    [...new Set(allTransactions.map(t => t.category).filter((cat): cat is string => Boolean(cat)))].sort(),
     [allTransactions]
   );
 
