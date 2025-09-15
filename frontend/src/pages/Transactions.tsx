@@ -744,7 +744,7 @@ const Transactions = () => {
                       fontWeight="medium"
                       color={isExpense ? "error.main" : "success.main"}
                     >
-                      {isExpense ? '+' : ''}${formatCurrency(Math.abs(amount))}
+                      {isExpense ? '-' : ''}${formatCurrency(Math.abs(amount))}
                     </Typography>
                   </TableCell>
                   <TableCell>
