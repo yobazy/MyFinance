@@ -1021,33 +1021,6 @@ const Categorization = () => {
 
             <Divider sx={{ mb: 2 }} />
 
-            {/* Debug: Current Categories Display */}
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-              <Typography variant="h6" color="info.contrastText" sx={{ mb: 1 }}>
-                Debug: Current Categories ({categories.length})
-              </Typography>
-              <Typography variant="body2" color="info.contrastText" sx={{ mb: 1 }}>
-                These are the categories currently available for transactions:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: '100px', overflowY: 'auto' }}>
-                {categories.map((category) => (
-                  <Chip 
-                    key={category.id} 
-                    label={`${category.name} (ID: ${category.id})`} 
-                    size="small" 
-                    variant="filled"
-                    color="primary"
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {categories.length === 0 && (
-                  <Typography variant="body2" color="info.contrastText" sx={{ fontStyle: 'italic' }}>
-                    No categories available
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-
             <Grid container spacing={1}>
               {categoryChips}
             </Grid>
