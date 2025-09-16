@@ -4,13 +4,14 @@ from .models import Transaction, Category, CategorizationRule, BackupSettings, D
 class TransactionSerializer(serializers.ModelSerializer):
     account_name = serializers.CharField(source='account.name', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
+    suggested_category_name = serializers.CharField(source='suggested_category.name', read_only=True)
     
     class Meta:
         model = Transaction
         fields = [
             'id', 'date', 'description', 'amount', 'source', 'account', 
             'account_name', 'category', 'category_name', 'auto_categorized', 
-            'confidence_score'
+            'confidence_score', 'suggested_category', 'suggested_category_name'
         ]
 
 class CategorySerializer(serializers.ModelSerializer):

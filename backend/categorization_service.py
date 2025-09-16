@@ -21,7 +21,9 @@ class AutoCategorizationService:
                 'STARBUCKS', 'MCDONALDS', 'TIM HORTONS', 'WENDYS', 'BURGER KING',
                 'PIZZA HUT', 'SUBWAY', 'KFC', 'POPEYES', 'PANERA', 'A&W',
                 'HARVEY', 'SWISS CHALET', 'BOSTON PIZZA', 'KELSEY', 'MONTANA',
-                'RESTAURANT', 'CAFE', 'COFFEE', 'BISTRO', 'GRILL', 'PUB'
+                'RESTAURANT', 'CAFE', 'COFFEE', 'BISTRO', 'GRILL', 'PUB',
+                'DOORDASH', 'UBER EATS', 'SKIP THE DISHES', 'FOODORA', 'GRUBHUB',
+                'BANGKOK', 'THAI', 'CHINESE', 'INDIAN', 'MEXICAN', 'ITALIAN'
             ],
             'Groceries': [
                 'WALMART', 'COSTCO', 'SUPERSTORE', 'SOBEYS', 'LOBLAWS',
@@ -35,7 +37,8 @@ class AutoCategorizationService:
             ],
             'Transportation': [
                 'TTC', 'UBER', 'LYFT', 'VIA RAIL', 'GO TRANSIT', 'OC TRANSPO',
-                'TAXI', 'CAB', 'TRANSIT', 'BUS', 'TRAIN', 'PARKING'
+                'TAXI', 'CAB', 'TRANSIT', 'BUS', 'TRAIN', 'PARKING',
+                'PRESTO', 'FARE', 'METRO', 'SUBWAY'
             ],
             'Shopping': [
                 'AMAZON', 'CANADIAN TIRE', 'HOME DEPOT', 'LOWES', 'IKEA',
@@ -57,7 +60,12 @@ class AutoCategorizationService:
             ],
             'Entertainment': [
                 'NETFLIX', 'SPOTIFY', 'AMAZON PRIME', 'DISNEY', 'APPLE MUSIC',
-                'CINEPLEX', 'LANDMARK', 'MOVIE', 'THEATRE', 'CONCERT'
+                'CINEPLEX', 'LANDMARK', 'MOVIE', 'THEATRE', 'CONCERT',
+                'STUBHUB', 'TICKETMASTER', 'LEGENDS MUSIC', 'MUSIC', 'CONCERT'
+            ],
+            'Subscriptions': [
+                'APPLE.COM', 'APPLE MUSIC', 'APPLE TV', 'APPLE STORE',
+                'GOOGLE', 'MICROSOFT', 'ADOBE', 'SUBSCRIPTION'
             ]
         }
     
@@ -217,15 +225,22 @@ class AutoCategorizationService:
                 transaction.category = category
                 transaction.auto_categorized = True
                 transaction.confidence_score = confidence
+                transaction.suggested_category = None  # Clear suggestion since it's now categorized
                 transaction.save()
                 stats['auto_categorized'] += 1
             
             elif category and confidence > 0.3:  # Low confidence but some match
                 transaction.confidence_score = confidence
+                transaction.suggested_category = category  # Store the suggestion
                 transaction.save()
                 stats['needs_review'] += 1
             
             else:
+                # Still try to get a suggestion even if confidence is very low
+                if category:
+                    transaction.suggested_category = category
+                    transaction.confidence_score = confidence
+                    transaction.save()
                 stats['no_match'] += 1
         
         return stats
@@ -266,4 +281,32 @@ class AutoCategorizationService:
                     'reason': f'Similar transactions ({count} matches)'
                 })
         
-        return suggestions[:limit] 
+        return suggestions[:limit]
+    
+    def update_suggestions_for_uncategorized(self) -> Dict[str, int]:
+        """
+        Update suggested categories for all uncategorized transactions.
+        This is useful for refreshing suggestions without changing existing categorizations.
+        """
+        uncategorized = Transaction.objects.filter(category__isnull=True)
+        
+        stats = {
+            'total_processed': 0,
+            'suggestions_updated': 0,
+            'no_suggestion': 0
+        }
+        
+        for transaction in uncategorized:
+            stats['total_processed'] += 1
+            
+            category, confidence = self.categorize_transaction(transaction)
+            
+            if category:
+                transaction.suggested_category = category
+                transaction.confidence_score = confidence
+                transaction.save()
+                stats['suggestions_updated'] += 1
+            else:
+                stats['no_suggestion'] += 1
+        
+        return stats 

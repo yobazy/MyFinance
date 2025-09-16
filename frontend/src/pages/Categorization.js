@@ -36,7 +36,6 @@ import {
 import { useTheme } from "@mui/material/styles";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CategoryIcon from '@mui/icons-material/Category';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
@@ -47,7 +46,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import PsychologyIcon from '@mui/icons-material/Psychology';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { useNavigate } from 'react-router-dom';
 
 const Categorization = () => {
@@ -174,38 +173,6 @@ const Categorization = () => {
     localStorage.setItem('autoCategorizationEnabled', event.target.checked);
   }, []);
 
-  const handleAutoCategorizeBulk = useCallback(async () => {
-    if (!autoCategorizationEnabled || allTransactions.length === 0) return;
-    
-    try {
-      setAutoCategorizing(true);
-      setSuccessMessage("");
-      
-      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/auto-categorize/", {
-        confidence_threshold: confidenceThreshold
-      });
-      
-      if (response.data.success) {
-        const stats = response.data.stats;
-        setAutoCategorizationStats(stats);
-        setShowAutoStats(true);
-        
-        // Show success message
-        setSuccessMessage(
-          `Auto-categorization complete! Categorized ${stats.auto_categorized} out of ${stats.total_processed} transactions.`
-        );
-        setShowSuccess(true);
-        
-        // Refresh transactions list to remove auto-categorized ones
-        await fetchInitialData();
-      }
-    } catch (error) {
-      console.error("Error during auto categorization:", error);
-      setError("Failed to auto-categorize transactions");
-    } finally {
-      setAutoCategorizing(false);
-    }
-  }, [autoCategorizationEnabled, allTransactions.length, confidenceThreshold]);
 
   const fetchCategorizationStats = useCallback(async () => {
     try {
@@ -254,6 +221,66 @@ const Categorization = () => {
       setLoading(false);
     }
   }, []);
+
+  const handleAutoCategorizeBulk = useCallback(async () => {
+    if (!autoCategorizationEnabled || allTransactions.length === 0) return;
+    
+    try {
+      setAutoCategorizing(true);
+      setSuccessMessage("");
+      
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/auto-categorize/", {
+        confidence_threshold: confidenceThreshold
+      });
+      
+      if (response.data.success) {
+        const stats = response.data.stats;
+        setAutoCategorizationStats(stats);
+        setShowAutoStats(true);
+        
+        // Show success message
+        setSuccessMessage(
+          `Auto-categorization complete! Categorized ${stats.auto_categorized} out of ${stats.total_processed} transactions.`
+        );
+        setShowSuccess(true);
+        
+        // Refresh transactions list to remove auto-categorized ones
+        await fetchInitialData();
+      }
+    } catch (error) {
+      console.error("Error during auto categorization:", error);
+      setError("Failed to auto-categorize transactions");
+    } finally {
+      setAutoCategorizing(false);
+    }
+  }, [autoCategorizationEnabled, allTransactions.length, confidenceThreshold, fetchInitialData]);
+
+  const handleUpdateSuggestions = useCallback(async () => {
+    try {
+      setAutoCategorizing(true);
+      setSuccessMessage("");
+      
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/update-suggestions/");
+      
+      if (response.data.success) {
+        const stats = response.data.stats;
+        
+        // Show success message
+        setSuccessMessage(
+          `Suggestions updated! Generated suggestions for ${stats.suggestions_updated} out of ${stats.total_processed} transactions.`
+        );
+        setShowSuccess(true);
+        
+        // Refresh transactions list to show updated suggestions
+        await fetchInitialData();
+      }
+    } catch (error) {
+      console.error("Error updating suggestions:", error);
+      setError("Failed to update suggestions");
+    } finally {
+      setAutoCategorizing(false);
+    }
+  }, [fetchInitialData]);
 
   // Load all transactions when "View All" is clicked
   const loadAllTransactions = useCallback(async () => {
@@ -548,6 +575,14 @@ const Categorization = () => {
                   variant="outlined"
                 />
               )}
+              {!transaction.category && transaction.suggested_category_name && (
+                <Chip 
+                  label={`Auto: ${transaction.suggested_category_name} (${Math.round((transaction.confidence_score || 0) * 100)}%)`}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                />
+              )}
             </Box>
             <Typography 
               variant="body2" 
@@ -784,6 +819,16 @@ const Categorization = () => {
                     disabled={autoCategorizing || allTransactions.length === 0}
                   >
                     {autoCategorizing ? 'Auto-Categorizing...' : `Auto-Categorize All (${allTransactions.length})`}
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<LightbulbIcon />}
+                    onClick={handleUpdateSuggestions}
+                    disabled={autoCategorizing}
+                  >
+                    Update Suggestions
                   </Button>
                   
                   <Button

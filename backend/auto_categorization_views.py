@@ -120,6 +120,27 @@ def create_categorization_rule(request):
             'error': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['POST'])
+def update_suggestions(request):
+    """
+    Update suggested categories for all uncategorized transactions.
+    """
+    try:
+        service = AutoCategorizationService()
+        stats = service.update_suggestions_for_uncategorized()
+        
+        return Response({
+            'success': True,
+            'message': f'Updated suggestions for {stats["suggestions_updated"]} transactions',
+            'stats': stats
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 def categorization_stats(request):
     """Get categorization statistics."""

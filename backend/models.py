@@ -35,6 +35,7 @@ class Transaction(models.Model):
     # New fields for auto-categorization
     auto_categorized = models.BooleanField(default=False)  # Track if auto-categorized
     confidence_score = models.FloatField(null=True, blank=True)  # Confidence in categorization
+    suggested_category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='suggested_transactions')  # Suggested category for uncategorized transactions
 
     def __str__(self):
         return f"{self.date} - {self.description} - {self.amount}"
