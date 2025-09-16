@@ -991,7 +991,13 @@ const Categorization = () => {
                 </Button>
                 
                 <Collapse in={showDefaultCategories}>
-                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2 }}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.50', 
+                    borderRadius: 1, 
+                    mb: 2,
+                    border: `1px solid ${theme.palette.divider}`
+                  }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       Common categories you can add instantly:
                     </Typography>
