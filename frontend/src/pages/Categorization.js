@@ -90,7 +90,7 @@ const Categorization = () => {
   const [matchingTransactionsCount, setMatchingTransactionsCount] = useState(0);
   
   // Add collapsible state for sections
-  const [showAutoCategorization, setShowAutoCategorization] = useState(true);
+  const [showAutoCategorization, setShowAutoCategorization] = useState(false);
   const [showCategoryManagement, setShowCategoryManagement] = useState(true);
   
   const ITEMS_PER_PAGE = 10;
@@ -661,16 +661,72 @@ const Categorization = () => {
       </Typography>
 
       {/* Auto Categorization Section */}
-      <Card sx={{ mb: 3, boxShadow: theme.shadows[2] }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+      <Card sx={{ mb: 2, boxShadow: theme.shadows[1] }}>
+        <CardContent sx={{ py: showAutoCategorization ? 3 : 2, px: 2 }}>
+          <Box 
+            display="flex" 
+            alignItems="center" 
+            justifyContent="space-between"
+            sx={{ 
+              mb: showAutoCategorization ? 3 : 0,
+              cursor: 'pointer',
+              '&:hover': {
+                '& .expand-icon': {
+                  transform: 'scale(1.1)',
+                  transition: 'transform 0.2s ease-in-out'
+                }
+              }
+            }}
+            onClick={() => setShowAutoCategorization(!showAutoCategorization)}
+          >
             <Box display="flex" alignItems="center">
-              <SmartToyIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Smart Auto-Categorization</Typography>
+              <SmartToyIcon 
+                color="primary" 
+                sx={{ 
+                  mr: 1.5, 
+                  fontSize: '1.5rem'
+                }} 
+              />
+              <Typography 
+                variant="h6"
+                sx={{ 
+                  fontWeight: 600
+                }}
+              >
+                Smart Auto-Categorization
+              </Typography>
+              {!showAutoCategorization && (
+                <Typography 
+                  variant="caption" 
+                  color="text.secondary" 
+                  sx={{ ml: 1, fontStyle: 'italic' }}
+                >
+                  {autoCategorizationEnabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+              )}
+              <Chip 
+                label="BETA" 
+                size="small" 
+                color="secondary" 
+                variant="outlined"
+                sx={{ 
+                  ml: 1, 
+                  fontSize: '0.65rem', 
+                  height: '18px',
+                  opacity: showAutoCategorization ? 1 : 0.7,
+                  transition: 'opacity 0.2s ease-in-out'
+                }}
+              />
             </Box>
             <IconButton
-              onClick={() => setShowAutoCategorization(!showAutoCategorization)}
               size="small"
+              className="expand-icon"
+              sx={{ 
+                transition: 'transform 0.2s ease-in-out',
+                '&:hover': {
+                  backgroundColor: 'action.hover'
+                }
+              }}
             >
               {showAutoCategorization ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
@@ -832,16 +888,59 @@ const Categorization = () => {
       </Snackbar>
 
       {/* Category Management Section */}
-      <Card sx={{ mb: 3, boxShadow: theme.shadows[2] }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+      <Card sx={{ mb: 2, boxShadow: theme.shadows[1] }}>
+        <CardContent sx={{ py: showCategoryManagement ? 3 : 2, px: 2 }}>
+          <Box 
+            display="flex" 
+            alignItems="center" 
+            justifyContent="space-between"
+            sx={{ 
+              mb: showCategoryManagement ? 3 : 0,
+              cursor: 'pointer',
+              '&:hover': {
+                '& .expand-icon': {
+                  transform: 'scale(1.1)',
+                  transition: 'transform 0.2s ease-in-out'
+                }
+              }
+            }}
+            onClick={() => setShowCategoryManagement(!showCategoryManagement)}
+          >
             <Box display="flex" alignItems="center">
-              <CategoryIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Manage Categories</Typography>
+              <CategoryIcon 
+                color="primary" 
+                sx={{ 
+                  mr: 1.5, 
+                  fontSize: '1.5rem'
+                }} 
+              />
+              <Typography 
+                variant="h6"
+                sx={{ 
+                  fontWeight: 600
+                }}
+              >
+                Manage Categories
+              </Typography>
+              {!showCategoryManagement && (
+                <Typography 
+                  variant="caption" 
+                  color="text.secondary" 
+                  sx={{ ml: 1, fontStyle: 'italic' }}
+                >
+                  ({categories.length} categories)
+                </Typography>
+              )}
             </Box>
             <IconButton
-              onClick={() => setShowCategoryManagement(!showCategoryManagement)}
               size="small"
+              className="expand-icon"
+              sx={{ 
+                transition: 'transform 0.2s ease-in-out',
+                '&:hover': {
+                  backgroundColor: 'action.hover'
+                }
+              }}
             >
               {showCategoryManagement ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
@@ -957,15 +1056,15 @@ const Categorization = () => {
       </Card>
 
       {/* Transactions Section */}
-      <Card sx={{ boxShadow: theme.shadows[2] }}>
-        <CardContent>
+      <Card sx={{ boxShadow: theme.shadows[1] }}>
+        <CardContent sx={{ py: 2, px: 2 }}>
           <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
             <Box display="flex" alignItems="center">
-              <AttachMoneyIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">
+              <AttachMoneyIcon color="primary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 Uncategorized Transactions
                 {!showAll && hasMoreTransactions && (
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
                     (Showing {transactions.length} of {allTransactions.length})
                   </Typography>
                 )}
@@ -978,6 +1077,11 @@ const Categorization = () => {
                 startIcon={<VisibilityIcon />}
                 onClick={handleViewAll}
                 disabled={loadingMore}
+                size="small"
+                sx={{ 
+                  textTransform: 'none',
+                  fontWeight: 500
+                }}
               >
                 {loadingMore ? 'Loading...' : `View All (${allTransactions.length})`}
               </Button>
