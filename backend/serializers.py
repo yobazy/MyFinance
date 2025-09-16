@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, Category, CategorizationRule
+from .models import Transaction, Category, CategorizationRule, BackupSettings, DatabaseBackup
 
 class TransactionSerializer(serializers.ModelSerializer):
     account_name = serializers.CharField(source='account.name', read_only=True)
@@ -27,3 +27,24 @@ class CategorizationRuleSerializer(serializers.ModelSerializer):
             'id', 'name', 'rule_type', 'pattern', 'category', 'category_name',
             'priority', 'is_active', 'created_at', 'updated_at'
         ]
+
+class BackupSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BackupSettings
+        fields = [
+            'id', 'max_backups', 'auto_backup_enabled', 'backup_frequency_hours',
+            'last_backup', 'backup_location'
+        ]
+
+class DatabaseBackupSerializer(serializers.ModelSerializer):
+    file_size_mb = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DatabaseBackup
+        fields = [
+            'id', 'backup_type', 'file_path', 'file_size', 'file_size_mb',
+            'created_at', 'is_compressed', 'notes'
+        ]
+    
+    def get_file_size_mb(self, obj):
+        return round(obj.file_size / (1024 * 1024), 2)

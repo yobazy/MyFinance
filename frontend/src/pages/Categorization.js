@@ -83,6 +83,12 @@ const Categorization = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   
+  // Bulk categorization state
+  const [showBulkConfirmDialog, setShowBulkConfirmDialog] = useState(false);
+  const [pendingTransactionId, setPendingTransactionId] = useState(null);
+  const [pendingCategoryId, setPendingCategoryId] = useState(null);
+  const [matchingTransactionsCount, setMatchingTransactionsCount] = useState(0);
+  
   // Add collapsible state for sections
   const [showAutoCategorization, setShowAutoCategorization] = useState(true);
   const [showCategoryManagement, setShowCategoryManagement] = useState(true);
@@ -324,15 +330,71 @@ const Categorization = () => {
 
   const handleUpdateTransaction = useCallback(async (transactionId, categoryId) => {
     try {
-      await axios.put(`http://127.0.0.1:8000/api/transactions/${transactionId}/`, {
+      // First, check how many transactions have the same description
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (!transaction) return;
+      
+      const matchingTransactions = transactions.filter(t => 
+        t.description === transaction.description && t.id !== transactionId
+      );
+      
+      if (matchingTransactions.length > 0) {
+        // Show confirmation dialog for bulk update
+        setPendingTransactionId(transactionId);
+        setPendingCategoryId(categoryId);
+        setMatchingTransactionsCount(matchingTransactions.length);
+        setShowBulkConfirmDialog(true);
+      } else {
+        // No other transactions to update, proceed directly
+        await performTransactionUpdate(transactionId, categoryId);
+      }
+    } catch (error) {
+      console.error("Error checking transactions:", error);
+      setError("Failed to categorize transaction. Please try again.");
+    }
+  }, [transactions]);
+
+  // New function to perform the actual update
+  const performTransactionUpdate = useCallback(async (transactionId, categoryId) => {
+    try {
+      const response = await axios.put(`http://127.0.0.1:8000/api/transactions/${transactionId}/update-category/`, {
         category: categoryId
       });
+      
+      // Show success message with count of updated transactions
+      if (response.data.success && response.data.updated_count > 1) {
+        setSuccessMessage(`Successfully categorized ${response.data.updated_count} transactions with the same description!`);
+        setShowSuccess(true);
+      } else {
+        setSuccessMessage("Transaction categorized successfully!");
+        setShowSuccess(true);
+      }
+      
       // Remove from both current view and all transactions
       setTransactions(prev => prev.filter(t => t.id !== transactionId));
       setAllTransactions(prev => prev.filter(t => t.id !== transactionId));
     } catch (error) {
       console.error("Error updating transaction:", error);
+      setError("Failed to categorize transaction. Please try again.");
     }
+  }, []);
+
+  // Function to handle confirmation dialog
+  const handleBulkConfirm = useCallback(() => {
+    if (pendingTransactionId && pendingCategoryId) {
+      performTransactionUpdate(pendingTransactionId, pendingCategoryId);
+    }
+    setShowBulkConfirmDialog(false);
+    setPendingTransactionId(null);
+    setPendingCategoryId(null);
+    setMatchingTransactionsCount(0);
+  }, [pendingTransactionId, pendingCategoryId, performTransactionUpdate]);
+
+  const handleBulkCancel = useCallback(() => {
+    setShowBulkConfirmDialog(false);
+    setPendingTransactionId(null);
+    setPendingCategoryId(null);
+    setMatchingTransactionsCount(0);
   }, []);
 
   const startEditingCategory = useCallback((category) => {
@@ -964,6 +1026,27 @@ const Categorization = () => {
             disabled={!editingCategoryName.trim()}
           >
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Categorization Confirmation Dialog */}
+      <Dialog open={showBulkConfirmDialog} onClose={handleBulkCancel}>
+        <DialogTitle>Bulk Categorization</DialogTitle>
+        <DialogContent>
+          <Typography>
+            This action will categorize {matchingTransactionsCount + 1} transactions with the same description.
+            Are you sure you want to proceed?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleBulkCancel}>Cancel</Button>
+          <Button 
+            onClick={handleBulkConfirm} 
+            variant="contained"
+            color="primary"
+          >
+            Categorize All
           </Button>
         </DialogActions>
       </Dialog>

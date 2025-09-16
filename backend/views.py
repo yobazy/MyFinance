@@ -424,14 +424,32 @@ def delete_category(request, category_id):
 
 @api_view(['PUT'])
 def update_transaction_category(request, transaction_id):
-    """Updates a transaction's category."""
+    """Updates a transaction's category and all other transactions with the same description."""
     try:
         transaction = Transaction.objects.get(id=transaction_id)
         category_id = request.data.get('category')
         category = Category.objects.get(id=category_id)
+        
+        # Update the original transaction
         transaction.category = category
         transaction.save()
-        return Response(TransactionSerializer(transaction).data)
+        
+        # Find and update all other transactions with the same description
+        description = transaction.description
+        other_transactions = Transaction.objects.filter(
+            description=description
+        ).exclude(id=transaction_id)
+        
+        # Update all matching transactions
+        updated_count = other_transactions.update(category=category)
+        
+        return Response({
+            'success': True,
+            'transaction': TransactionSerializer(transaction).data,
+            'message': f'Updated {updated_count + 1} transactions with the same description',
+            'updated_count': updated_count + 1
+        })
+        
     except Transaction.DoesNotExist:
         return Response({'error': 'Transaction not found'}, status=404)
     except Category.DoesNotExist:

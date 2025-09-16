@@ -32,6 +32,21 @@ import { ThemeProvider } from "@mui/material/styles";
 import { getTheme } from "./theme";
 import { CssBaseline } from "@mui/material";
 
+// Backup check function
+const checkAndCreateAutoBackup = async () => {
+  try {
+    const response = await fetch('http://localhost:8000/api/backup/check-auto/');
+    if (response.ok) {
+      const data = await response.json();
+      if (data.backup_created) {
+        console.log('Auto backup created:', data.backup);
+      }
+    }
+  } catch (error) {
+    console.log('Backup check failed:', error);
+  }
+};
+
 const App = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
@@ -44,6 +59,10 @@ const App = () => {
     };
 
     window.addEventListener('themeChange', handleThemeChange);
+    
+    // Check for auto backup when app loads
+    checkAndCreateAutoBackup();
+    
     return () => window.removeEventListener('themeChange', handleThemeChange);
   }, []);
 
@@ -73,7 +92,6 @@ const navItems = [
     { to: "/upload", icon: <UploadFileIcon />, label: "Upload" },
     { to: "/transactions", icon: <ReceiptIcon />, label: "Transactions" },
     { to: "/categorization", icon: <CategoryIcon />, label: "Categories" },
-
     { to: "/user-settings", icon: <SettingsIcon />, label: "Settings" },
   ];
 

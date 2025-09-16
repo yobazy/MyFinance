@@ -86,3 +86,42 @@ class AmexTransaction(models.Model):
 
     class Meta:
         db_table = 'amex'
+
+# Database Management Models
+class BackupSettings(models.Model):
+    """Settings for database backup management"""
+    max_backups = models.PositiveIntegerField(default=5, help_text="Maximum number of auto-backups to keep")
+    auto_backup_enabled = models.BooleanField(default=True, help_text="Enable automatic backups")
+    backup_frequency_hours = models.PositiveIntegerField(default=24, help_text="Hours between automatic backups")
+    last_backup = models.DateTimeField(null=True, blank=True, help_text="Last backup timestamp")
+    backup_location = models.CharField(max_length=500, default="backups/", help_text="Directory to store backups")
+    
+    class Meta:
+        verbose_name = "Backup Settings"
+        verbose_name_plural = "Backup Settings"
+    
+    def __str__(self):
+        return f"Backup Settings (Max: {self.max_backups}, Enabled: {self.auto_backup_enabled})"
+
+class DatabaseBackup(models.Model):
+    """Individual backup records"""
+    BACKUP_TYPES = [
+        ('auto', 'Automatic'),
+        ('manual', 'Manual'),
+        ('scheduled', 'Scheduled'),
+    ]
+    
+    backup_type = models.CharField(max_length=20, choices=BACKUP_TYPES, default='manual')
+    file_path = models.CharField(max_length=500, help_text="Path to backup file")
+    file_size = models.BigIntegerField(help_text="Size of backup file in bytes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_compressed = models.BooleanField(default=True, help_text="Whether backup is compressed")
+    notes = models.TextField(blank=True, help_text="Optional notes about this backup")
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Database Backup"
+        verbose_name_plural = "Database Backups"
+    
+    def __str__(self):
+        return f"Backup {self.id} - {self.backup_type} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"

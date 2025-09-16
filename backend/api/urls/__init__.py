@@ -7,4 +7,5 @@ urlpatterns = [
     path('transactions/', include('backend.api.urls.transactions')),
     path('visualizations/', include('backend.api.urls.visualizations')),
     path('auto-categorization/', include('backend.api.urls.auto_categorization')),
+    path('backup/', include('backend.api.urls.backup')),
 ] 
