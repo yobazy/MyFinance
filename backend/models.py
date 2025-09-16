@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Sum
 
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -24,6 +25,20 @@ class Account(models.Model):
 
     def __str__(self):
         return f"{self.bank} - {self.name}"
+    
+    def calculate_balance(self):
+        """Calculate the current balance by summing all transactions for this account."""
+        from .models import Transaction
+        result = Transaction.objects.filter(account=self).aggregate(
+            total=Sum('amount')
+        )
+        return result['total'] or 0
+    
+    def update_balance(self):
+        """Update the balance field with the calculated balance."""
+        self.balance = self.calculate_balance()
+        self.save(update_fields=['balance'])
+        return self.balance
        
 class Transaction(models.Model):
     date = models.DateField()

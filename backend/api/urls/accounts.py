@@ -4,6 +4,7 @@ from backend.views import (
     create_account,
     update_account,
     delete_account,
+    refresh_account_balances,
 )
 
 app_name = 'accounts'
@@ -13,4 +14,5 @@ urlpatterns = [
     path('create/', create_account, name='create'),
     path('<int:account_id>/', update_account, name='update'),
     path('<int:account_id>/delete/', delete_account, name='delete'),
+    path('refresh-balances/', refresh_account_balances, name='refresh_balances'),
 ] 

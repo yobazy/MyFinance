@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Container,
   Typography,
@@ -20,7 +20,6 @@ import {
   Alert,
   Snackbar,
   Chip,
-  Divider,
 } from "@mui/material";
 import {
   Delete as DeleteIcon,
@@ -28,6 +27,7 @@ import {
   AccountBalance as AccountIcon,
   CreditCard as CreditCardIcon,
   Savings as SavingsIcon,
+  Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
@@ -49,17 +49,31 @@ const AccountsPage = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
-
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       const response = await axios.get("http://127.0.0.1:8000/api/accounts/");
       setAccounts(response.data.accounts);
     } catch (error) {
       showMessage("Failed to fetch accounts", "error");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  const refreshBalances = async () => {
+    setRefreshing(true);
+    try {
+      await axios.post("http://127.0.0.1:8000/api/accounts/refresh-balances/");
+      await fetchAccounts();
+      showMessage("Account balances refreshed successfully!");
+    } catch (error) {
+      showMessage("Failed to refresh balances", "error");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -134,17 +148,27 @@ const AccountsPage = () => {
         </Typography>
       </Box>
 
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={() => {
-          setEditingAccount(null);
-          setOpenDialog(true);
-        }}
-        sx={{ mb: 4 }}
-      >
-        Add New Account
-      </Button>
+      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => {
+            setEditingAccount(null);
+            setOpenDialog(true);
+          }}
+        >
+          Add New Account
+        </Button>
+        <Button
+          variant="outlined"
+          color="secondary"
+          onClick={refreshBalances}
+          disabled={refreshing}
+          startIcon={<RefreshIcon />}
+        >
+          {refreshing ? "Refreshing..." : "Refresh Balances"}
+        </Button>
+      </Box>
 
       <Grid container spacing={3}>
         {accounts.map((account) => (

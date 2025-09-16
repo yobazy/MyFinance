@@ -129,6 +129,9 @@ def process_td_data(df, account):
             source="TD",
             account=account
         )
+    
+    # Update account balance after processing all transactions
+    account.update_balance()
 def process_amex_data(df, account):
     """Process and insert Amex data into the database, ensuring correct formats."""
     from datetime import datetime
@@ -186,6 +189,9 @@ def process_amex_data(df, account):
             source="Amex",
             account=account
         )
+    
+    # Update account balance after processing all transactions
+    account.update_balance()
 @csrf_exempt
 def manage_accounts(request):
     if request.method == "POST":
@@ -494,6 +500,31 @@ def delete_account(request, account_id):
             return JsonResponse({"error": "Account not found"}, status=404)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def refresh_account_balances(request):
+    """Refresh all account balances by recalculating from transactions."""
+    try:
+        accounts = Account.objects.all()
+        updated_accounts = []
+        
+        for account in accounts:
+            old_balance = account.balance
+            new_balance = account.update_balance()
+            updated_accounts.append({
+                'id': account.id,
+                'name': account.name,
+                'bank': account.bank,
+                'old_balance': float(old_balance),
+                'new_balance': float(new_balance)
+            })
+        
+        return Response({
+            'message': f'Successfully updated {len(updated_accounts)} account balances',
+            'accounts': updated_accounts
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 @api_view(['GET'])
 def get_dashboard_data(request):
