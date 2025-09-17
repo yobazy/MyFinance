@@ -142,8 +142,16 @@ const AccountsPage = () => {
       case "AMEX":
         return (
           <img 
-            src="https://www.americanexpress.com/content/dam/amex/us/merchant/supplies-uplift/product/images/Amex_Bluebox-Logo.png" 
+            src="/bank_amex_icon.svg" 
             alt="American Express Logo" 
+            style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+          />
+        );
+      case "TD":
+        return (
+          <img 
+            src="/bank_td_icon.svg" 
+            alt="TD Bank Logo" 
             style={{ width: '24px', height: '24px', objectFit: 'contain' }}
           />
         );
