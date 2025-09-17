@@ -3,13 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { 
   AppBar, 
   Toolbar, 
-  Typography, 
   Button, 
   Container,
   IconButton,
   Menu,
   MenuItem,
-  useTheme,
   useMediaQuery,
   Box
 } from "@mui/material";
@@ -22,6 +20,8 @@ import CategoryIcon from '@mui/icons-material/Category';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RuleIcon from '@mui/icons-material/Rule';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import Dashboard from "./pages/Dashboard.tsx";
 import AccountsPage from "./pages/AccountsPage.tsx";
 import FileUploader from "./pages/FileUploader";
@@ -51,9 +51,11 @@ const checkAndCreateAutoBackup = async () => {
 
 const App = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [manageAnchorEl, setManageAnchorEl] = React.useState(null);
   const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
   const theme = React.useMemo(() => getTheme(mode), [mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const hoverTimeoutRef = React.useRef(null);
   
   React.useEffect(() => {
     const handleThemeChange = (event) => {
@@ -65,7 +67,12 @@ const App = () => {
     // Check for auto backup when app loads
     checkAndCreateAutoBackup();
     
-    return () => window.removeEventListener('themeChange', handleThemeChange);
+    return () => {
+      window.removeEventListener('themeChange', handleThemeChange);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleMenu = (event) => {
@@ -74,6 +81,32 @@ const App = () => {
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleManageMenu = (event) => {
+    setManageAnchorEl(event.currentTarget);
+  };
+
+  const handleManageClose = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setManageAnchorEl(null);
+    }, 200);
+  };
+
+  const handleManageMouseEnter = (e) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setManageAnchorEl(e.currentTarget);
+  };
+
+  const handleMenuMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
   };
 
   const NavButton = ({ to, icon, label }) => (
@@ -93,8 +126,7 @@ const navItems = [
     { to: "/accounts", icon: <AccountBalanceIcon />, label: "Accounts" },
     { to: "/upload", icon: <UploadFileIcon />, label: "Upload" },
     { to: "/transactions", icon: <ReceiptIcon />, label: "Transactions" },
-    { to: "/categorization", icon: <CategoryIcon />, label: "Categories" },
-    { to: "/rules", icon: <RuleIcon />, label: "Rules" },
+    { to: "/visualizations", icon: <BarChartIcon />, label: "Analytics" },
     { to: "/user-settings", icon: <SettingsIcon />, label: "Settings" },
   ];
 
@@ -140,7 +172,7 @@ const navItems = [
                   open={Boolean(anchorEl)}
                   onClose={handleClose}
                 >
-                  {navItems.map((item) => (
+                  {navItems.slice(0, -1).map((item) => (
                     <MenuItem 
                       key={item.to} 
                       component={Link} 
@@ -152,11 +184,52 @@ const navItems = [
                       {item.label}
                     </MenuItem>
                   ))}
+                  <MenuItem 
+                    onClick={handleManageMenu}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    <ManageAccountsIcon />
+                    Manage
+                    <ArrowDropDownIcon />
+                  </MenuItem>
+                  <MenuItem 
+                    component={Link} 
+                    to={navItems[navItems.length - 1].to}
+                    onClick={handleClose}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    {navItems[navItems.length - 1].icon}
+                    {navItems[navItems.length - 1].label}
+                  </MenuItem>
+                </Menu>
+                <Menu
+                  anchorEl={manageAnchorEl}
+                  open={Boolean(manageAnchorEl)}
+                  onClose={handleManageClose}
+                >
+                  <MenuItem 
+                    component={Link} 
+                    to="/categorization"
+                    onClick={handleManageClose}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    <CategoryIcon />
+                    Categories
+                  </MenuItem>
+                  <MenuItem 
+                    component={Link} 
+                    to="/rules"
+                    onClick={handleManageClose}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    <RuleIcon />
+                    Rules
+                  </MenuItem>
                 </Menu>
               </>
             ) : (
               <Box sx={{ display: 'flex' }}>
-                {navItems.map((item) => (
+                {navItems.slice(0, -1).map((item) => (
                   <NavButton
                     key={item.to}
                     to={item.to}
@@ -164,10 +237,90 @@ const navItems = [
                     label={item.label}
                   />
                 ))}
+                <Box
+                  onMouseEnter={handleManageMouseEnter}
+                  onMouseLeave={handleManageClose}
+                  sx={{ 
+                    position: 'relative',
+                    display: 'inline-block'
+                  }}
+                >
+                  <Button
+                    color="inherit"
+                    startIcon={<ManageAccountsIcon />}
+                    endIcon={<ArrowDropDownIcon />}
+                    sx={{ ml: 1 }}
+                  >
+                    Manage
+                  </Button>
+                  {/* Invisible bridge to prevent gap */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      zIndex: 1,
+                    }}
+                    onMouseEnter={handleMenuMouseEnter}
+                  />
+                </Box>
+                <NavButton
+                  to={navItems[navItems.length - 1].to}
+                  icon={navItems[navItems.length - 1].icon}
+                  label={navItems[navItems.length - 1].label}
+                />
               </Box>
             )}
           </Toolbar>
         </AppBar>
+
+        {/* Manage Dropdown Menu for Desktop */}
+        <Menu
+          anchorEl={manageAnchorEl}
+          open={Boolean(manageAnchorEl)}
+          onClose={handleManageClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+          MenuListProps={{
+            onMouseEnter: handleMenuMouseEnter,
+            onMouseLeave: handleManageClose,
+          }}
+          disableAutoFocusItem
+          disableRestoreFocus
+          sx={{
+            '& .MuiPaper-root': {
+              marginTop: '0px', // No gap to prevent flickering
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            }
+          }}
+        >
+          <MenuItem 
+            component={Link} 
+            to="/categorization"
+            onClick={handleManageClose}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          >
+            <CategoryIcon />
+            Categories
+          </MenuItem>
+          <MenuItem 
+            component={Link} 
+            to="/rules"
+            onClick={handleManageClose}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          >
+            <RuleIcon />
+            Rules
+          </MenuItem>
+        </Menu>
 
         <Container sx={{ mt: 4 }}>
           <Routes>
