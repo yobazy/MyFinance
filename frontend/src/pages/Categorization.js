@@ -83,6 +83,21 @@ const Categorization = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   
+  // Preview state
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewData, setPreviewData] = useState([]);
+  const [previewStats, setPreviewStats] = useState(null);
+  const [previewChanges, setPreviewChanges] = useState(new Map());
+  const [applyingChanges, setApplyingChanges] = useState(false);
+  const [previewPagination, setPreviewPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    pageSize: 20,
+    totalCount: 0,
+    hasNext: false,
+    hasPrevious: false
+  });
+  
   // Bulk categorization state
   const [showBulkConfirmDialog, setShowBulkConfirmDialog] = useState(false);
   const [pendingTransactionId, setPendingTransactionId] = useState(null);
@@ -289,6 +304,124 @@ const Categorization = () => {
       setAutoCategorizing(false);
     }
   }, [fetchInitialData]);
+
+  // Preview functionality
+  const handleGeneratePreview = useCallback(async (page = 1) => {
+    try {
+      setAutoCategorizing(true);
+      setSuccessMessage("");
+      
+      // Ensure we're sending clean, serializable data
+      const requestData = {
+        confidence_threshold: Number(confidenceThreshold),
+        page: Number(page),
+        page_size: 20
+      };
+      
+      console.log('Sending preview request:', requestData);
+      console.log('Request data type:', typeof requestData);
+      console.log('Request data JSON:', JSON.stringify(requestData));
+      
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/preview/", requestData);
+      
+      if (response.data.success) {
+        setPreviewData(response.data.preview_data);
+        setPreviewStats(response.data.page_stats);
+        setPreviewPagination(response.data.pagination);
+        setPreviewMode(true);
+        setPreviewChanges(new Map());
+      }
+    } catch (error) {
+      console.error("Error generating preview:", error);
+      setError("Failed to generate preview");
+    } finally {
+      setAutoCategorizing(false);
+    }
+  }, [confidenceThreshold]);
+
+  const handlePreviewPageChange = useCallback((event, page) => {
+    // Extract just the page number to avoid circular references
+    const pageNumber = Number(page);
+    handleGeneratePreview(pageNumber);
+  }, [handleGeneratePreview]);
+
+  const handlePreviewChange = useCallback((transactionId, action, categoryId = null) => {
+    setPreviewChanges(prev => {
+      const newChanges = new Map(prev);
+      if (action === 'remove') {
+        newChanges.set(transactionId, { action: 'remove' });
+      } else if (action === 'categorize' && categoryId) {
+        newChanges.set(transactionId, { action: 'categorize', categoryId });
+      } else if (action === 'revert') {
+        newChanges.delete(transactionId);
+      }
+      return newChanges;
+    });
+  }, []);
+
+  const handleApplyPreview = useCallback(async () => {
+    try {
+      setApplyingChanges(true);
+      
+      const changes = Array.from(previewChanges.entries()).map(([transactionId, change]) => {
+        const transaction = previewData.find(t => t.transaction_id === transactionId);
+        return {
+          transaction_id: Number(transactionId),
+          category_id: Number(change.categoryId || transaction?.suggested_category?.id),
+          action: String(change.action),
+          confidence: Number(transaction?.confidence || 0)
+        };
+      });
+      
+      const requestData = {
+        changes: changes
+      };
+      
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/apply-preview/", requestData);
+      
+      if (response.data.success) {
+        setSuccessMessage(
+          `Successfully applied ${response.data.applied_count} changes!`
+        );
+        setShowSuccess(true);
+        
+        // Exit preview mode and refresh data
+        setPreviewMode(false);
+        setPreviewData([]);
+        setPreviewStats(null);
+        setPreviewChanges(new Map());
+        setPreviewPagination({
+          currentPage: 1,
+          totalPages: 1,
+          pageSize: 20,
+          totalCount: 0,
+          hasNext: false,
+          hasPrevious: false
+        });
+        await fetchInitialData();
+      }
+    } catch (error) {
+      console.error("Error applying changes:", error);
+      setError("Failed to apply changes");
+    } finally {
+      setApplyingChanges(false);
+    }
+  }, [previewChanges, previewData, fetchInitialData]);
+
+  const handleCancelPreview = useCallback(() => {
+    setPreviewMode(false);
+    setPreviewData([]);
+    setPreviewStats(null);
+    setPreviewChanges(new Map());
+    setPreviewPagination({
+      currentPage: 1,
+      totalPages: 1,
+      pageSize: 20,
+      totalCount: 0,
+      hasNext: false,
+      hasPrevious: false
+    });
+  }, []);
 
   // Load all transactions when "View All" is clicked
   const loadAllTransactions = useCallback(async () => {
@@ -818,7 +951,7 @@ const Categorization = () => {
                   </Typography>
                 </Box>
 
-                <Box display="flex" gap={2} alignItems="center">
+                <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
                   <Button
                     variant="contained"
                     color="primary"
@@ -827,6 +960,16 @@ const Categorization = () => {
                     disabled={autoCategorizing || allTransactions.length === 0}
                   >
                     {autoCategorizing ? 'Auto-Categorizing...' : `Auto-Categorize All (${allTransactions.length})`}
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={autoCategorizing ? <CircularProgress size={20} /> : <VisibilityIcon />}
+                    onClick={handleGeneratePreview}
+                    disabled={autoCategorizing || allTransactions.length === 0}
+                  >
+                    {autoCategorizing ? 'Generating Preview...' : 'Preview Changes'}
                   </Button>
                   
                   <Button
@@ -870,6 +1013,217 @@ const Categorization = () => {
           </Collapse>
         </CardContent>
       </Card>
+
+      {/* Preview Mode Interface */}
+      {previewMode && (
+        <Card sx={{ mb: 2, boxShadow: theme.shadows[2], border: '2px solid', borderColor: 'secondary.main' }}>
+          <CardContent sx={{ py: 3, px: 2 }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+              <Box display="flex" alignItems="center">
+                <VisibilityIcon color="secondary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Preview Mode - Review Changes
+                </Typography>
+                <Chip 
+                  label={`${previewChanges.size} changes`} 
+                  size="small" 
+                  color="secondary" 
+                  variant="outlined"
+                  sx={{ ml: 1 }}
+                />
+              </Box>
+              <Box display="flex" gap={1}>
+                <Button
+                  variant="outlined"
+                  onClick={handleCancelPreview}
+                  disabled={applyingChanges}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={applyingChanges ? <CircularProgress size={20} /> : <AutorenewIcon />}
+                  onClick={handleApplyPreview}
+                  disabled={applyingChanges || previewChanges.size === 0}
+                >
+                  {applyingChanges ? 'Applying...' : `Apply ${previewChanges.size} Changes`}
+                </Button>
+              </Box>
+            </Box>
+
+            {previewStats && (
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">Preview Summary</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Page {previewPagination.currentPage} of {previewPagination.totalPages} 
+                    ({previewPagination.totalCount} total transactions)
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="body2" color="text.secondary">This Page</Typography>
+                    <Typography variant="h6">{previewStats.total_processed}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="body2" color="text.secondary">High Confidence</Typography>
+                    <Typography variant="h6" color="success.main">{previewStats.high_confidence}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="body2" color="text.secondary">Medium Confidence</Typography>
+                    <Typography variant="h6" color="warning.main">{previewStats.medium_confidence}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="body2" color="text.secondary">Low Confidence</Typography>
+                    <Typography variant="h6" color="error.main">{previewStats.low_confidence}</Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+
+            <Grid container spacing={2}>
+              {previewData.map((transaction) => {
+                const change = previewChanges.get(transaction.transaction_id);
+                const isModified = change !== undefined;
+                const isRemoved = change?.action === 'remove';
+                const isCategorized = change?.action === 'categorize';
+                
+                return (
+                  <Grid item xs={12} key={transaction.transaction_id}>
+                    <Paper 
+                      elevation={isModified ? 3 : 1} 
+                      sx={{ 
+                        p: 2, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 2,
+                        transition: 'all 0.2s',
+                        border: isModified ? '2px solid' : '1px solid',
+                        borderColor: isRemoved ? 'error.main' : isCategorized ? 'success.main' : 'divider',
+                        bgcolor: isRemoved ? 'error.light' : isCategorized ? 'success.light' : 'background.paper',
+                        opacity: isRemoved ? 0.6 : 1
+                      }}
+                    >
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Box display="flex" alignItems="center" gap={1} mb={1}>
+                          <Typography variant="body1" fontWeight="medium">
+                            {transaction.description}
+                          </Typography>
+                          <Chip 
+                            label={`${Math.round(transaction.confidence * 100)}%`}
+                            size="small"
+                            color={transaction.confidence_level === 'high' ? 'success' : transaction.confidence_level === 'medium' ? 'warning' : 'error'}
+                            variant="outlined"
+                          />
+                          {transaction.reason === 'User rule' && (
+                            <Chip 
+                              label="User Rule"
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          )}
+                          {isModified && (
+                            <Chip 
+                              label={isRemoved ? 'Removed' : 'Modified'}
+                              size="small"
+                              color={isRemoved ? 'error' : 'success'}
+                              variant="filled"
+                            />
+                          )}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {transaction.account_name} • {new Date(transaction.date).toLocaleDateString()}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          color={transaction.amount >= 0 ? "error.main" : "success.main"}
+                          fontWeight="bold"
+                        >
+                          ${Math.abs(transaction.amount).toFixed(2)}
+                        </Typography>
+                      </Box>
+                      
+                      <Box display="flex" alignItems="center" gap={2}>
+                        {!isRemoved && (
+                          <Box>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              Suggested Category:
+                            </Typography>
+                            <Chip 
+                              label={isCategorized ? 
+                                categories.find(c => c.id === change.categoryId)?.name || 'Unknown' :
+                                transaction.suggested_category.name
+                              }
+                              color="primary"
+                              variant="outlined"
+                            />
+                          </Box>
+                        )}
+                        
+                        <Box display="flex" gap={1}>
+                          {!isRemoved && (
+                            <FormControl size="small" sx={{ minWidth: 150 }}>
+                              <InputLabel>Change to</InputLabel>
+                              <Select
+                                value={isCategorized ? change.categoryId : ''}
+                                onChange={(e) => handlePreviewChange(transaction.transaction_id, 'categorize', e.target.value)}
+                                label="Change to"
+                              >
+                                {categories.map((category) => (
+                                  <MenuItem key={category.id} value={category.id}>
+                                    {category.name}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          )}
+                          
+                          <Button
+                            variant="outlined"
+                            color={isRemoved ? 'success' : 'error'}
+                            size="small"
+                            onClick={() => handlePreviewChange(
+                              transaction.transaction_id, 
+                              isRemoved ? 'revert' : 'remove'
+                            )}
+                          >
+                            {isRemoved ? 'Restore' : 'Remove'}
+                          </Button>
+                          
+                          {isModified && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => handlePreviewChange(transaction.transaction_id, 'revert')}
+                            >
+                              Revert
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+
+            {/* Preview Pagination */}
+            {previewPagination.totalPages > 1 && (
+              <Box display="flex" justifyContent="center" mt={3}>
+                <Pagination
+                  count={previewPagination.totalPages}
+                  page={previewPagination.currentPage}
+                  onChange={handlePreviewPageChange}
+                  color="primary"
+                  size="large"
+                />
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Auto-Categorization Stats Dialog */}
       <Dialog 
@@ -1105,57 +1459,59 @@ const Categorization = () => {
         </CardContent>
       </Card>
 
-      {/* Transactions Section */}
-      <Card sx={{ boxShadow: theme.shadows[1] }}>
-        <CardContent sx={{ py: 2, px: 2 }}>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-            <Box display="flex" alignItems="center">
-              <AttachMoneyIcon color="primary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Uncategorized Transactions
-                {!showAll && hasMoreTransactions && (
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
-                    (Showing {transactions.length} of {allTransactions.length})
-                  </Typography>
-                )}
-              </Typography>
+      {/* Transactions Section - Hidden in preview mode */}
+      {!previewMode && (
+        <Card sx={{ boxShadow: theme.shadows[1] }}>
+          <CardContent sx={{ py: 2, px: 2 }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+              <Box display="flex" alignItems="center">
+                <AttachMoneyIcon color="primary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Uncategorized Transactions
+                  {!showAll && hasMoreTransactions && (
+                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
+                      (Showing {transactions.length} of {allTransactions.length})
+                    </Typography>
+                  )}
+                </Typography>
+              </Box>
+              
+              {!showAll && hasMoreTransactions && (
+                <Button
+                  variant="outlined"
+                  startIcon={<VisibilityIcon />}
+                  onClick={handleViewAll}
+                  disabled={loadingMore}
+                  size="small"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500
+                  }}
+                >
+                  {loadingMore ? 'Loading...' : `View All (${allTransactions.length})`}
+                </Button>
+              )}
             </Box>
-            
-            {!showAll && hasMoreTransactions && (
-              <Button
-                variant="outlined"
-                startIcon={<VisibilityIcon />}
-                onClick={handleViewAll}
-                disabled={loadingMore}
-                size="small"
-                sx={{ 
-                  textTransform: 'none',
-                  fontWeight: 500
-                }}
-              >
-                {loadingMore ? 'Loading...' : `View All (${allTransactions.length})`}
-              </Button>
+
+            <Grid container spacing={2}>
+              {transactionItems}
+            </Grid>
+
+            {/* Pagination */}
+            {showAll && totalPages > 1 && (
+              <Box display="flex" justifyContent="center" mt={3}>
+                <Pagination
+                  count={totalPages}
+                  page={currentPage}
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                />
+              </Box>
             )}
-          </Box>
-
-          <Grid container spacing={2}>
-            {transactionItems}
-          </Grid>
-
-          {/* Pagination */}
-          {showAll && totalPages > 1 && (
-            <Box display="flex" justifyContent="center" mt={3}>
-              <Pagination
-                count={totalPages}
-                page={currentPage}
-                onChange={handlePageChange}
-                color="primary"
-                size="large"
-              />
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit Category Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>

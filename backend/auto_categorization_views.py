@@ -143,6 +143,187 @@ def update_suggestions(request):
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['POST'])
+def preview_auto_categorization(request):
+    """
+    Generate preview of auto-categorization suggestions without applying them.
+    Supports pagination to handle large datasets.
+    """
+    try:
+        # Debug logging
+        print(f"Request data: {request.data}")
+        print(f"Request data type: {type(request.data)}")
+        
+        service = AutoCategorizationService()
+        
+        # Handle potential data type issues
+        try:
+            confidence_threshold = float(request.data.get('confidence_threshold', 0.6))
+        except (ValueError, TypeError):
+            confidence_threshold = 0.6
+            
+        try:
+            page = int(request.data.get('page', 1))
+        except (ValueError, TypeError):
+            page = 1
+            
+        try:
+            page_size = int(request.data.get('page_size', 20))
+        except (ValueError, TypeError):
+            page_size = 20
+        
+        print(f"Parsed values - confidence: {confidence_threshold}, page: {page}, page_size: {page_size}")
+        
+        # Get uncategorized transactions with pagination
+        uncategorized = Transaction.objects.filter(category__isnull=True)
+        total_count = uncategorized.count()
+        
+        # Calculate pagination
+        start_index = (page - 1) * page_size
+        end_index = start_index + page_size
+        paginated_transactions = uncategorized[start_index:end_index]
+        
+        preview_data = []
+        page_stats = {
+            'total_processed': 0,
+            'high_confidence': 0,
+            'medium_confidence': 0,
+            'low_confidence': 0,
+            'no_suggestion': 0,
+            'user_rules_applied': 0
+        }
+        
+        # Process only the current page of transactions
+        for transaction in paginated_transactions:
+            page_stats['total_processed'] += 1
+            
+            category, confidence = service.categorize_transaction(transaction)
+            
+            if category:
+                suggestion_data = {
+                    'transaction_id': transaction.id,
+                    'description': transaction.description,
+                    'amount': float(transaction.amount),
+                    'date': transaction.date.isoformat(),
+                    'account_name': transaction.account.name if transaction.account else 'Unknown',
+                    'suggested_category': {
+                        'id': category.id,
+                        'name': category.name
+                    },
+                    'confidence': round(confidence, 3),
+                    'reason': 'Auto-match' if confidence < 0.9 else 'User rule',
+                    'confidence_level': 'high' if confidence >= 0.8 else 'medium' if confidence >= 0.5 else 'low'
+                }
+                
+                preview_data.append(suggestion_data)
+                
+                # Update page stats
+                if confidence >= 0.9:
+                    page_stats['user_rules_applied'] += 1
+                elif confidence >= 0.8:
+                    page_stats['high_confidence'] += 1
+                elif confidence >= 0.5:
+                    page_stats['medium_confidence'] += 1
+                else:
+                    page_stats['low_confidence'] += 1
+            else:
+                page_stats['no_suggestion'] += 1
+        
+        # Sort by confidence (highest first)
+        preview_data.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        # Calculate pagination info
+        total_pages = (total_count + page_size - 1) // page_size
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        return Response({
+            'success': True,
+            'preview_data': preview_data,
+            'page_stats': page_stats,
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'page_size': page_size,
+                'total_count': total_count,
+                'has_next': has_next,
+                'has_previous': has_previous
+            },
+            'confidence_threshold': confidence_threshold
+        })
+        
+    except Exception as e:
+        print(f"Error in preview_auto_categorization: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def apply_categorization_preview(request):
+    """
+    Apply the categorization changes from a preview.
+    """
+    try:
+        changes = request.data.get('changes', [])
+        
+        if not changes:
+            return Response({
+                'success': True,
+                'message': 'No changes to apply',
+                'applied_count': 0
+            })
+        
+        applied_count = 0
+        errors = []
+        
+        for change in changes:
+            try:
+                transaction_id = change['transaction_id']
+                category_id = change['category_id']
+                action = change.get('action', 'categorize')  # 'categorize' or 'remove'
+                
+                transaction = Transaction.objects.get(id=transaction_id)
+                
+                if action == 'categorize':
+                    category = Category.objects.get(id=category_id)
+                    transaction.category = category
+                    transaction.auto_categorized = True
+                    transaction.confidence_score = change.get('confidence', 0.0)
+                    transaction.suggested_category = None  # Clear suggestion
+                    transaction.save()
+                    applied_count += 1
+                    
+                elif action == 'remove':
+                    # Remove the suggestion but keep transaction uncategorized
+                    transaction.suggested_category = None
+                    transaction.confidence_score = None
+                    transaction.save()
+                    applied_count += 1
+                    
+            except Transaction.DoesNotExist:
+                errors.append(f"Transaction {transaction_id} not found")
+            except Category.DoesNotExist:
+                errors.append(f"Category {category_id} not found")
+            except Exception as e:
+                errors.append(f"Error processing transaction {transaction_id}: {str(e)}")
+        
+        return Response({
+            'success': True,
+            'message': f'Applied {applied_count} changes successfully',
+            'applied_count': applied_count,
+            'errors': errors
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 def categorization_stats(request):
     """Get categorization statistics."""
