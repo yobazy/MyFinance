@@ -15,9 +15,51 @@ class TransactionSerializer(serializers.ModelSerializer):
         ]
 
 class CategorySerializer(serializers.ModelSerializer):
+    subcategories = serializers.SerializerMethodField()
+    parent_name = serializers.CharField(source='parent.name', read_only=True)
+    full_path = serializers.CharField(read_only=True)
+    level = serializers.IntegerField(read_only=True)
+    is_root = serializers.BooleanField(read_only=True)
+    transaction_count = serializers.SerializerMethodField()
+    
     class Meta:
         model = Category
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'parent', 'parent_name', 'description', 'color', 
+            'is_active', 'created_at', 'updated_at', 'subcategories', 
+            'full_path', 'level', 'is_root', 'transaction_count'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_subcategories(self, obj):
+        """Get immediate subcategories (not recursive)"""
+        subcategories = obj.subcategories.filter(is_active=True)
+        return CategorySerializer(subcategories, many=True, context=self.context).data
+    
+    def get_transaction_count(self, obj):
+        """Get transaction count for this category and all its subcategories"""
+        return obj.get_transaction_count()
+
+class CategoryTreeSerializer(serializers.ModelSerializer):
+    """Serializer for hierarchical category tree display"""
+    subcategories = serializers.SerializerMethodField()
+    transaction_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'name', 'parent', 'description', 'color', 
+            'is_active', 'subcategories', 'transaction_count'
+        ]
+    
+    def get_subcategories(self, obj):
+        """Get immediate subcategories (not recursive)"""
+        subcategories = obj.subcategories.filter(is_active=True)
+        return CategoryTreeSerializer(subcategories, many=True, context=self.context).data
+    
+    def get_transaction_count(self, obj):
+        """Get transaction count for this category and all its subcategories"""
+        return obj.get_transaction_count()
 
 class CategorizationRuleSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)

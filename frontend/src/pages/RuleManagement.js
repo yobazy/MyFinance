@@ -893,7 +893,7 @@ const RuleManagement = () => {
                 >
                   {categories.map(category => (
                     <MenuItem key={category.id} value={category.id}>
-                      {category.name}
+                      {category.full_path || category.name}
                     </MenuItem>
                   ))}
                 </Select>

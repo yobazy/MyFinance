@@ -3,10 +3,58 @@ from django.db.models import Sum
 from django.utils import timezone
 
 class Category(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-
+    name = models.CharField(max_length=255)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subcategories')
+    description = models.TextField(blank=True, help_text="Optional description for the category")
+    color = models.CharField(max_length=7, default='#2196F3', help_text="Hex color code for UI display")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['name', 'parent']  # Allow same name under different parents
+        ordering = ['parent__name', 'name']  # Order by parent then name
+        verbose_name_plural = "Categories"
+    
     def __str__(self):
+        if self.parent:
+            return f"{self.parent.name} > {self.name}"
         return self.name
+    
+    @property
+    def full_path(self):
+        """Get the full hierarchical path of the category"""
+        if self.parent:
+            return f"{self.parent.full_path} > {self.name}"
+        return self.name
+    
+    @property
+    def level(self):
+        """Get the depth level of the category (0 for root categories)"""
+        level = 0
+        parent = self.parent
+        while parent:
+            level += 1
+            parent = parent.parent
+        return level
+    
+    @property
+    def is_root(self):
+        """Check if this is a root category (no parent)"""
+        return self.parent is None
+    
+    def get_all_subcategories(self):
+        """Get all subcategories recursively"""
+        subcategories = list(self.subcategories.all())
+        for subcategory in subcategories:
+            subcategories.extend(subcategory.get_all_subcategories())
+        return subcategories
+    
+    def get_transaction_count(self):
+        """Get the count of transactions in this category and all its subcategories"""
+        from django.db.models import Count
+        subcategory_ids = [self.id] + [sub.id for sub in self.get_all_subcategories()]
+        return Transaction.objects.filter(category__in=subcategory_ids).count()
 
 class Account(models.Model):
     ACCOUNT_TYPES = [

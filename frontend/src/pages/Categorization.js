@@ -43,6 +43,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import StarIcon from '@mui/icons-material/Star';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -56,9 +58,13 @@ const Categorization = () => {
   const [transactions, setTransactions] = useState([]);
   const [allTransactions, setAllTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [categoryTree, setCategoryTree] = useState([]);
   const [newCategory, setNewCategory] = useState("");
+  const [newSubcategory, setNewSubcategory] = useState("");
+  const [selectedParentCategory, setSelectedParentCategory] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
@@ -209,12 +215,16 @@ const Categorization = () => {
     try {
       setLoading(true);
       
-      // Fetch categories
-      const categoriesResponse = await axios.get("http://127.0.0.1:8000/api/categories/");
+      // Fetch categories, category tree, and transactions in parallel
+      const [categoriesResponse, categoryTreeResponse, transactionsResponse] = await Promise.all([
+        axios.get("http://127.0.0.1:8000/api/categories/"),
+        axios.get("http://127.0.0.1:8000/api/categories/tree/"),
+        axios.get("http://127.0.0.1:8000/api/transactions/?uncategorized=true")
+      ]);
+      
       setCategories(categoriesResponse.data);
-
-      // Fetch a small batch of transactions first
-      const transactionsResponse = await axios.get("http://127.0.0.1:8000/api/transactions/?uncategorized=true");
+      setCategoryTree(categoryTreeResponse.data);
+      
       const allFetchedTransactions = transactionsResponse.data;
       
       // Only show first 20 initially
@@ -467,10 +477,34 @@ const Categorization = () => {
       console.log('Manual category created successfully:', response.data);
       setCategories(prev => [...prev, response.data]);
       setNewCategory("");
+      
+      // Refresh category tree
+      const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
+      setCategoryTree(treeResponse.data);
     } catch (error) {
       console.error("Error adding category:", error);
     }
   }, [newCategory]);
+
+  const handleAddSubcategory = useCallback(async () => {
+    if (!newSubcategory.trim() || !selectedParentCategory) return;
+    try {
+      console.log('Creating subcategory:', newSubcategory, 'under parent:', selectedParentCategory);
+      const response = await axios.post(`http://127.0.0.1:8000/api/categories/${selectedParentCategory}/subcategories/`, {
+        name: newSubcategory
+      });
+      console.log('Subcategory created successfully:', response.data);
+      setCategories(prev => [...prev, response.data]);
+      setNewSubcategory("");
+      setSelectedParentCategory(null);
+      
+      // Refresh category tree
+      const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
+      setCategoryTree(treeResponse.data);
+    } catch (error) {
+      console.error("Error adding subcategory:", error);
+    }
+  }, [newSubcategory, selectedParentCategory]);
 
   const handleUpdateCategory = useCallback(async (categoryId, newName) => {
     try {
@@ -491,10 +525,27 @@ const Categorization = () => {
     try {
       await axios.delete(`http://127.0.0.1:8000/api/categories/${categoryId}/delete/`);
       setCategories(prev => prev.filter(c => c.id !== categoryId));
+      
+      // Refresh category tree
+      const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
+      setCategoryTree(treeResponse.data);
     } catch (error) {
       console.error("Error deleting category:", error);
     }
   }, []);
+
+  const toggleCategoryExpansion = useCallback((categoryId) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  }, []);
+
 
   // Function to perform the actual update
   const performTransactionUpdate = useCallback(async (transactionId, categoryId) => {
@@ -570,6 +621,51 @@ const Categorization = () => {
     setEditingCategoryName(category.name);
     setOpenDialog(true);
   }, []);
+
+  const renderCategoryTree = useCallback((categories, level = 0) => {
+    return categories.map((category) => (
+      <Box key={category.id} sx={{ ml: level * 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          {category.subcategories && category.subcategories.length > 0 && (
+            <IconButton
+              size="small"
+              onClick={() => toggleCategoryExpansion(category.id)}
+              sx={{ mr: 1 }}
+            >
+              {expandedCategories.has(category.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          )}
+          
+          <Chip
+            label={`${category.name} (${category.transaction_count || 0})`}
+            onDelete={() => handleDeleteCategory(category.id)}
+            deleteIcon={<DeleteIcon />}
+            onClick={() => startEditingCategory(category)}
+            clickable
+            color="primary"
+            variant="outlined"
+            sx={{ mr: 1, mb: 1 }}
+            style={{ backgroundColor: category.color || '#2196F3', color: 'white' }}
+          />
+          
+          <IconButton
+            size="small"
+            onClick={() => setSelectedParentCategory(category.id)}
+            title="Add subcategory"
+            sx={{ ml: 1 }}
+          >
+            <AddCircleOutlineIcon />
+          </IconButton>
+        </Box>
+        
+        {category.subcategories && category.subcategories.length > 0 && expandedCategories.has(category.id) && (
+          <Box sx={{ ml: 2 }}>
+            {renderCategoryTree(category.subcategories, level + 1)}
+          </Box>
+        )}
+      </Box>
+    ));
+  }, [expandedCategories, handleDeleteCategory, startEditingCategory, toggleCategoryExpansion]);
 
   const handleEditCategory = useCallback(() => {
     if (editingCategory && editingCategoryName.trim()) {
@@ -664,21 +760,8 @@ const Categorization = () => {
 
   // Memoize the category chips to prevent unnecessary re-renders
   const categoryChips = useMemo(() => {
-    return categories.map((category) => (
-      <Grid item key={category.id}>
-        <Chip
-          label={category.name}
-          onDelete={() => handleDeleteCategory(category.id)}
-          deleteIcon={<DeleteIcon />}
-          onClick={() => startEditingCategory(category)}
-          clickable
-          color="primary"
-          variant="outlined"
-          sx={{ mr: 1, mb: 1 }}
-        />
-      </Grid>
-    ));
-  }, [categories, handleDeleteCategory, startEditingCategory]);
+    return renderCategoryTree(categoryTree);
+  }, [categoryTree, renderCategoryTree]);
 
   // Memoize transaction items to prevent unnecessary re-renders
   const transactionItems = useMemo(() => {
@@ -744,7 +827,7 @@ const Categorization = () => {
             >
               {categories.map((category) => (
                 <MenuItem key={category.id} value={category.id}>
-                  {category.name}
+                  {category.full_path || category.name}
                 </MenuItem>
               ))}
             </Select>
@@ -1173,7 +1256,7 @@ const Categorization = () => {
                               >
                                 {categories.map((category) => (
                                   <MenuItem key={category.id} value={category.id}>
-                                    {category.name}
+                                    {category.full_path || category.name}
                                   </MenuItem>
                                 ))}
                               </Select>
@@ -1372,11 +1455,12 @@ const Categorization = () => {
           </Box>
           
           <Collapse in={showCategoryManagement}>
+            {/* Root Category Creation */}
             <Box display="flex" gap={2} mb={3}>
               <TextField
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                placeholder="New category name"
+                placeholder="New root category name"
                 variant="outlined"
                 size="small"
                 sx={{ flexGrow: 1 }}
@@ -1389,19 +1473,57 @@ const Categorization = () => {
                 onClick={handleAddCategory}
                 disabled={!newCategory.trim()}
               >
-                Add Category
+                Add Root Category
               </Button>
-              {availableDefaultCategories.length > 0 && (
-                <Button 
-                  variant="outlined" 
-                  color="secondary"
-                  startIcon={<StarIcon />}
-                  onClick={() => setOpenDefaultDialog(true)}
-                >
-                  Add Defaults
-                </Button>
-              )}
             </Box>
+
+            {/* Subcategory Creation */}
+            <Box display="flex" gap={2} mb={3} alignItems="center">
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel>Parent Category</InputLabel>
+                <Select
+                  value={selectedParentCategory || ''}
+                  onChange={(e) => setSelectedParentCategory(e.target.value)}
+                  label="Parent Category"
+                >
+                  {categories.filter(cat => !cat.parent).map((category) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {category.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                value={newSubcategory}
+                onChange={(e) => setNewSubcategory(e.target.value)}
+                placeholder="New subcategory name"
+                variant="outlined"
+                size="small"
+                sx={{ flexGrow: 1 }}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddSubcategory()}
+              />
+              <Button 
+                variant="contained" 
+                color="secondary"
+                startIcon={<SubdirectoryArrowRightIcon />}
+                onClick={handleAddSubcategory}
+                disabled={!newSubcategory.trim() || !selectedParentCategory}
+              >
+                Add Subcategory
+              </Button>
+            </Box>
+            
+            {availableDefaultCategories.length > 0 && (
+              <Button 
+                variant="outlined" 
+                color="secondary"
+                startIcon={<StarIcon />}
+                onClick={() => setOpenDefaultDialog(true)}
+                sx={{ mb: 2 }}
+              >
+                Add Defaults
+              </Button>
+            )}
 
             {/* Default Categories Preview */}
             {availableDefaultCategories.length > 0 && (
@@ -1452,9 +1574,12 @@ const Categorization = () => {
 
             <Divider sx={{ mb: 2 }} />
 
-            <Grid container spacing={1}>
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Category Hierarchy
+              </Typography>
               {categoryChips}
-            </Grid>
+            </Box>
           </Collapse>
         </CardContent>
       </Card>

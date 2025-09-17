@@ -232,9 +232,24 @@ def transactions_missing_categories(request):
 
 @api_view(['GET'])
 def get_categories(request):
-    """Fetches all categories."""
-    categories = Category.objects.all()
-    serializer = CategorySerializer(categories, many=True)
+    """Fetches all categories with optional tree structure."""
+    tree_view = request.GET.get('tree', 'false').lower() == 'true'
+    root_only = request.GET.get('root_only', 'false').lower() == 'true'
+    
+    if tree_view:
+        # Return hierarchical tree structure
+        from .serializers import CategoryTreeSerializer
+        categories = Category.objects.filter(parent__isnull=True, is_active=True)
+        serializer = CategoryTreeSerializer(categories, many=True)
+    elif root_only:
+        # Return only root categories
+        categories = Category.objects.filter(parent__isnull=True, is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+    else:
+        # Return flat list of all categories
+        categories = Category.objects.filter(is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+    
     return Response(serializer.data, content_type="application/json")
 
 @csrf_exempt
@@ -423,10 +438,50 @@ def delete_category(request, category_id):
     """Deletes a category."""
     try:
         category = Category.objects.get(id=category_id)
+        # Check if category has subcategories
+        if category.subcategories.exists():
+            return Response({
+                'error': 'Cannot delete category with subcategories. Please delete subcategories first.'
+            }, status=400)
         category.delete()
         return Response(status=204)
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=404)
+
+@api_view(['POST'])
+def create_subcategory(request, parent_id):
+    """Creates a subcategory under a parent category."""
+    try:
+        parent_category = Category.objects.get(id=parent_id)
+        # Include parent in the data
+        data = request.data.copy()
+        data['parent'] = parent_id
+        serializer = CategorySerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+    except Category.DoesNotExist:
+        return Response({'error': 'Parent category not found'}, status=404)
+
+@api_view(['GET'])
+def get_category_subcategories(request, category_id):
+    """Gets all subcategories of a specific category."""
+    try:
+        category = Category.objects.get(id=category_id)
+        subcategories = category.subcategories.filter(is_active=True)
+        serializer = CategorySerializer(subcategories, many=True)
+        return Response(serializer.data)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=404)
+
+@api_view(['GET'])
+def get_category_tree(request):
+    """Gets the complete category tree structure."""
+    from .serializers import CategoryTreeSerializer
+    categories = Category.objects.filter(parent__isnull=True, is_active=True)
+    serializer = CategoryTreeSerializer(categories, many=True)
+    return Response(serializer.data)
 
 @api_view(['PUT'])
 def update_transaction_category(request, transaction_id):
