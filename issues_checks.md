@@ -5,6 +5,7 @@ Issues:
 [] Smart Auto-cateogization should be hidden until enabled
 [] Remove debug current categories
 [] uncategorized transactions still show even if category assigned
+[] when bulk categorizing the number shows only the count on the current page, the notification shows the true number.
 
 Checks:
 [] Amex populates right
@@ -17,4 +18,6 @@ To Do:
 [] Auto categorys?
 [] database backups 
 [] database save / load
+[] database reset should ask user to confirm before reset
+[] subcategories?
 
