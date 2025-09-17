@@ -21,6 +21,7 @@ class CategorySerializer(serializers.ModelSerializer):
     level = serializers.IntegerField(read_only=True)
     is_root = serializers.BooleanField(read_only=True)
     transaction_count = serializers.SerializerMethodField()
+    parent = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True, default=None)
     
     class Meta:
         model = Category
@@ -44,6 +45,7 @@ class CategoryTreeSerializer(serializers.ModelSerializer):
     """Serializer for hierarchical category tree display"""
     subcategories = serializers.SerializerMethodField()
     transaction_count = serializers.SerializerMethodField()
+    parent = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True, default=None)
     
     class Meta:
         model = Category

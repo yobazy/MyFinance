@@ -469,17 +469,16 @@ const Categorization = () => {
   // Memoize handlers to prevent unnecessary re-renders
   const handleAddCategory = useCallback(async () => {
     if (!newCategory.trim()) return;
+    const categoryName = newCategory; // Store the name before clearing
     try {
-      console.log('Creating manual category:', newCategory);
       const response = await axios.post("http://127.0.0.1:8000/api/categories/create/", {
-        name: newCategory
+        name: categoryName
       });
-      console.log('Manual category created successfully:', response.data);
       setCategories(prev => [...prev, response.data]);
       setNewCategory("");
       
       // Show success notification
-      setSuccessMessage(`Category "${newCategory}" created successfully!`);
+      setSuccessMessage(`Category "${categoryName}" created successfully!`);
       setShowSuccess(true);
       
       // Refresh category tree
