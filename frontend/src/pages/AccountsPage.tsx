@@ -137,6 +137,21 @@ const AccountsPage = () => {
     }
   };
 
+  const getBankIcon = (bank: string): React.ReactElement | undefined => {
+    switch (bank) {
+      case "AMEX":
+        return (
+          <img 
+            src="https://www.americanexpress.com/content/dam/amex/us/merchant/supplies-uplift/product/images/Amex_Bluebox-Logo.png" 
+            alt="American Express Logo" 
+            style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+          />
+        );
+      default:
+        return undefined;
+    }
+  };
+
   return (
     <Container>
       <Box mb={4}>
@@ -201,11 +216,20 @@ const AccountsPage = () => {
                   </Box>
                 </Box>
                 
-                <Chip 
-                  label={account.bank}
-                  size="small"
-                  sx={{ mb: 2 }}
-                />
+                {getBankIcon(account.bank) ? (
+                  <Chip 
+                    label={account.bank}
+                    size="small"
+                    sx={{ mb: 2 }}
+                    icon={getBankIcon(account.bank)}
+                  />
+                ) : (
+                  <Chip 
+                    label={account.bank}
+                    size="small"
+                    sx={{ mb: 2 }}
+                  />
+                )}
                 
                 <Typography variant="body2" color="text.secondary">
                   Account Type: {account.type.charAt(0).toUpperCase() + account.type.slice(1)}
@@ -237,8 +261,18 @@ const AccountsPage = () => {
               label="Bank"
               onChange={(e) => setBank(e.target.value)}
             >
-              <MenuItem value="TD">Toronto-Dominion Bank</MenuItem>
-              <MenuItem value="AMEX">American Express</MenuItem>
+              <MenuItem value="TD">
+                <Box display="flex" alignItems="center" gap={1}>
+                  {getBankIcon("TD")}
+                  Toronto-Dominion Bank
+                </Box>
+              </MenuItem>
+              <MenuItem value="AMEX">
+                <Box display="flex" alignItems="center" gap={1}>
+                  {getBankIcon("AMEX")}
+                  American Express
+                </Box>
+              </MenuItem>
             </Select>
           </FormControl>
 
