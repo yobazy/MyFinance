@@ -478,6 +478,10 @@ const Categorization = () => {
       setCategories(prev => [...prev, response.data]);
       setNewCategory("");
       
+      // Show success notification
+      setSuccessMessage(`Category "${newCategory}" created successfully!`);
+      setShowSuccess(true);
+      
       // Refresh category tree
       const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
       setCategoryTree(treeResponse.data);
