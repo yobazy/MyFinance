@@ -329,11 +329,11 @@ def reset_database(request):
         return JsonResponse({"error": str(e)}, status=500)
     
 from django.http import JsonResponse
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from backend.models import Transaction, Category
 from datetime import datetime
 import numpy as np
-from django.db.models.functions import Abs
+from django.db.models.functions import Abs, TruncMonth
 
 
 def get_visualization_data(request):
@@ -347,9 +347,18 @@ def get_visualization_data(request):
     # Get start & end date from frontend query params (default: use computed defaults)
     start_date = request.GET.get("start_date", default_start)
     end_date = request.GET.get("end_date", default_end)
+    account_id = request.GET.get("account_id", None)
 
     # Get all transactions within the date range
     transactions = Transaction.objects.filter(date__range=[start_date, end_date])
+    
+    # Filter by account if specified
+    if account_id and account_id != 'all':
+        try:
+            account_id = int(account_id)
+            transactions = transactions.filter(account_id=account_id)
+        except (ValueError, TypeError):
+            pass  # Invalid account_id, ignore filter
 
     # Only expenses for category pie (positive values for charting)
     expenses = transactions.filter(amount__gt=0)
@@ -386,12 +395,97 @@ def get_visualization_data(request):
         )
         category_variance[category] = float(np.std(list(category_transactions))) if category_transactions else 0
 
+    # NEW: Weekly spending patterns (day of week analysis)
+    from django.db.models.functions import Extract
+    weekly_patterns = (
+        expenses.annotate(day_of_week=Extract('date', 'week_day'))
+        .values('day_of_week')
+        .annotate(total_amount=Sum('amount'), transaction_count=Count('id'))
+        .order_by('day_of_week')
+    )
+    
+    # Convert day numbers to names
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    weekly_data = []
+    for item in weekly_patterns:
+        day_num = item['day_of_week'] - 1  # Convert from 1-7 to 0-6
+        weekly_data.append({
+            'day': day_names[day_num],
+            'amount': float(item['total_amount']),
+            'count': item['transaction_count']
+        })
+
+    # NEW: Top merchants analysis
+    top_merchants = (
+        expenses.values('description')
+        .annotate(total_amount=Sum('amount'), transaction_count=Count('id'))
+        .order_by('-total_amount')[:10]
+    )
+
+    # NEW: Category spending trends over time (monthly)
+    category_trends = {}
+    for category in category_names:
+        if category:
+            category_monthly = (
+                expenses.filter(category__name=category)
+                .annotate(month=TruncMonth("date"))
+                .values("month")
+                .annotate(total_amount=Sum("amount"))
+                .order_by("month")
+            )
+            category_trends[category] = list(category_monthly)
+
+    # NEW: Spending summary metrics
+    total_spending = expenses.aggregate(total=Sum('amount'))['total'] or 0
+    total_income = income.aggregate(total=Sum('amount'))['total'] or 0
+    avg_daily_spending = total_spending / max(1, (datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days)
+    total_transactions = expenses.count()
+    
+    # NEW: Month-over-month comparison
+    current_month_spending = 0
+    previous_month_spending = 0
+    if monthly_trend:
+        current_month = monthly_trend.last()
+        if current_month:
+            current_month_spending = float(current_month['total_amount'])
+        
+        # Get previous month
+        if len(monthly_trend) > 1:
+            previous_month = monthly_trend[len(monthly_trend)-2]
+            previous_month_spending = float(previous_month['total_amount'])
+    
+    mom_change = 0
+    if previous_month_spending > 0:
+        mom_change = ((current_month_spending - previous_month_spending) / previous_month_spending) * 100
+
+    # NEW: Unusual spending detection (transactions > 2 standard deviations from mean)
+    if expenses.exists():
+        amounts = list(expenses.values_list('amount', flat=True))
+        mean_amount = np.mean(amounts)
+        std_amount = np.std(amounts)
+        threshold = mean_amount + (2 * std_amount)
+        unusual_transactions = expenses.filter(amount__gt=threshold).values(
+            'date', 'description', 'amount', 'category__name'
+        )[:5]
+
     # Construct JSON response
     response_data = {
         "category_spending": list(category_spending),
         "monthly_trend": list(monthly_trend),
         "monthly_income": list(monthly_income),
         "category_variance": category_variance,
+        "weekly_patterns": weekly_data,
+        "top_merchants": list(top_merchants),
+        "category_trends": category_trends,
+        "summary_metrics": {
+            "total_spending": float(total_spending),
+            "total_income": abs(float(total_income)),
+            "net_balance": abs(float(total_income)) - float(total_spending),
+            "avg_daily_spending": float(avg_daily_spending),
+            "total_transactions": total_transactions,
+            "mom_change_percent": round(mom_change, 2)
+        },
+        "unusual_transactions": list(unusual_transactions) if 'unusual_transactions' in locals() else []
     }
 
     return JsonResponse(response_data, safe=False)
