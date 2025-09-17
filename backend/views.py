@@ -311,6 +311,12 @@ def get_accounts(request):
 def get_transactions(request):
     """Fetch all transactions."""
     transactions = Transaction.objects.select_related('account').all().order_by("-date")  # Order by latest
+    
+    # Filter for uncategorized transactions if requested
+    uncategorized = request.GET.get('uncategorized', 'false').lower() == 'true'
+    if uncategorized:
+        transactions = transactions.filter(category__isnull=True)
+    
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
 
