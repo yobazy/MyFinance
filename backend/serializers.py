@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, Category, CategorizationRule, BackupSettings, DatabaseBackup
+from .models import Transaction, Category, CategorizationRule, RuleGroup, RuleUsage, BackupSettings, DatabaseBackup
 
 class TransactionSerializer(serializers.ModelSerializer):
     account_name = serializers.CharField(source='account.name', read_only=True)
@@ -21,13 +21,39 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class CategorizationRuleSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    rule_preview = serializers.CharField(source='get_rule_preview', read_only=True)
     
     class Meta:
         model = CategorizationRule
         fields = [
-            'id', 'name', 'rule_type', 'pattern', 'category', 'category_name',
-            'priority', 'is_active', 'created_at', 'updated_at'
+            'id', 'name', 'description', 'rule_type', 'pattern', 'category', 'category_name',
+            'priority', 'is_active', 'case_sensitive', 'created_by', 'conditions',
+            'match_count', 'last_matched', 'created_at', 'updated_at', 'rule_preview'
         ]
+        read_only_fields = ['match_count', 'last_matched', 'created_at', 'updated_at']
+
+class RuleGroupSerializer(serializers.ModelSerializer):
+    rule_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RuleGroup
+        fields = ['id', 'name', 'description', 'color', 'is_active', 'created_at', 'rule_count']
+        read_only_fields = ['created_at']
+    
+    def get_rule_count(self, obj):
+        return obj.categorizationrule_set.count()
+
+class RuleUsageSerializer(serializers.ModelSerializer):
+    rule_name = serializers.CharField(source='rule.name', read_only=True)
+    transaction_description = serializers.CharField(source='transaction.description', read_only=True)
+    
+    class Meta:
+        model = RuleUsage
+        fields = [
+            'id', 'rule', 'rule_name', 'transaction', 'transaction_description',
+            'matched_at', 'confidence_score', 'was_applied'
+        ]
+        read_only_fields = ['matched_at']
 
 class BackupSettingsSerializer(serializers.ModelSerializer):
     class Meta:

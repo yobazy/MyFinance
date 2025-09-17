@@ -21,10 +21,12 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import CategoryIcon from '@mui/icons-material/Category';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
+import RuleIcon from '@mui/icons-material/Rule';
 import Dashboard from "./pages/Dashboard.tsx";
 import AccountsPage from "./pages/AccountsPage.tsx";
 import FileUploader from "./pages/FileUploader";
 import Categorization from "./pages/Categorization";
+import RuleManagement from "./pages/RuleManagement";
 import Visualizations from "./pages/Visualizations";
 import Transactions from "./pages/Transactions.tsx";
 import UserSettings from "./pages/UserSettings";
@@ -92,6 +94,7 @@ const navItems = [
     { to: "/upload", icon: <UploadFileIcon />, label: "Upload" },
     { to: "/transactions", icon: <ReceiptIcon />, label: "Transactions" },
     { to: "/categorization", icon: <CategoryIcon />, label: "Categories" },
+    { to: "/rules", icon: <RuleIcon />, label: "Rules" },
     { to: "/user-settings", icon: <SettingsIcon />, label: "Settings" },
   ];
 
@@ -172,6 +175,7 @@ const navItems = [
             <Route path="/upload" element={<FileUploader />} />
             <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/categorization" element={<Categorization />} />
+            <Route path="/rules" element={<RuleManagement />} />
             <Route path="/visualizations" element={<Visualizations />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/user-settings" element={<UserSettings />} />

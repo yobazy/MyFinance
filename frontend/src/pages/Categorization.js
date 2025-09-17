@@ -47,6 +47,7 @@ import AutorenewIcon from '@mui/icons-material/Autorenew';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import RuleIcon from '@mui/icons-material/Rule';
 import { useNavigate } from 'react-router-dom';
 
 const Categorization = () => {
@@ -238,10 +239,17 @@ const Categorization = () => {
         setAutoCategorizationStats(stats);
         setShowAutoStats(true);
         
-        // Show success message
-        setSuccessMessage(
-          `Auto-categorization complete! Categorized ${stats.auto_categorized} out of ${stats.total_processed} transactions.`
-        );
+        // Show success message with rule breakdown
+        const userRulesApplied = stats.user_rules_applied || 0;
+        const autoCategorized = stats.auto_categorized || 0;
+        const totalCategorized = userRulesApplied + autoCategorized;
+        
+        let message = `Categorization complete! Categorized ${totalCategorized} out of ${stats.total_processed} transactions.`;
+        if (userRulesApplied > 0) {
+          message += ` (${userRulesApplied} by user rules, ${autoCategorized} by auto-categorization)`;
+        }
+        
+        setSuccessMessage(message);
         setShowSuccess(true);
         
         // Refresh transactions list to remove auto-categorized ones
@@ -355,6 +363,31 @@ const Categorization = () => {
     }
   }, []);
 
+  // Function to perform the actual update
+  const performTransactionUpdate = useCallback(async (transactionId, categoryId) => {
+    try {
+      const response = await axios.put(`http://127.0.0.1:8000/api/transactions/${transactionId}/update-category/`, {
+        category: categoryId
+      });
+      
+      // Show success message with count of updated transactions
+      if (response.data.success && response.data.updated_count > 1) {
+        setSuccessMessage(`Successfully categorized ${response.data.updated_count} transactions with the same description!`);
+        setShowSuccess(true);
+      } else {
+        setSuccessMessage("Transaction categorized successfully!");
+        setShowSuccess(true);
+      }
+      
+      // Remove from both current view and all transactions
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      setAllTransactions(prev => prev.filter(t => t.id !== transactionId));
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+      setError("Failed to categorize transaction. Please try again.");
+    }
+  }, []);
+
   const handleUpdateTransaction = useCallback(async (transactionId, categoryId) => {
     try {
       // First, check how many transactions have the same description
@@ -379,32 +412,7 @@ const Categorization = () => {
       console.error("Error checking transactions:", error);
       setError("Failed to categorize transaction. Please try again.");
     }
-  }, [transactions]);
-
-  // New function to perform the actual update
-  const performTransactionUpdate = useCallback(async (transactionId, categoryId) => {
-    try {
-      const response = await axios.put(`http://127.0.0.1:8000/api/transactions/${transactionId}/update-category/`, {
-        category: categoryId
-      });
-      
-      // Show success message with count of updated transactions
-      if (response.data.success && response.data.updated_count > 1) {
-        setSuccessMessage(`Successfully categorized ${response.data.updated_count} transactions with the same description!`);
-        setShowSuccess(true);
-      } else {
-        setSuccessMessage("Transaction categorized successfully!");
-        setShowSuccess(true);
-      }
-      
-      // Remove from both current view and all transactions
-      setTransactions(prev => prev.filter(t => t.id !== transactionId));
-      setAllTransactions(prev => prev.filter(t => t.id !== transactionId));
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-      setError("Failed to categorize transaction. Please try again.");
-    }
-  }, []);
+  }, [transactions, performTransactionUpdate]);
 
   // Function to handle confirmation dialog
   const handleBulkConfirm = useCallback(() => {
@@ -838,6 +846,15 @@ const Categorization = () => {
                   >
                     View Stats
                   </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<RuleIcon />}
+                    onClick={() => navigate('/rules')}
+                  >
+                    Manage Rules
+                  </Button>
                 </Box>
 
                 {autoCategorizing && (
@@ -871,25 +888,31 @@ const Categorization = () => {
           {autoCategorizationStats ? (
             <Box>
               <Grid container spacing={2}>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={4}>
                   <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
                     <Typography variant="h4">{autoCategorizationStats.total_processed}</Typography>
                     <Typography variant="body2">Total Processed</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={4}>
                   <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
-                    <Typography variant="h4">{autoCategorizationStats.auto_categorized}</Typography>
+                    <Typography variant="h4">{autoCategorizationStats.auto_categorized || 0}</Typography>
                     <Typography variant="body2">Auto-Categorized</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={4}>
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
+                    <Typography variant="h4">{autoCategorizationStats.user_rules_applied || 0}</Typography>
+                    <Typography variant="body2">User Rules Applied</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6}>
                   <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
                     <Typography variant="h4">{autoCategorizationStats.needs_review}</Typography>
                     <Typography variant="body2">Needs Review</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText' }}>
                     <Typography variant="h4">{autoCategorizationStats.no_match}</Typography>
                     <Typography variant="body2">No Match</Typography>
@@ -902,11 +925,14 @@ const Categorization = () => {
                   <Typography variant="h6" gutterBottom>Success Rate</Typography>
                   <LinearProgress 
                     variant="determinate" 
-                    value={(autoCategorizationStats.auto_categorized / autoCategorizationStats.total_processed) * 100}
+                    value={((autoCategorizationStats.auto_categorized || 0) + (autoCategorizationStats.user_rules_applied || 0)) / autoCategorizationStats.total_processed * 100}
                     sx={{ height: 10, borderRadius: 5 }}
                   />
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {Math.round((autoCategorizationStats.auto_categorized / autoCategorizationStats.total_processed) * 100)}% of transactions auto-categorized
+                    {Math.round(((autoCategorizationStats.auto_categorized || 0) + (autoCategorizationStats.user_rules_applied || 0)) / autoCategorizationStats.total_processed * 100)}% of transactions categorized
+                    {autoCategorizationStats.user_rules_applied > 0 && (
+                      <span> ({autoCategorizationStats.user_rules_applied} by user rules, {autoCategorizationStats.auto_categorized || 0} by auto-categorization)</span>
+                    )}
                   </Typography>
                 </Box>
               )}

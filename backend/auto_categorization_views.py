@@ -26,7 +26,9 @@ def auto_categorize_transactions(request):
         return Response({
             'success': True,
             'message': f'Processed {stats["total_processed"]} transactions',
-            'stats': stats
+            'stats': stats,
+            'user_rules_applied': stats.get('user_rule_categorized', 0),
+            'auto_categorized': stats.get('auto_categorized', 0)
         })
         
     except Exception as e:

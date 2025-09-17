@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from .views import (
     get_categories,
     create_category,
@@ -15,4 +15,7 @@ urlpatterns = [
     path('categories/<int:category_id>/delete/', delete_category, name='delete_category'),
     path('missing-categories/', transactions_missing_categories, name='missing_categories'),
     path('transactions/<int:transaction_id>/update-category/', update_transaction_category, name='update_transaction_category'),
+    
+    # Rule management endpoints
+    path('rules/', include('backend.api.urls.rules')),
 ]

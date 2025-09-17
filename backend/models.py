@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -55,30 +56,116 @@ class Transaction(models.Model):
     def __str__(self):
         return f"{self.date} - {self.description} - {self.amount}"
 
-# New model for categorization rules
+# Enhanced model for categorization rules
 class CategorizationRule(models.Model):
     RULE_TYPES = [
         ('keyword', 'Keyword Match'),
         ('contains', 'Description Contains'),
         ('exact', 'Exact Match'),
+        ('regex', 'Regular Expression'),
         ('amount_range', 'Amount Range'),
+        ('amount_exact', 'Exact Amount'),
+        ('amount_greater', 'Amount Greater Than'),
+        ('amount_less', 'Amount Less Than'),
         ('recurring', 'Recurring Payment'),
+        ('merchant', 'Merchant Name'),
+        ('date_range', 'Date Range'),
+        ('day_of_week', 'Day of Week'),
+        ('combined', 'Combined Conditions'),
     ]
     
     name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, help_text="Optional description of what this rule does")
     rule_type = models.CharField(max_length=20, choices=RULE_TYPES)
-    pattern = models.TextField()  # The pattern to match (keywords, regex, etc.)
+    pattern = models.TextField(help_text="The pattern to match (keywords, regex, amount, etc.)")
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
-    priority = models.IntegerField(default=1)  # Higher number = higher priority
+    priority = models.IntegerField(default=1, help_text="Higher number = higher priority")
     is_active = models.BooleanField(default=True)
+    case_sensitive = models.BooleanField(default=False, help_text="Whether pattern matching should be case sensitive")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=100, default='system', help_text="Who created this rule")
+    
+    # Additional fields for complex rules
+    conditions = models.JSONField(default=dict, blank=True, help_text="Additional conditions for combined rules")
+    match_count = models.PositiveIntegerField(default=0, help_text="Number of transactions matched by this rule")
+    last_matched = models.DateTimeField(null=True, blank=True, help_text="When this rule last matched a transaction")
     
     class Meta:
         ordering = ['-priority', 'name']
+        verbose_name = "Categorization Rule"
+        verbose_name_plural = "Categorization Rules"
     
     def __str__(self):
         return f"{self.name} -> {self.category.name}"
+    
+    def increment_match_count(self):
+        """Increment the match count and update last matched timestamp"""
+        self.match_count += 1
+        self.last_matched = timezone.now()
+        self.save(update_fields=['match_count', 'last_matched'])
+    
+    def get_rule_preview(self):
+        """Get a human-readable preview of what this rule matches"""
+        if self.rule_type == 'keyword':
+            return f"Description contains any of: {self.pattern}"
+        elif self.rule_type == 'contains':
+            return f"Description contains: {self.pattern}"
+        elif self.rule_type == 'exact':
+            return f"Description exactly matches: {self.pattern}"
+        elif self.rule_type == 'regex':
+            return f"Description matches regex: {self.pattern}"
+        elif self.rule_type == 'amount_range':
+            try:
+                import json
+                range_data = json.loads(self.pattern)
+                return f"Amount between ${range_data.get('min', 0)} and ${range_data.get('max', '∞')}"
+            except:
+                return f"Amount range: {self.pattern}"
+        elif self.rule_type == 'amount_exact':
+            return f"Amount exactly: ${self.pattern}"
+        elif self.rule_type == 'amount_greater':
+            return f"Amount greater than: ${self.pattern}"
+        elif self.rule_type == 'amount_less':
+            return f"Amount less than: ${self.pattern}"
+        elif self.rule_type == 'merchant':
+            return f"Merchant name contains: {self.pattern}"
+        elif self.rule_type == 'recurring':
+            return f"Recurring payment pattern"
+        else:
+            return f"Custom rule: {self.pattern}"
+
+# Model for rule groups/categories
+class RuleGroup(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=7, default='#2196F3', help_text="Hex color code for UI display")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Rule Group"
+        verbose_name_plural = "Rule Groups"
+    
+    def __str__(self):
+        return self.name
+
+# Model to track rule performance and usage
+class RuleUsage(models.Model):
+    rule = models.ForeignKey(CategorizationRule, on_delete=models.CASCADE, related_name='usage_records')
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
+    matched_at = models.DateTimeField(auto_now_add=True)
+    confidence_score = models.FloatField(default=1.0)
+    was_applied = models.BooleanField(default=True, help_text="Whether this rule was actually applied to categorize the transaction")
+    
+    class Meta:
+        ordering = ['-matched_at']
+        verbose_name = "Rule Usage"
+        verbose_name_plural = "Rule Usage Records"
+    
+    def __str__(self):
+        return f"{self.rule.name} -> {self.transaction.description[:50]}"
 
 class TDTransaction(models.Model):
     date = models.DateField()
