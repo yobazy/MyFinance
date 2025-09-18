@@ -20,50 +20,52 @@ const FileUploader = () => {
     const theme = useTheme();
     const [file, setFile] = useState(null);
     const [fileType, setFileType] = useState("TD");
-    const [bank, setBank] = useState("");
     const [accounts, setAccounts] = useState([]); // Store fetched accounts
     const [account, setAccount] = useState("");
+    const [selectedAccount, setSelectedAccount] = useState(null); // Store selected account object
     const [message, setMessage] = useState("");
 
-    // Fetch accounts when bank selection changes
+    // Fetch all accounts on component mount
     useEffect(() => {
-        if (bank) {
         axios
-            .get(`http://127.0.0.1:8000/api/accounts/?bank=${bank}`)
+            .get(`http://127.0.0.1:8000/api/accounts/`)
             .then((response) => {
             setAccounts(response.data.accounts);
             })
             .catch(() => {
             setAccounts([]);
             });
-        }
-    }, [bank]);
-
-    const handleBankChange = (event) => {
-        const selectedBank = event.target.value;
-        setBank(selectedBank);
-        setAccount(""); // Clear the selected account when bank changes
-        
-        // Automatically set file type based on bank selection
-        if (selectedBank === "AMEX") {
-            setFileType("Amex");
-        } else if (selectedBank === "TD") {
-            setFileType("TD");
-        }
-    };
+    }, []);
 
     const handleAccountChange = (event) => {
-    setAccount(event.target.value);
+        const selectedAccountName = event.target.value;
+        setAccount(selectedAccountName);
+        
+        // Find the selected account object to get bank info
+        const accountObj = accounts.find(acc => acc.name === selectedAccountName);
+        setSelectedAccount(accountObj);
+        
+        // Automatically set file type based on account's bank
+        if (accountObj) {
+            if (accountObj.bank === "AMEX") {
+                setFileType("Amex");
+            } else if (accountObj.bank === "TD") {
+                setFileType("TD");
+            }
+        }
     };
     
     const handleCreateAccount = async () => {
-        if (!bank || !account) {
-          setMessage("Please enter a bank and account name.");
+        if (!selectedAccount) {
+          setMessage("Please select an account first.");
           return;
         }
     
         try {
-          const response = await axios.post("http://127.0.0.1:8000/api/accounts/create/", { bank, name: account });
+          const response = await axios.post("http://127.0.0.1:8000/api/accounts/create/", { 
+            bank: selectedAccount.bank, 
+            name: account 
+          });
           setMessage(`Account "${account}" created successfully!`);
         } catch (error) {
           setMessage("Failed to create account.");
@@ -77,16 +79,16 @@ const FileUploader = () => {
         }
     };
 
-    const handleUpload = async () => {
-        if (!file || !bank || !account) {
-          setMessage("Please select a file and enter bank and account.");
-          return;
-        }
+  const handleUpload = async () => {
+    if (!file || !selectedAccount || !account) {
+      setMessage("Please select a file and account.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("file_type", fileType);
-    formData.append("bank", bank);
+    formData.append("bank", selectedAccount.bank);
     formData.append("account", account);
 
     try {
@@ -112,23 +114,31 @@ const FileUploader = () => {
         <CardContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <FormControl fullWidth>
-              <InputLabel>Bank</InputLabel>
-              <Select value={bank} onChange={handleBankChange}>
-                <MenuItem value="TD">TD Bank</MenuItem>
-                <MenuItem value="AMEX">American Express</MenuItem>
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
               <InputLabel>Account</InputLabel>
               <Select value={account} onChange={handleAccountChange}>
                 {accounts.map((account) => (
                   <MenuItem key={account.id} value={account.name}>
-                    {account.name}
+                    {account.name} ({account.bank})
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+
+            {selectedAccount && (
+              <Box sx={{ 
+                p: 2, 
+                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.grey[100], 
+                borderRadius: 1,
+                border: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300]}`
+              }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Selected Bank:</strong> {selectedAccount.bank === "TD" ? "TD Bank" : "American Express"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Account Type:</strong> {selectedAccount.type.charAt(0).toUpperCase() + selectedAccount.type.slice(1)}
+                </Typography>
+              </Box>
+            )}
 
             <Box sx={{ mb: 2 }}>
               <Typography variant="body1" gutterBottom>
@@ -139,7 +149,7 @@ const FileUploader = () => {
                 paddingLeft: '1.5rem',
                 color: theme.palette.text.secondary 
               }}>
-                <li>File must be in {bank === "TD" ? "CSV" : "XLS/XLSX"} format</li>
+                <li>File must be in {selectedAccount?.bank === "TD" ? "CSV" : "XLS/XLSX"} format</li>
                 <li>Must contain transaction date, description, and amount</li>
                 <li>No header modifications</li>
               </ul>
@@ -157,7 +167,7 @@ const FileUploader = () => {
             }}>
               <input
                 type="file"
-                accept={bank === "TD" ? ".csv" : ".xls,.xlsx"}
+                accept={selectedAccount?.bank === "TD" ? ".csv" : ".xls,.xlsx"}
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
                 id="file-input"
@@ -172,7 +182,7 @@ const FileUploader = () => {
                   {file ? file.name : 'Drag and drop or click to select file'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Supported formats: {bank === "TD" ? "CSV" : "XLS, XLSX"}
+                  Supported formats: {selectedAccount?.bank === "TD" ? "CSV" : "XLS, XLSX"}
                 </Typography>
               </label>
             </Box>
@@ -180,7 +190,7 @@ const FileUploader = () => {
             <Button
               variant="contained"
               onClick={handleUpload}
-              disabled={!file || !bank || !account}
+              disabled={!file || !selectedAccount || !account}
               fullWidth
             >
               Upload Statement
