@@ -481,7 +481,7 @@ const Categorization = () => {
       setSuccessMessage(`Category "${categoryName}" created successfully!`);
       setShowSuccess(true);
       
-      // Refresh category tree
+      // Immediately refresh category tree to show in hierarchy
       const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
       setCategoryTree(treeResponse.data);
     } catch (error) {
@@ -505,7 +505,7 @@ const Categorization = () => {
       setSuccessMessage(`Subcategory "${newSubcategory}" created successfully!`);
       setShowSuccess(true);
       
-      // Refresh category tree
+      // Immediately refresh category tree to show in hierarchy
       const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
       setCategoryTree(treeResponse.data);
     } catch (error) {
@@ -523,6 +523,10 @@ const Categorization = () => {
       ));
       setEditingCategory(null);
       setEditingCategoryName("");
+      
+      // Immediately refresh category tree to show updated name in hierarchy
+      const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
+      setCategoryTree(treeResponse.data);
     } catch (error) {
       console.error("Error updating category:", error);
     }
@@ -741,6 +745,15 @@ const Categorization = () => {
             console.log('New categories state:', newState);
             return newState;
           });
+          
+          // Immediately refresh category tree to show in hierarchy
+          try {
+            const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
+            setCategoryTree(treeResponse.data);
+            console.log('Category tree refreshed after creating:', categoryName);
+          } catch (treeError) {
+            console.error('Error refreshing category tree:', treeError);
+          }
           
           // Small delay to ensure state updates
           await new Promise(resolve => setTimeout(resolve, 100));
