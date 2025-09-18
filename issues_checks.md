@@ -6,13 +6,11 @@ Issues:
 [x] Remove debug current categories
 [x] uncategorized transactions still show even if category assigned
 [] when bulk categorizing the number shows only the count on the current page, the notification shows the true number.
-[] Manage categories 
 [] Once some transactions are cat the page does not populate with more
 [] the View All button just loads the paginated thing, instead we should have the total transactions ...
 [] bulk edit dialog popup only accounts for transactions on the page, rather than all transactions
 [] Uncat menu, category selection should be alphebatizes
-[] top 3 of category selection should be most common categories
-[] old databases are removed when 
+[x] old databases are removed when 
 
 Checks:
 [x] Amex populates right
@@ -33,7 +31,7 @@ To Do:
 [] update defaults category
 [] help docs for uploading
 [] reorg settings page
-
+[] top 3 of category selection should be most common categories
 
 [] add cibc, rbc, bmo, mbna
 
