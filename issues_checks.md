@@ -7,6 +7,11 @@ Issues:
 [] uncategorized transactions still show even if category assigned
 [] when bulk categorizing the number shows only the count on the current page, the notification shows the true number.
 [] Manage categories 
+[] Once some transactions are cat the page does not populate with more
+[] the View All button just loads the paginated thing, instead we should have the total transactions ...
+[] bulk edit dialog popup only accounts for transactions on the page, rather than all transactions
+[] Uncat menu, category selection should be alphebatizes
+[] top 3 of category selection should be most common categories
 
 Checks:
 [x] Amex populates right
@@ -19,7 +24,27 @@ To Do:
 [~] Auto categorys?
 [x] database backups 
 [x] database save / load
-[] database reset should ask user to confirm before reset
-[] subcategories?
+[x] database reset should ask user to confirm before reset
+[] database restore deletes the backup
+[x] subcategories?
 [] logs / crash reports
+[] reorg settings page
+[] add scotiabank
+[] update defaults category
 
+
+[] add cibc, rbc, bmo, mbna
+
+INTERACTIVE DEMO PAGE? 
+
+DEFAULTS:
+
+[] Events
+[] Vape
+[] Nicotine
+[] Alc
+[] Kush
+[] Nightlife
+[] TCKTWB - > events
+[] MCDONALDS -> Dining out
+[] Shopping > CONVENIENCE
