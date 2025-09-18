@@ -871,9 +871,11 @@ const Categorization = () => {
         <Typography variant="h4" gutterBottom>
           Transaction Categories 🏷️
         </Typography>
+        
+        {/* No Transactions Message */}
         <Card 
           sx={{ 
-            minHeight: '60vh', 
+            minHeight: '40vh', 
             display: 'flex', 
             flexDirection: 'column', 
             justifyContent: 'center', 
@@ -881,6 +883,7 @@ const Categorization = () => {
             backgroundColor: theme.palette.background.paper,
             cursor: 'pointer',
             transition: 'transform 0.2s, box-shadow 0.2s',
+            mb: 2,
             '&:hover': {
               transform: 'translateY(-4px)',
               boxShadow: theme.shadows[4],
@@ -916,6 +919,300 @@ const Categorization = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Category Management Section */}
+        <Card sx={{ mb: 2, boxShadow: theme.shadows[1] }}>
+          <CardContent sx={{ py: showCategoryManagement ? 3 : 2, px: 2 }}>
+            <Box 
+              display="flex" 
+              alignItems="center" 
+              justifyContent="space-between"
+              sx={{ 
+                mb: showCategoryManagement ? 3 : 0,
+                cursor: 'pointer',
+                '&:hover': {
+                  '& .expand-icon': {
+                    transform: 'scale(1.1)',
+                    transition: 'transform 0.2s ease-in-out'
+                  }
+                }
+              }}
+              onClick={() => setShowCategoryManagement(!showCategoryManagement)}
+            >
+              <Box display="flex" alignItems="center">
+                <CategoryIcon 
+                  color="primary" 
+                  sx={{ 
+                    mr: 1.5, 
+                    fontSize: '1.5rem'
+                  }} 
+                />
+                <Typography 
+                  variant="h6"
+                  sx={{ 
+                    fontWeight: 600
+                  }}
+                >
+                  Manage Categories
+                </Typography>
+                {!showCategoryManagement && (
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary" 
+                    sx={{ ml: 1, fontStyle: 'italic' }}
+                  >
+                    ({categories.length} categories)
+                  </Typography>
+                )}
+              </Box>
+              <IconButton
+                size="small"
+                className="expand-icon"
+                sx={{ 
+                  transition: 'transform 0.2s ease-in-out',
+                  '&:hover': {
+                    backgroundColor: 'action.hover'
+                  }
+                }}
+              >
+                {showCategoryManagement ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+            
+            <Collapse in={showCategoryManagement}>
+              {/* Root Category Creation */}
+              <Box display="flex" gap={2} mb={3}>
+                <TextField
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="New root category name"
+                  variant="outlined"
+                  size="small"
+                  sx={{ flexGrow: 1 }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                />
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddCategory}
+                  disabled={!newCategory.trim()}
+                >
+                  Add Root Category
+                </Button>
+              </Box>
+
+              {/* Subcategory Creation */}
+              <Box display="flex" gap={2} mb={3} alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Parent Category</InputLabel>
+                  <Select
+                    value={selectedParentCategory || ''}
+                    onChange={(e) => setSelectedParentCategory(e.target.value)}
+                    label="Parent Category"
+                  >
+                    {categories.filter(cat => !cat.parent).map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {category.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  value={newSubcategory}
+                  onChange={(e) => setNewSubcategory(e.target.value)}
+                  placeholder="New subcategory name"
+                  variant="outlined"
+                  size="small"
+                  sx={{ flexGrow: 1 }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddSubcategory()}
+                />
+                <Button 
+                  variant="contained" 
+                  color="secondary"
+                  startIcon={<SubdirectoryArrowRightIcon />}
+                  onClick={handleAddSubcategory}
+                  disabled={!newSubcategory.trim() || !selectedParentCategory}
+                >
+                  Add Subcategory
+                </Button>
+              </Box>
+              
+              {availableDefaultCategories.length > 0 && (
+                <Button 
+                  variant="outlined" 
+                  color="secondary"
+                  startIcon={<StarIcon />}
+                  onClick={() => setOpenDefaultDialog(true)}
+                  sx={{ mb: 2 }}
+                >
+                  Add Defaults
+                </Button>
+              )}
+
+              {/* Default Categories Preview */}
+              {availableDefaultCategories.length > 0 && (
+                <Box mb={2}>
+                  <Button
+                    onClick={() => setShowDefaultCategories(!showDefaultCategories)}
+                    startIcon={showDefaultCategories ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    sx={{ mb: 1 }}
+                    size="small"
+                  >
+                    {showDefaultCategories ? 'Hide' : 'Show'} Available Default Categories ({availableDefaultCategories.length})
+                  </Button>
+                  
+                  <Collapse in={showDefaultCategories}>
+                    <Box sx={{ 
+                      p: 2, 
+                      bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.50', 
+                      borderRadius: 1, 
+                      mb: 2,
+                      border: `1px solid ${theme.palette.divider}`
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Common categories you can add instantly:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {availableDefaultCategories.slice(0, 10).map((cat) => (
+                          <Chip 
+                            key={cat.name} 
+                            label={cat.name} 
+                            size="small" 
+                            variant="outlined"
+                            color="secondary"
+                          />
+                        ))}
+                        {availableDefaultCategories.length > 10 && (
+                          <Chip 
+                            label={`+${availableDefaultCategories.length - 10} more`} 
+                            size="small" 
+                            variant="outlined"
+                            color="secondary"
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  </Collapse>
+                </Box>
+              )}
+
+              <Divider sx={{ mb: 2 }} />
+
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Category Hierarchy
+                </Typography>
+                {categoryChips}
+              </Box>
+            </Collapse>
+          </CardContent>
+        </Card>
+
+        {/* Edit Category Dialog */}
+        <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
+          <DialogTitle>Edit Category</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Category Name"
+              fullWidth
+              variant="outlined"
+              value={editingCategoryName}
+              onChange={(e) => setEditingCategoryName(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleEditCategory()}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleEditCategory} 
+              variant="contained"
+              disabled={!editingCategoryName.trim()}
+            >
+              Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Default Categories Dialog */}
+        <Dialog 
+          open={openDefaultDialog} 
+          onClose={() => setOpenDefaultDialog(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box display="flex" alignItems="center">
+              <StarIcon color="primary" sx={{ mr: 1 }} />
+              Add Default Categories
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Select from our curated list of common financial categories. You can add them instantly to get started with categorizing your transactions.
+            </Typography>
+            
+            {Object.entries(groupedDefaultCategories).map(([groupName, groupCategories]) => {
+              const availableInGroup = groupCategories.filter(catName => 
+                availableDefaultCategories.some(cat => cat.name === catName)
+              );
+              
+              if (availableInGroup.length === 0) return null;
+              
+              return (
+                <Box key={groupName} sx={{ mb: 3 }}>
+                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                    <Typography variant="h6" color="primary">
+                      {groupName}
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={() => handleSelectAllInGroup(availableInGroup)}
+                      disabled={availableInGroup.every(catName => selectedDefaultCategories.has(catName))}
+                    >
+                      Select All
+                    </Button>
+                  </Box>
+                  <FormGroup row>
+                    {availableInGroup.map((catName) => (
+                      <FormControlLabel
+                        key={catName}
+                        control={
+                          <Checkbox
+                            checked={selectedDefaultCategories.has(catName)}
+                            onChange={() => handleDefaultCategoryToggle(catName)}
+                            color="primary"
+                          />
+                        }
+                        label={catName}
+                        sx={{ minWidth: '200px', mb: 1 }}
+                      />
+                    ))}
+                  </FormGroup>
+                  <Divider />
+                </Box>
+              );
+            })}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenDefaultDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateSelectedCategories}
+              variant="contained"
+              disabled={selectedDefaultCategories.size === 0 || creatingDefaultCategories}
+              startIcon={creatingDefaultCategories ? <CircularProgress size={20} /> : <AddIcon />}
+            >
+              {creatingDefaultCategories 
+                ? 'Creating...' 
+                : `Add Selected (${selectedDefaultCategories.size})`
+              }
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     );
   }
