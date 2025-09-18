@@ -55,7 +55,6 @@ const App = () => {
   const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
   const theme = React.useMemo(() => getTheme(mode), [mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const hoverTimeoutRef = React.useRef(null);
   
   React.useEffect(() => {
     const handleThemeChange = (event) => {
@@ -69,9 +68,6 @@ const App = () => {
     
     return () => {
       window.removeEventListener('themeChange', handleThemeChange);
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
     };
   }, []);
 
@@ -88,25 +84,7 @@ const App = () => {
   };
 
   const handleManageClose = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-    hoverTimeoutRef.current = setTimeout(() => {
-      setManageAnchorEl(null);
-    }, 200);
-  };
-
-  const handleManageMouseEnter = (e) => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-    setManageAnchorEl(e.currentTarget);
-  };
-
-  const handleMenuMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
+    setManageAnchorEl(null);
   };
 
   const NavButton = ({ to, icon, label }) => (
@@ -237,35 +215,15 @@ const navItems = [
                     label={item.label}
                   />
                 ))}
-                <Box
-                  onMouseEnter={handleManageMouseEnter}
-                  onMouseLeave={handleManageClose}
-                  sx={{ 
-                    position: 'relative',
-                    display: 'inline-block'
-                  }}
+                <Button
+                  color="inherit"
+                  startIcon={<ManageAccountsIcon />}
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={handleManageMenu}
+                  sx={{ ml: 1 }}
                 >
-                  <Button
-                    color="inherit"
-                    startIcon={<ManageAccountsIcon />}
-                    endIcon={<ArrowDropDownIcon />}
-                    sx={{ ml: 1 }}
-                  >
-                    Manage
-                  </Button>
-                  {/* Invisible bridge to prevent gap */}
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      zIndex: 1,
-                    }}
-                    onMouseEnter={handleMenuMouseEnter}
-                  />
-                </Box>
+                  Manage
+                </Button>
                 <NavButton
                   to={navItems[navItems.length - 1].to}
                   icon={navItems[navItems.length - 1].icon}
@@ -288,10 +246,6 @@ const navItems = [
           transformOrigin={{
             vertical: 'top',
             horizontal: 'left',
-          }}
-          MenuListProps={{
-            onMouseEnter: handleMenuMouseEnter,
-            onMouseLeave: handleManageClose,
           }}
           disableAutoFocusItem
           disableRestoreFocus
