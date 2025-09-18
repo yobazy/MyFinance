@@ -55,6 +55,7 @@ const UserSettings = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [restoreDialog, setRestoreDialog] = useState({ open: false, backupId: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, backupId: null });
+  const [resetConfirmDialog, setResetConfirmDialog] = useState({ open: false });
 
   useEffect(() => {
     // Load theme preference on component mount
@@ -75,12 +76,18 @@ const UserSettings = () => {
     window.dispatchEvent(new CustomEvent('themeChange', { detail: newTheme }));
   };
 
-  const handleResetDatabase = async () => {
+  const handleResetDatabase = () => {
+    setResetConfirmDialog({ open: true });
+  };
+
+  const handleConfirmResetDatabase = async () => {
     try {
       const response = await axios.post("http://127.0.0.1:8000/api/reset-database/");
       setMessage(response.data.message);
+      setResetConfirmDialog({ open: false });
     } catch (error) {
       setMessage("Failed to reset database.");
+      setResetConfirmDialog({ open: false });
     }
   };
 
@@ -538,6 +545,32 @@ const UserSettings = () => {
             disabled={backupLoading}
           >
             {backupLoading ? <CircularProgress size={20} /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reset Database Confirmation Dialog */}
+      <Dialog open={resetConfirmDialog.open} onClose={() => setResetConfirmDialog({ open: false })}>
+        <DialogTitle>Confirm Database Reset</DialogTitle>
+        <DialogContent>
+          <Typography>
+            <strong>WARNING:</strong> This will permanently delete ALL transactions and accounts from your database.
+            <br /><br />
+            This action cannot be undone! Make sure you have a backup if you want to preserve your data.
+            <br /><br />
+            Are you absolutely sure you want to reset the database?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetConfirmDialog({ open: false })}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmResetDatabase}
+            color="error"
+            variant="contained"
+          >
+            Yes, Reset Database
           </Button>
         </DialogActions>
       </Dialog>
