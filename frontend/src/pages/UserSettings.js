@@ -183,7 +183,8 @@ const UserSettings = () => {
       });
 
       if (response.ok) {
-        showSnackbar('Database restored successfully', 'success');
+        const data = await response.json();
+        showSnackbar(data.message || 'Database restored successfully', 'success');
         setRestoreDialog({ open: false, backupId: null });
       } else {
         const error = await response.json();
@@ -507,8 +508,13 @@ const UserSettings = () => {
         <DialogTitle>Confirm Restore</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to restore this backup? This will replace your current database.
-            <strong> This action cannot be undone!</strong>
+            Are you sure you want to restore this backup? This will replace your current database with the backup data including:
+            <br />• All transactions and accounts
+            <br />• All categories and subcategories
+            <br />• All categorization rules and rule groups
+            <br />• All backup settings and history
+            <br /><br />
+            <strong>This action cannot be undone!</strong>
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -554,7 +560,11 @@ const UserSettings = () => {
         <DialogTitle>Confirm Database Reset</DialogTitle>
         <DialogContent>
           <Typography>
-            <strong>WARNING:</strong> This will permanently delete ALL transactions and accounts from your database.
+            <strong>WARNING:</strong> This will permanently delete ALL data from your database including:
+            <br />• All transactions and accounts
+            <br />• All categories and subcategories
+            <br />• All categorization rules and rule groups
+            <br />• All backup settings and backup history
             <br /><br />
             This action cannot be undone! Make sure you have a backup if you want to preserve your data.
             <br /><br />

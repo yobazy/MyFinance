@@ -71,8 +71,15 @@ def restore_backup_view(request, backup_id):
         service = DatabaseBackupService()
         service.restore_backup(backup_id)
         
+        # Get counts of restored data for user feedback
+        from backend.models import Category, Transaction, Account, CategorizationRule
+        category_count = Category.objects.count()
+        transaction_count = Transaction.objects.count()
+        account_count = Account.objects.count()
+        rule_count = CategorizationRule.objects.count()
+        
         return Response({
-            'message': 'Database restored successfully'
+            'message': f'Database restored successfully! Restored {category_count} categories, {transaction_count} transactions, {account_count} accounts, and {rule_count} categorization rules.'
         }, status=status.HTTP_200_OK)
         
     except DatabaseBackup.DoesNotExist:

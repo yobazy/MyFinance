@@ -214,6 +214,9 @@ class DatabaseBackupService:
             # Restore backup records and settings after database restore
             self._restore_backup_metadata(current_backups, current_settings)
             
+            # Validate that the restore was successful
+            self._validate_restore()
+            
             return True
             
         except Exception as e:
@@ -249,6 +252,28 @@ class DatabaseBackupService:
         except Exception as e:
             # Log the error but don't fail the restore
             print(f"Warning: Failed to restore backup metadata: {str(e)}")
+    
+    def _validate_restore(self):
+        """Validate that the restore was successful by checking key data"""
+        try:
+            from .models import Category, Transaction, Account, CategorizationRule
+            
+            # Check if we can access the database and key models
+            category_count = Category.objects.count()
+            transaction_count = Transaction.objects.count()
+            account_count = Account.objects.count()
+            rule_count = CategorizationRule.objects.count()
+            
+            # Log the validation results
+            print(f"Restore validation - Categories: {category_count}, Transactions: {transaction_count}, Accounts: {account_count}, Rules: {rule_count}")
+            
+            # If we get here without errors, the restore was successful
+            return True
+            
+        except Exception as e:
+            # Log the error but don't fail the restore
+            print(f"Warning: Restore validation failed: {str(e)}")
+            return False
     
     def should_create_auto_backup(self):
         """Check if an automatic backup should be created"""

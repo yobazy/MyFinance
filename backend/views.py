@@ -9,7 +9,7 @@ from django.db.models.functions import TruncMonth
 from .models import Account
 from django.views.decorators.csrf import csrf_exempt
 
-from backend.models import Transaction, Category, TDTransaction, AmexTransaction  # ✅ Import Transaction model
+from backend.models import Transaction, Category, TDTransaction, AmexTransaction, CategorizationRule, RuleUsage, RuleGroup, DatabaseBackup, BackupSettings  # ✅ Import all models
 from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
 
 UPLOAD_DIR = "uploads/"
@@ -322,15 +322,24 @@ def get_transactions(request):
 
 @api_view(["POST"])
 def reset_database(request):
-    """Deletes all transactions and accounts, then runs migrations."""
+    """Deletes all data from the database, then runs migrations."""
     try:
+        # Delete all data in the correct order to avoid foreign key constraints
         Transaction.objects.all().delete()
+        TDTransaction.objects.all().delete()
+        AmexTransaction.objects.all().delete()
+        CategorizationRule.objects.all().delete()
+        RuleUsage.objects.all().delete()
+        RuleGroup.objects.all().delete()
+        Category.objects.all().delete()
         Account.objects.all().delete()
+        DatabaseBackup.objects.all().delete()
+        BackupSettings.objects.all().delete()
 
         # Run migrations
         os.system("python manage.py makemigrations && python manage.py migrate")
 
-        return JsonResponse({"message": "Database reset and migrations applied!"})
+        return JsonResponse({"message": "Database reset and migrations applied! All data including categories, rules, and transactions have been deleted."})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     
