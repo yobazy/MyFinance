@@ -1,10 +1,10 @@
 Issues:
-[] bank is established for account and upload section, we only need it in one spot
-[] balances dont update on account page for each account
-[] trying to sort category leads to a crash
+[x] bank is established for account and upload section, we only need it in one spot
+[x] balances dont update on account page for each account
+[x] trying to sort category leads to a crash
 [x] Smart Auto-cateogization should be hidden until enabled
 [x] Remove debug current categories
-[] uncategorized transactions still show even if category assigned
+[x] uncategorized transactions still show even if category assigned
 [] when bulk categorizing the number shows only the count on the current page, the notification shows the true number.
 [] Manage categories 
 [] Once some transactions are cat the page does not populate with more
@@ -12,6 +12,7 @@ Issues:
 [] bulk edit dialog popup only accounts for transactions on the page, rather than all transactions
 [] Uncat menu, category selection should be alphebatizes
 [] top 3 of category selection should be most common categories
+[] old databases are removed when 
 
 Checks:
 [x] Amex populates right
@@ -25,12 +26,13 @@ To Do:
 [x] database backups 
 [x] database save / load
 [x] database reset should ask user to confirm before reset
-[] database restore deletes the backup
+[x] database restore deletes the backup
 [x] subcategories?
 [] logs / crash reports
-[] reorg settings page
 [] add scotiabank
 [] update defaults category
+[] help docs for uploading
+[] reorg settings page
 
 
 [] add cibc, rbc, bmo, mbna

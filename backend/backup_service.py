@@ -153,6 +153,10 @@ class DatabaseBackupService:
             if not os.path.exists(backup.file_path):
                 raise Exception("Backup file not found")
             
+            # Preserve current backup records and settings before restore
+            current_backups = list(DatabaseBackup.objects.all().values())
+            current_settings = list(BackupSettings.objects.all().values())
+            
             if self._get_database_path():
                 # SQLite restore
                 db_path = self._get_database_path()
@@ -207,10 +211,44 @@ class DatabaseBackupService:
                     if result.returncode != 0:
                         raise Exception(f"psql restore failed: {result.stderr}")
             
+            # Restore backup records and settings after database restore
+            self._restore_backup_metadata(current_backups, current_settings)
+            
             return True
             
         except Exception as e:
             raise Exception(f"Restore failed: {str(e)}")
+    
+    def _restore_backup_metadata(self, current_backups, current_settings):
+        """Restore backup records and settings after database restore"""
+        try:
+            # Clear any existing backup records that might have been restored
+            DatabaseBackup.objects.all().delete()
+            BackupSettings.objects.all().delete()
+            
+            # Restore backup records
+            for backup_data in current_backups:
+                # Remove the id field to let Django auto-assign new IDs
+                backup_data_copy = backup_data.copy()
+                if 'id' in backup_data_copy:
+                    del backup_data_copy['id']
+                
+                # Create new backup record
+                DatabaseBackup.objects.create(**backup_data_copy)
+            
+            # Restore backup settings
+            for settings_data in current_settings:
+                # Remove the id field to let Django auto-assign new IDs
+                settings_data_copy = settings_data.copy()
+                if 'id' in settings_data_copy:
+                    del settings_data_copy['id']
+                
+                # Create new settings record
+                BackupSettings.objects.create(**settings_data_copy)
+                
+        except Exception as e:
+            # Log the error but don't fail the restore
+            print(f"Warning: Failed to restore backup metadata: {str(e)}")
     
     def should_create_auto_backup(self):
         """Check if an automatic backup should be created"""
