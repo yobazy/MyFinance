@@ -147,6 +147,7 @@ class AutoCategorizationService:
         
         This method has ABSOLUTE PRIORITY over all other categorization methods.
         User rules completely override the default auto-categorization system.
+        Only suggests subcategories, not root categories.
         """
         from .models import RuleUsage
         
@@ -155,19 +156,24 @@ class AutoCategorizationService:
         
         for rule in rules:
             if self._rule_matches(transaction, rule):
-                # Record rule usage for analytics
-                RuleUsage.objects.create(
-                    rule=rule,
-                    transaction=transaction,
-                    confidence_score=0.95,  # Very high confidence for user rules
-                    was_applied=True
-                )
-                
-                # Update rule statistics
-                rule.increment_match_count()
-                
-                # Return immediately - user rules have absolute priority
-                return rule.category, 0.95  # Very high confidence for user rules
+                # Only suggest subcategories (categories with a parent)
+                if rule.category.parent is not None:
+                    # Record rule usage for analytics
+                    RuleUsage.objects.create(
+                        rule=rule,
+                        transaction=transaction,
+                        confidence_score=0.95,  # Very high confidence for user rules
+                        was_applied=True
+                    )
+                    
+                    # Update rule statistics
+                    rule.increment_match_count()
+                    
+                    # Return immediately - user rules have absolute priority
+                    return rule.category, 0.95  # Very high confidence for user rules
+                else:
+                    # If the rule points to a root category, skip it
+                    continue
         
         return None, 0.0
     
@@ -358,11 +364,35 @@ class AutoCategorizationService:
     def _check_default_rules(self, description: str, amount: float) -> Tuple[Optional[Category], float]:
         """Check against default categorization rules."""
         
+        # Map default rule categories to their corresponding subcategories
+        category_mapping = {
+            'Dining Out': 'Dining Out',
+            'Groceries': 'Groceries', 
+            'Gas & Fuel': 'Gas & Fuel',
+            'Transportation': 'Public Transit',  # Default to Public Transit for general transportation
+            'Shopping': 'Online Shopping',  # Default to Online Shopping for general shopping
+            'Convenience': 'Convenience',
+            'Utilities': 'Miscellaneous',  # Map to Miscellaneous since there's no Utilities subcategory
+            'Banking & Fees': 'Banking & Fees',
+            'Healthcare': 'Personal Care',  # Map to Personal Care since there's no Healthcare subcategory
+            'Entertainment': 'Subscriptions',  # Default to Subscriptions for general entertainment
+            'Events': 'Events',
+            'Nightlife': 'Nightlife',
+            'Subscriptions': 'Subscriptions',
+            'Alcohol': 'Alcohol',
+            'Cannabis': 'Cannabis',
+            'Vaping': 'Vaping'
+        }
+        
         for category_name, keywords in self.default_rules.items():
             for keyword in keywords:
                 if keyword in description:
                     try:
-                        category = Category.objects.get(name=category_name)
+                        # Get the mapped subcategory name
+                        subcategory_name = category_mapping.get(category_name, category_name)
+                        
+                        # Find the subcategory (category with a parent)
+                        category = Category.objects.get(name=subcategory_name, parent__isnull=False)
                         confidence = 0.8  # Good confidence for default rules
                         
                         # Boost confidence for exact merchant matches
@@ -371,14 +401,23 @@ class AutoCategorizationService:
                         
                         return category, confidence
                     except Category.DoesNotExist:
-                        # Category doesn't exist, create it
-                        category = Category.objects.create(name=category_name)
-                        return category, 0.8
+                        # If subcategory doesn't exist, try to find the root category and create a subcategory
+                        try:
+                            root_category = Category.objects.get(name=category_name, parent__isnull=True)
+                            # Create the subcategory under the root category
+                            category = Category.objects.create(
+                                name=subcategory_name,
+                                parent=root_category
+                            )
+                            return category, 0.8
+                        except Category.DoesNotExist:
+                            # If neither root nor subcategory exists, skip this rule
+                            continue
         
         return None, 0.0
     
     def _check_recurring_patterns(self, transaction: Transaction) -> Tuple[Optional[Category], float]:
-        """Check for recurring payment patterns."""
+        """Check for recurring payment patterns. Only suggests subcategories."""
         # Look for similar transactions in the past
         similar_transactions = Transaction.objects.filter(
             description__icontains=transaction.description[:20],  # First 20 chars
@@ -391,8 +430,10 @@ class AutoCategorizationService:
             categories = [t.category for t in similar_transactions if t.category]
             if categories:
                 most_common_category = max(set(categories), key=categories.count)
-                confidence = len([c for c in categories if c == most_common_category]) / len(categories)
-                return most_common_category, min(confidence * 0.7, 0.75)  # Lower confidence for pattern matching
+                # Only suggest subcategories (categories with a parent)
+                if most_common_category.parent is not None:
+                    confidence = len([c for c in categories if c == most_common_category]) / len(categories)
+                    return most_common_category, min(confidence * 0.7, 0.75)  # Lower confidence for pattern matching
         
         return None, 0.0
     
@@ -471,12 +512,13 @@ class AutoCategorizationService:
     def get_categorization_suggestions(self, transaction: Transaction, limit=3) -> List[Dict]:
         """
         Get categorization suggestions for a transaction with confidence scores.
+        Only suggests subcategories, not root categories.
         """
         suggestions = []
         
         # Get primary suggestion
         category, confidence = self.categorize_transaction(transaction)
-        if category:
+        if category and category.parent is not None:  # Only suggest subcategories
             suggestions.append({
                 'category': category,
                 'confidence': confidence,
@@ -491,7 +533,7 @@ class AutoCategorizationService:
         
         category_counts = {}
         for t in similar_transactions:
-            if t.category:
+            if t.category and t.category.parent is not None:  # Only count subcategories
                 category_counts[t.category] = category_counts.get(t.category, 0) + 1
         
         # Sort by frequency and add to suggestions
