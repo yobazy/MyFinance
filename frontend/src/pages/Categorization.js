@@ -642,48 +642,72 @@ const Categorization = () => {
   }, []);
 
   const renderCategoryTree = useCallback((categories, level = 0) => {
-    return categories.map((category) => (
-      <Box key={category.id} sx={{ ml: level * 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          {category.subcategories && category.subcategories.length > 0 && (
+    return categories.map((category) => {
+      // Define colors based on hierarchy level
+      const isRootCategory = level === 0;
+      const rootColor = category.color || '#2563eb'; // Use theme primary color for root
+      const subcategoryColor = category.color || '#64748b'; // Use theme secondary text color for subcategories
+      
+      // Create a lighter version of the subcategory color
+      const subcategoryBgColor = isRootCategory 
+        ? rootColor 
+        : `${subcategoryColor}20`; // 20% opacity for subcategory background
+      
+      const textColor = isRootCategory ? 'white' : subcategoryColor;
+      const borderColor = isRootCategory ? rootColor : subcategoryColor;
+      
+      return (
+        <Box key={category.id} sx={{ ml: level * 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            {category.subcategories && category.subcategories.length > 0 && (
+              <IconButton
+                size="small"
+                onClick={() => toggleCategoryExpansion(category.id)}
+                sx={{ mr: 1 }}
+              >
+                {expandedCategories.has(category.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            )}
+            
+            <Chip
+              label={`${category.name} (${category.transaction_count || 0})`}
+              onDelete={() => handleDeleteCategory(category.id)}
+              deleteIcon={<DeleteIcon />}
+              onClick={() => startEditingCategory(category)}
+              clickable
+              color="primary"
+              variant={isRootCategory ? "filled" : "outlined"}
+              sx={{ 
+                mr: 1, 
+                mb: 1,
+                backgroundColor: subcategoryBgColor,
+                color: textColor,
+                borderColor: borderColor,
+                fontWeight: isRootCategory ? 600 : 400,
+                '&:hover': {
+                  backgroundColor: isRootCategory ? rootColor : `${subcategoryColor}30`,
+                }
+              }}
+            />
+            
             <IconButton
               size="small"
-              onClick={() => toggleCategoryExpansion(category.id)}
-              sx={{ mr: 1 }}
+              onClick={() => setSelectedParentCategory(category.id)}
+              title="Add subcategory"
+              sx={{ ml: 1 }}
             >
-              {expandedCategories.has(category.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              <AddCircleOutlineIcon />
             </IconButton>
-          )}
-          
-          <Chip
-            label={`${category.name} (${category.transaction_count || 0})`}
-            onDelete={() => handleDeleteCategory(category.id)}
-            deleteIcon={<DeleteIcon />}
-            onClick={() => startEditingCategory(category)}
-            clickable
-            color="primary"
-            variant="outlined"
-            sx={{ mr: 1, mb: 1 }}
-            style={{ backgroundColor: category.color || '#2196F3', color: 'white' }}
-          />
-          
-          <IconButton
-            size="small"
-            onClick={() => setSelectedParentCategory(category.id)}
-            title="Add subcategory"
-            sx={{ ml: 1 }}
-          >
-            <AddCircleOutlineIcon />
-          </IconButton>
-        </Box>
-        
-        {category.subcategories && category.subcategories.length > 0 && expandedCategories.has(category.id) && (
-          <Box sx={{ ml: 2 }}>
-            {renderCategoryTree(category.subcategories, level + 1)}
           </Box>
-        )}
-      </Box>
-    ));
+          
+          {category.subcategories && category.subcategories.length > 0 && expandedCategories.has(category.id) && (
+            <Box sx={{ ml: 2 }}>
+              {renderCategoryTree(category.subcategories, level + 1)}
+            </Box>
+          )}
+        </Box>
+      );
+    });
   }, [expandedCategories, handleDeleteCategory, startEditingCategory, toggleCategoryExpansion]);
 
   const handleEditCategory = useCallback(() => {
