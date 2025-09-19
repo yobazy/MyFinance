@@ -106,6 +106,31 @@ const AccountsPage = () => {
     }
   };
 
+  const handleUpdateAccount = async () => {
+    if (!bank || !accountName || !accountType || !editingAccount) {
+      showMessage("Please fill in all fields", "error");
+      return;
+    }
+
+    try {
+      await axios.put(`http://127.0.0.1:8000/api/accounts/${editingAccount.id}/`, {
+        bank,
+        name: accountName,
+        type: accountType,
+      });
+      
+      await fetchAccounts();
+      setAccountName("");
+      setBank("");
+      setAccountType("checking");
+      setEditingAccount(null);
+      setOpenDialog(false);
+      showMessage("Account updated successfully!");
+    } catch (error) {
+      showMessage("Failed to update account", "error");
+    }
+  };
+
   const handleDeleteAccount = async (accountId: number) => {
     try {
       await axios.delete(`http://127.0.0.1:8000/api/accounts/${accountId}/delete/`);
@@ -265,7 +290,13 @@ const AccountsPage = () => {
       </Grid>
 
       {/* Add/Edit Account Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
+      <Dialog open={openDialog} onClose={() => {
+        setOpenDialog(false);
+        setEditingAccount(null);
+        setAccountName("");
+        setBank("");
+        setAccountType("checking");
+      }}>
         <DialogTitle>
           {editingAccount ? "Edit Account" : "Add New Account"}
         </DialogTitle>
@@ -320,8 +351,17 @@ const AccountsPage = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddAccount} variant="contained">
+          <Button onClick={() => {
+            setOpenDialog(false);
+            setEditingAccount(null);
+            setAccountName("");
+            setBank("");
+            setAccountType("checking");
+          }}>Cancel</Button>
+          <Button 
+            onClick={editingAccount ? handleUpdateAccount : handleAddAccount} 
+            variant="contained"
+          >
             {editingAccount ? "Save Changes" : "Add Account"}
           </Button>
         </DialogActions>
