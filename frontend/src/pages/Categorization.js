@@ -112,6 +112,13 @@ const Categorization = () => {
   const [pendingCategoryId, setPendingCategoryId] = useState(null);
   const [matchingTransactionsCount, setMatchingTransactionsCount] = useState(0);
   
+  // Similar transactions state
+  const [similarCounts, setSimilarCounts] = useState(new Map());
+  const [showSimilarConfirmDialog, setShowSimilarConfirmDialog] = useState(false);
+  const [pendingSimilarTransactionId, setPendingSimilarTransactionId] = useState(null);
+  const [pendingSimilarCategoryId, setPendingSimilarCategoryId] = useState(null);
+  const [pendingSimilarCount, setPendingSimilarCount] = useState(0);
+  
   // Add collapsible state for sections
   const [showAutoCategorization, setShowAutoCategorization] = useState(false);
   const [showCategoryManagement, setShowCategoryManagement] = useState(true);
@@ -713,6 +720,89 @@ const Categorization = () => {
     }
   }, [previewData]);
 
+  const getSimilarCount = useCallback(async (transactionId, description) => {
+    try {
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/similar-count/", {
+        transaction_id: Number(transactionId),
+        description: description
+      });
+
+      if (response.data.success) {
+        setSimilarCounts(prev => new Map(prev).set(transactionId, response.data.similar_count));
+        return response.data.similar_count;
+      }
+      return 0;
+    } catch (error) {
+      console.error("Error getting similar count:", error);
+      return 0;
+    }
+  }, []);
+
+  const handleApplyToSimilarClick = useCallback(async (transactionId, categoryId) => {
+    const transaction = previewData.find(t => t.transaction_id === transactionId);
+    if (!transaction) {
+      setError("Transaction not found");
+      return;
+    }
+
+    // Get the count of similar transactions
+    const count = await getSimilarCount(transactionId, transaction.description);
+    
+    if (count <= 1) {
+      setError("No other similar transactions found to apply this category to.");
+      return;
+    }
+
+    // Show confirmation dialog
+    setPendingSimilarTransactionId(transactionId);
+    setPendingSimilarCategoryId(categoryId);
+    setPendingSimilarCount(count);
+    setShowSimilarConfirmDialog(true);
+  }, [previewData, getSimilarCount]);
+
+  const handleApplyToSimilar = useCallback(async () => {
+    try {
+      setAcceptingIndividual(prev => new Set(prev).add(pendingSimilarTransactionId));
+      
+      const transaction = previewData.find(t => t.transaction_id === pendingSimilarTransactionId);
+      if (!transaction) {
+        setError("Transaction not found");
+        return;
+      }
+
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/apply-to-similar/", {
+        transaction_id: Number(pendingSimilarTransactionId),
+        category_id: Number(pendingSimilarCategoryId),
+        description: transaction.description
+      });
+
+      if (response.data.success) {
+        setSuccessMessage(
+          `Successfully applied category to ${response.data.updated_count} similar transactions!`
+        );
+        setShowSuccess(true);
+        
+        // Refresh the preview data to reflect the changes
+        handleGeneratePreview(previewPagination.currentPage);
+      } else {
+        setError(response.data.error || "Failed to apply to similar transactions");
+      }
+    } catch (error) {
+      console.error("Error applying to similar transactions:", error);
+      setError("Failed to apply to similar transactions");
+    } finally {
+      setAcceptingIndividual(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pendingSimilarTransactionId);
+        return newSet;
+      });
+      setShowSimilarConfirmDialog(false);
+      setPendingSimilarTransactionId(null);
+      setPendingSimilarCategoryId(null);
+      setPendingSimilarCount(0);
+    }
+  }, [previewData, previewPagination.currentPage, handleGeneratePreview, pendingSimilarTransactionId, pendingSimilarCategoryId]);
+
   const handleApplyPreview = useCallback(async () => {
     try {
       setApplyingChanges(true);
@@ -796,6 +886,15 @@ const Categorization = () => {
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
+
+  // Load similar counts when preview data changes
+  useEffect(() => {
+    if (previewMode && previewData.length > 0) {
+      previewData.forEach(transaction => {
+        getSimilarCount(transaction.transaction_id, transaction.description);
+      });
+    }
+  }, [previewMode, previewData, getSimilarCount]);
 
   // Handle pagination
   const handlePageChange = useCallback((event, page) => {
@@ -2011,16 +2110,35 @@ const Categorization = () => {
                           )}
                           
                           {!isRemoved && !isModified && (
-                            <Button
-                              variant="contained"
-                              color="success"
-                              size="small"
-                              onClick={() => handleAcceptIndividual(transaction.transaction_id)}
-                              startIcon={<CheckIcon />}
-                              disabled={acceptingIndividual.has(transaction.transaction_id)}
-                            >
-                              {acceptingIndividual.has(transaction.transaction_id) ? 'Accepting...' : 'Accept'}
-                            </Button>
+                            <>
+                              <Button
+                                variant="contained"
+                                color="success"
+                                size="small"
+                                onClick={() => handleAcceptIndividual(transaction.transaction_id)}
+                                startIcon={<CheckIcon />}
+                                disabled={acceptingIndividual.has(transaction.transaction_id)}
+                              >
+                                {acceptingIndividual.has(transaction.transaction_id) ? 'Accepting...' : 'Accept'}
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                color="primary"
+                                size="small"
+                                onClick={() => handleApplyToSimilarClick(transaction.transaction_id, transaction.suggested_category.id)}
+                                disabled={acceptingIndividual.has(transaction.transaction_id)}
+                                sx={{ ml: 1 }}
+                              >
+                                Apply to All Similar
+                                {similarCounts.has(transaction.transaction_id) && similarCounts.get(transaction.transaction_id) > 1 && (
+                                  <Chip 
+                                    label={`${similarCounts.get(transaction.transaction_id)}`}
+                                    size="small"
+                                    sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
+                                  />
+                                )}
+                              </Button>
+                            </>
                           )}
                           
                           <Button
@@ -2442,6 +2560,28 @@ const Categorization = () => {
             color="primary"
           >
             Categorize All
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Similar Transactions Confirmation Dialog */}
+      <Dialog open={showSimilarConfirmDialog} onClose={() => setShowSimilarConfirmDialog(false)}>
+        <DialogTitle>Apply to All Similar Transactions</DialogTitle>
+        <DialogContent>
+          <Typography>
+            This action will apply the category to {pendingSimilarCount} transactions with the same description.
+            Are you sure you want to proceed?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSimilarConfirmDialog(false)}>Cancel</Button>
+          <Button 
+            onClick={handleApplyToSimilar} 
+            variant="contained"
+            color="primary"
+            disabled={acceptingIndividual.has(pendingSimilarTransactionId)}
+          >
+            {acceptingIndividual.has(pendingSimilarTransactionId) ? 'Applying...' : 'Apply to All'}
           </Button>
         </DialogActions>
       </Dialog>

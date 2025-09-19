@@ -324,6 +324,115 @@ def apply_categorization_preview(request):
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['POST'])
+def get_similar_transactions_count(request):
+    """
+    Get count of uncategorized transactions with the same description.
+    """
+    try:
+        transaction_id = request.data.get('transaction_id')
+        description = request.data.get('description')
+        
+        if not transaction_id and not description:
+            return Response({
+                'success': False,
+                'error': 'Transaction ID or description is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the description from the transaction if not provided
+        if not description:
+            try:
+                transaction = Transaction.objects.get(id=transaction_id)
+                description = transaction.description
+            except Transaction.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Transaction not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Count uncategorized transactions with the same description
+        similar_count = Transaction.objects.filter(
+            description=description,
+            category__isnull=True
+        ).count()
+        
+        return Response({
+            'success': True,
+            'similar_count': similar_count,
+            'description': description
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def apply_category_to_similar_transactions(request):
+    """
+    Apply a category to all transactions with the same description.
+    """
+    try:
+        transaction_id = request.data.get('transaction_id')
+        category_id = request.data.get('category_id')
+        description = request.data.get('description')
+        
+        if not transaction_id or not category_id:
+            return Response({
+                'success': False,
+                'error': 'Transaction ID and Category ID are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the category
+        try:
+            category = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Category not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get the description from the transaction if not provided
+        if not description:
+            try:
+                transaction = Transaction.objects.get(id=transaction_id)
+                description = transaction.description
+            except Transaction.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Transaction not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Find all uncategorized transactions with the same description
+        similar_transactions = Transaction.objects.filter(
+            description=description,
+            category__isnull=True
+        )
+        
+        # Apply the category to all similar transactions
+        updated_count = 0
+        for transaction in similar_transactions:
+            transaction.category = category
+            transaction.auto_categorized = True
+            transaction.suggested_category = None
+            transaction.save()
+            updated_count += 1
+        
+        return Response({
+            'success': True,
+            'message': f'Applied category to {updated_count} similar transactions',
+            'updated_count': updated_count,
+            'description': description,
+            'category_name': category.name
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 def categorization_stats(request):
     """Get categorization statistics."""
