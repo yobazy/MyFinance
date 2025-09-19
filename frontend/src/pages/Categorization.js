@@ -698,9 +698,6 @@ const Categorization = () => {
           Math.max(0, prev[transaction.confidence_level === 'high' ? 'high_confidence' : 
               transaction.confidence_level === 'medium' ? 'medium_confidence' : 'low_confidence'] - 1)
         }));
-        
-        // Refresh the main data to show the categorized transaction
-        await fetchInitialData();
       } else {
         setError(response.data.error || "Failed to accept change");
       }
@@ -714,7 +711,7 @@ const Categorization = () => {
         return newSet;
       });
     }
-  }, [previewData, fetchInitialData]);
+  }, [previewData]);
 
   const handleApplyPreview = useCallback(async () => {
     try {
