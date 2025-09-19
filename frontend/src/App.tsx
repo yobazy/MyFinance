@@ -21,6 +21,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RuleIcon from '@mui/icons-material/Rule';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import HelpIcon from '@mui/icons-material/Help';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import Dashboard from "./pages/Dashboard.tsx";
 import AccountsPage from "./pages/AccountsPage.tsx";
@@ -30,6 +31,7 @@ import RuleManagement from "./pages/RuleManagement";
 import Visualizations from "./pages/Visualizations";
 import Transactions from "./pages/Transactions.tsx";
 import UserSettings from "./pages/UserSettings";
+import HelpPage from "./pages/HelpPage.tsx";
 import { ThemeProvider } from "@mui/material/styles";
 import { getTheme } from "./theme";
 import { CssBaseline } from "@mui/material";
@@ -105,6 +107,7 @@ const navItems = [
     { to: "/upload", icon: <UploadFileIcon />, label: "Upload" },
     { to: "/transactions", icon: <ReceiptIcon />, label: "Transactions" },
     { to: "/visualizations", icon: <BarChartIcon />, label: "Analytics" },
+    { to: "/help", icon: <HelpIcon />, label: "Help" },
     { to: "/user-settings", icon: <SettingsIcon />, label: "Settings" },
   ];
 
@@ -285,6 +288,7 @@ const navItems = [
             <Route path="/rules" element={<RuleManagement />} />
             <Route path="/visualizations" element={<Visualizations />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/help" element={<HelpPage />} />
             <Route path="/user-settings" element={<UserSettings />} />
           </Routes>
         </Container>
