@@ -1880,7 +1880,13 @@ const Categorization = () => {
             </Box>
 
             {previewStats && (
-              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Box sx={{ 
+                mb: 3, 
+                p: 2, 
+                bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.50', 
+                borderRadius: 1,
+                border: `1px solid ${theme.palette.divider}`
+              }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="h6">Preview Summary</Typography>
                   <Typography variant="body2" color="text.secondary">
