@@ -50,6 +50,7 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import RuleIcon from '@mui/icons-material/Rule';
+import CheckIcon from '@mui/icons-material/Check';
 import { useNavigate } from 'react-router-dom';
 
 const Categorization = () => {
@@ -95,6 +96,7 @@ const Categorization = () => {
   const [previewStats, setPreviewStats] = useState(null);
   const [previewChanges, setPreviewChanges] = useState(new Map());
   const [applyingChanges, setApplyingChanges] = useState(false);
+  const [acceptingIndividual, setAcceptingIndividual] = useState(new Set());
   const [previewPagination, setPreviewPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -653,6 +655,66 @@ const Categorization = () => {
       return newChanges;
     });
   }, []);
+
+  const handleAcceptIndividual = useCallback(async (transactionId) => {
+    try {
+      setAcceptingIndividual(prev => new Set(prev).add(transactionId));
+      
+      const transaction = previewData.find(t => t.transaction_id === transactionId);
+      if (!transaction) {
+        setError("Transaction not found");
+        return;
+      }
+
+      if (!transaction.suggested_category) {
+        setError("No suggested category for this transaction");
+        return;
+      }
+
+      const change = {
+        transaction_id: Number(transactionId),
+        category_id: Number(transaction.suggested_category.id),
+        action: 'categorize',
+        confidence: Number(transaction.confidence || 0)
+      };
+
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/apply-preview/", {
+        changes: [change]
+      });
+
+      if (response.data.success) {
+        setSuccessMessage(`Successfully categorized "${transaction.description}"!`);
+        setShowSuccess(true);
+        
+        // Remove the accepted transaction from preview data
+        setPreviewData(prev => prev.filter(t => t.transaction_id !== transactionId));
+        
+        // Update preview stats
+        setPreviewStats(prev => ({
+          ...prev,
+          total_processed: Math.max(0, prev.total_processed - 1),
+          [transaction.confidence_level === 'high' ? 'high_confidence' : 
+           transaction.confidence_level === 'medium' ? 'medium_confidence' : 'low_confidence']: 
+          Math.max(0, prev[transaction.confidence_level === 'high' ? 'high_confidence' : 
+              transaction.confidence_level === 'medium' ? 'medium_confidence' : 'low_confidence'] - 1)
+        }));
+        
+        // Refresh the main data to show the categorized transaction
+        await fetchInitialData();
+      } else {
+        setError(response.data.error || "Failed to accept change");
+      }
+    } catch (error) {
+      console.error("Error accepting individual change:", error);
+      setError("Failed to accept change");
+    } finally {
+      setAcceptingIndividual(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(transactionId);
+        return newSet;
+      });
+    }
+  }, [previewData, fetchInitialData]);
 
   const handleApplyPreview = useCallback(async () => {
     try {
@@ -1943,6 +2005,19 @@ const Categorization = () => {
                                 ))}
                               </Select>
                             </FormControl>
+                          )}
+                          
+                          {!isRemoved && !isModified && (
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              onClick={() => handleAcceptIndividual(transaction.transaction_id)}
+                              startIcon={<CheckIcon />}
+                              disabled={acceptingIndividual.has(transaction.transaction_id)}
+                            >
+                              {acceptingIndividual.has(transaction.transaction_id) ? 'Accepting...' : 'Accept'}
+                            </Button>
                           )}
                           
                           <Button
