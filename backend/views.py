@@ -9,7 +9,7 @@ from django.db.models.functions import TruncMonth
 from .models import Account
 from django.views.decorators.csrf import csrf_exempt
 
-from backend.models import Transaction, Category, TDTransaction, AmexTransaction, CategorizationRule, RuleUsage, RuleGroup, DatabaseBackup, BackupSettings  # ✅ Import all models
+from backend.models import Transaction, Category, TDTransaction, AmexTransaction, ScotiabankTransaction, CategorizationRule, RuleUsage, RuleGroup, DatabaseBackup, BackupSettings  # ✅ Import all models
 from backend.serializers import TransactionSerializer, CategorySerializer  # ✅ Import Serializer
 
 UPLOAD_DIR = "uploads/"
@@ -73,6 +73,12 @@ def upload_file(request):
             df.columns = df.columns.str.lower().str.replace(' ', '_')
             df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
             process_amex_data(df, account)
+        elif file_type == "Scotiabank":
+            # Read Scotiabank CSV
+            df = pd.read_csv(file_path)
+            # Clean column names
+            df.columns = df.columns.str.strip()
+            process_scotiabank_data(df, account)
         else:
             return Response({"error": "Unsupported file type"}, status=400)
 
@@ -112,10 +118,13 @@ def process_td_data(df, account):
         except ValueError:
             amount = 0.0
         
+        # Convert description to uppercase for consistency
+        description_upper = str(row.Description).upper()
+        
         # Create TDTransaction record
         TDTransaction.objects.create(
             date=row.Date,
-            charge_name=row.Description,
+            charge_name=description_upper,
             credit_amt=amount if amount > 0 else None,
             debit_amt=abs(amount) if amount < 0 else None,
             balance=None  # Not available in this format
@@ -124,7 +133,7 @@ def process_td_data(df, account):
         # Create Transaction record
         Transaction.objects.create(
             date=row.Date,
-            description=row.Description,
+            description=description_upper,
             amount=amount,
             source="TD",
             account=account
@@ -170,10 +179,13 @@ def process_amex_data(df, account):
         if row.date is None or row.date_processed is None:
             continue  # Skip rows with invalid dates
 
+        # Convert description to uppercase for consistency
+        description_upper = str(row.description).upper()
+        
         AmexTransaction.objects.create(
             date=row.date,
             date_processed=row.date_processed,
-            description=row.description,
+            description=description_upper,
             cardmember=row.cardmember,
             amount=row.amount,
             commission=row.commission,
@@ -184,7 +196,7 @@ def process_amex_data(df, account):
         # Insert into the combined transactions table
         Transaction.objects.create(
             date=row.date,
-            description=row.description,
+            description=description_upper,
             amount=row.amount,
             source="Amex",
             account=account
@@ -192,6 +204,58 @@ def process_amex_data(df, account):
     
     # Update account balance after processing all transactions
     account.update_balance()
+
+def process_scotiabank_data(df, account):
+    """Process and insert Scotiabank data into the database."""
+    from datetime import datetime
+    
+    # Convert date column to proper format
+    def convert_date(date_str):
+        try:
+            # Scotiabank uses YYYY-MM-DD format
+            return datetime.strptime(date_str, "%Y-%m-%d").strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+    
+    df['Date'] = df['Date'].astype(str).apply(convert_date)
+    
+    # Process each row
+    for row in df.itertuples(index=False):
+        if row.Date is None:
+            continue  # Skip rows with invalid dates
+            
+        # Handle amount - Scotiabank files have a single Amount column
+        amount_str = str(row.Amount).replace('$', '').replace(',', '')
+        try:
+            amount = float(amount_str) if amount_str != 'nan' else 0.0
+        except ValueError:
+            amount = 0.0
+        
+        # Convert description to uppercase for consistency
+        description_upper = str(row.Description).upper()
+        
+        # Create ScotiabankTransaction record
+        ScotiabankTransaction.objects.create(
+            date=row.Date,
+            description=description_upper,
+            sub_description=row.Sub_description if hasattr(row, 'Sub_description') else '',
+            status=row.Status if hasattr(row, 'Status') else '',
+            transaction_type=row.Type_of_Transaction if hasattr(row, 'Type_of_Transaction') else '',
+            amount=amount
+        )
+        
+        # Create Transaction record
+        Transaction.objects.create(
+            date=row.Date,
+            description=description_upper,
+            amount=amount,
+            source="Scotiabank",
+            account=account
+        )
+    
+    # Update account balance after processing all transactions
+    account.update_balance()
+
 @csrf_exempt
 def manage_accounts(request):
     if request.method == "POST":
@@ -328,6 +392,7 @@ def reset_database(request):
         Transaction.objects.all().delete()
         TDTransaction.objects.all().delete()
         AmexTransaction.objects.all().delete()
+        ScotiabankTransaction.objects.all().delete()
         CategorizationRule.objects.all().delete()
         RuleUsage.objects.all().delete()
         RuleGroup.objects.all().delete()
@@ -510,7 +575,8 @@ def get_most_recent_transaction_date(request, table_name):
     """Fetch the most recent transaction date for a given table."""
     model_mapping = {
         "td": TDTransaction,
-        "amex": AmexTransaction
+        "amex": AmexTransaction,
+        "scotiabank": ScotiabankTransaction
     }
     model = model_mapping.get(table_name)
 

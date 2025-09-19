@@ -155,6 +155,14 @@ const AccountsPage = () => {
             style={{ width: '24px', height: '24px', objectFit: 'contain' }}
           />
         );
+      case "SCOTIA":
+        return (
+          <img 
+            src="/bank_scotia_icon.svg" 
+            alt="Scotiabank Logo" 
+            style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+          />
+        );
       default:
         return undefined;
     }
@@ -279,6 +287,12 @@ const AccountsPage = () => {
                 <Box display="flex" alignItems="center" gap={1}>
                   {getBankIcon("AMEX")}
                   American Express
+                </Box>
+              </MenuItem>
+              <MenuItem value="SCOTIA">
+                <Box display="flex" alignItems="center" gap={1}>
+                  {getBankIcon("SCOTIA")}
+                  Scotiabank
                 </Box>
               </MenuItem>
             </Select>

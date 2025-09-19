@@ -238,6 +238,17 @@ class AmexTransaction(models.Model):
     class Meta:
         db_table = 'amex'
 
+class ScotiabankTransaction(models.Model):
+    date = models.DateField()
+    description = models.TextField()
+    sub_description = models.TextField(blank=True)
+    status = models.CharField(max_length=50)
+    transaction_type = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = 'scotiabank'
+
 # Database Management Models
 class BackupSettings(models.Model):
     """Settings for database backup management"""

@@ -51,6 +51,8 @@ const FileUploader = () => {
                 setFileType("Amex");
             } else if (accountObj.bank === "TD") {
                 setFileType("TD");
+            } else if (accountObj.bank === "SCOTIA") {
+                setFileType("Scotiabank");
             }
         }
     };
@@ -132,7 +134,12 @@ const FileUploader = () => {
                 border: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300]}`
               }}>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Selected Bank:</strong> {selectedAccount.bank === "TD" ? "TD Bank" : "American Express"}
+                  <strong>Selected Bank:</strong> {
+                    selectedAccount.bank === "TD" ? "TD Bank" : 
+                    selectedAccount.bank === "AMEX" ? "American Express" :
+                    selectedAccount.bank === "SCOTIA" ? "Scotiabank" : 
+                    selectedAccount.bank
+                  }
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   <strong>Account Type:</strong> {selectedAccount.type.charAt(0).toUpperCase() + selectedAccount.type.slice(1)}
@@ -149,7 +156,12 @@ const FileUploader = () => {
                 paddingLeft: '1.5rem',
                 color: theme.palette.text.secondary 
               }}>
-                <li>File must be in {selectedAccount?.bank === "TD" ? "CSV" : "XLS/XLSX"} format</li>
+                <li>File must be in {
+                  selectedAccount?.bank === "TD" ? "CSV" : 
+                  selectedAccount?.bank === "AMEX" ? "XLS/XLSX" :
+                  selectedAccount?.bank === "SCOTIA" ? "CSV" : 
+                  "CSV"
+                } format</li>
                 <li>Must contain transaction date, description, and amount</li>
                 <li>No header modifications</li>
               </ul>
@@ -167,7 +179,12 @@ const FileUploader = () => {
             }}>
               <input
                 type="file"
-                accept={selectedAccount?.bank === "TD" ? ".csv" : ".xls,.xlsx"}
+                accept={
+                  selectedAccount?.bank === "TD" ? ".csv" : 
+                  selectedAccount?.bank === "AMEX" ? ".xls,.xlsx" :
+                  selectedAccount?.bank === "SCOTIA" ? ".csv" : 
+                  ".csv"
+                }
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
                 id="file-input"
@@ -182,7 +199,12 @@ const FileUploader = () => {
                   {file ? file.name : 'Drag and drop or click to select file'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Supported formats: {selectedAccount?.bank === "TD" ? "CSV" : "XLS, XLSX"}
+                  Supported formats: {
+                    selectedAccount?.bank === "TD" ? "CSV" : 
+                    selectedAccount?.bank === "AMEX" ? "XLS, XLSX" :
+                    selectedAccount?.bank === "SCOTIA" ? "CSV" : 
+                    "CSV"
+                  }
                 </Typography>
               </label>
             </Box>
