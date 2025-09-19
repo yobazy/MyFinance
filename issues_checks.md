@@ -9,6 +9,7 @@ Issues:
 [] Once some transactions are cat the page does not populate with more
 [] the View All button just loads the paginated thing, instead we should have the total transactions ...
 [] bulk edit dialog popup only accounts for transactions on the page, rather than all transactions
+[] after accepting bulk edit, changes arent immediately reflected (only the selected one disappears, if theres other transactions of the same type)
 [] Uncat menu, category selection should be alphebatizes
 [x] old databases are removed when 
 
@@ -27,8 +28,8 @@ To Do:
 [x] database restore deletes the backup
 [x] subcategories?
 [] logs / crash reports
-[] add scotiabank
-[] update defaults category
+[x] add scotiabank
+[x] update defaults category
 [] help docs for uploading
 [] reorg settings page
 [] top 3 of category selection should be most common categories
@@ -36,15 +37,3 @@ To Do:
 [] add cibc, rbc, bmo, mbna
 
 INTERACTIVE DEMO PAGE? 
-
-DEFAULTS:
-
-[] Events
-[] Vape
-[] Nicotine
-[] Alc
-[] Kush
-[] Nightlife
-[] TCKTWB - > events
-[] MCDONALDS -> Dining out
-[] Shopping > CONVENIENCE
