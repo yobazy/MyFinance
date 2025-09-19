@@ -729,62 +729,118 @@ const Categorization = () => {
       console.log('Selected categories to create:', selectedCategoriesArray);
       console.log('Current categories before creation:', categories);
       
-      // Create categories one by one and immediately update state
+      // First, collect all unique parent categories that need to be created
+      const parentCategories = new Set();
+      const categoryMappings = new Map(); // Maps subcategory name to parent category name
+      
+      selectedCategoriesArray.forEach(categoryName => {
+        const defaultCategory = defaultCategories.find(dc => dc.name === categoryName);
+        if (defaultCategory) {
+          parentCategories.add(defaultCategory.category);
+          categoryMappings.set(categoryName, defaultCategory.category);
+        }
+      });
+      
+      console.log('Parent categories to create:', Array.from(parentCategories));
+      console.log('Category mappings:', Object.fromEntries(categoryMappings));
+      
+      // Create parent categories first
+      const parentCategoryMap = new Map(); // Maps parent name to parent ID
+      for (const parentName of parentCategories) {
+        try {
+          // Check if parent category already exists
+          const existingParent = categories.find(cat => cat.name === parentName && !cat.parent);
+          if (existingParent) {
+            console.log(`Parent category "${parentName}" already exists with ID:`, existingParent.id);
+            parentCategoryMap.set(parentName, existingParent.id);
+            continue;
+          }
+          
+          console.log(`Creating parent category: ${parentName}`);
+          const response = await axios.post("http://127.0.0.1:8000/api/categories/create/", {
+            name: parentName
+          });
+          
+          console.log('Parent category created successfully:', response.data);
+          parentCategoryMap.set(parentName, response.data.id);
+          
+          // Add parent to categories state
+          setCategories(prev => {
+            const exists = prev.some(cat => cat.id === response.data.id || cat.name === response.data.name);
+            if (exists) return prev;
+            return [...prev, response.data];
+          });
+          
+        } catch (error) {
+          console.error(`Error creating parent category "${parentName}":`, error);
+        }
+      }
+      
+      // Now create subcategories with proper parent relationships
       for (const categoryName of selectedCategoriesArray) {
         try {
-          console.log(`Creating category: ${categoryName}`);
-          const response = await axios.post("http://127.0.0.1:8000/api/categories/create/", {
+          const parentName = categoryMappings.get(categoryName);
+          const parentId = parentCategoryMap.get(parentName);
+          
+          if (!parentId) {
+            console.error(`No parent ID found for category "${categoryName}" with parent "${parentName}"`);
+            continue;
+          }
+          
+          // Check if subcategory already exists under this parent
+          const existingSubcategory = categories.find(cat => 
+            cat.name === categoryName && cat.parent === parentId
+          );
+          
+          if (existingSubcategory) {
+            console.log(`Subcategory "${categoryName}" already exists under parent "${parentName}"`);
+            continue;
+          }
+          
+          console.log(`Creating subcategory: ${categoryName} under parent: ${parentName} (ID: ${parentId})`);
+          const response = await axios.post(`http://127.0.0.1:8000/api/categories/${parentId}/subcategories/`, {
             name: categoryName
           });
           
-          console.log('Category created successfully:', response.data);
+          console.log('Subcategory created successfully:', response.data);
           
-          // Immediately add to categories state
+          // Add subcategory to categories state
           setCategories(prev => {
-            console.log('Previous categories state:', prev);
-            // Check if category already exists to avoid duplicates
-            const exists = prev.some(cat => cat.id === response.data.id || cat.name === response.data.name);
-            if (exists) {
-              console.log(`Category ${categoryName} already exists in state, skipping`);
-              return prev;
-            }
-            console.log(`Adding category ${categoryName} to state`);
-            const newState = [...prev, response.data];
-            console.log('New categories state:', newState);
-            return newState;
+            const exists = prev.some(cat => cat.id === response.data.id || (cat.name === response.data.name && cat.parent === parentId));
+            if (exists) return prev;
+            return [...prev, response.data];
           });
           
-          // Immediately refresh category tree to show in hierarchy
-          try {
-            const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
-            setCategoryTree(treeResponse.data);
-            console.log('Category tree refreshed after creating:', categoryName);
-          } catch (treeError) {
-            console.error('Error refreshing category tree:', treeError);
-          }
-          
-          // Small delay to ensure state updates
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
         } catch (error) {
-          console.error(`Error creating category "${categoryName}":`, error);
+          console.error(`Error creating subcategory "${categoryName}":`, error);
           // Continue creating other categories even if one fails
         }
+      }
+      
+      // Refresh category tree to show the new hierarchy
+      try {
+        const treeResponse = await axios.get("http://127.0.0.1:8000/api/categories/tree/");
+        setCategoryTree(treeResponse.data);
+        console.log('Category tree refreshed after creating all categories');
+      } catch (treeError) {
+        console.error('Error refreshing category tree:', treeError);
       }
       
       // Clear selections and close dialog
       setSelectedDefaultCategories(new Set());
       setOpenDefaultDialog(false);
       
-      console.log('Category creation process completed');
-      console.log('Final categories state should be updated');
+      setSuccessMessage(`Successfully created ${selectedCategoriesArray.length} categories with proper hierarchy!`);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
       
     } catch (error) {
-      console.error("Error creating default categories:", error);
+      console.error('Error in handleCreateSelectedCategories:', error);
+      setError('Failed to create some categories. Please try again.');
     } finally {
       setCreatingDefaultCategories(false);
     }
-  }, [selectedDefaultCategories, categories]);
+  }, [selectedDefaultCategories, categories, defaultCategories]);
 
   // Memoize the category chips to prevent unnecessary re-renders
   const categoryChips = useMemo(() => {
