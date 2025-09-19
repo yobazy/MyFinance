@@ -132,7 +132,10 @@ const Categorization = () => {
     // Lifestyle & Entertainment
     { name: "Dining Out", category: "Food" },
     { name: "Entertainment", category: "Entertainment" },
+    { name: "Events", category: "Entertainment" },
+    { name: "Nightlife", category: "Entertainment" },
     { name: "Shopping", category: "Shopping" },
+    { name: "Convenience", category: "Shopping" },
     { name: "Clothing", category: "Shopping" },
     { name: "Subscriptions", category: "Entertainment" },
     { name: "Fitness & Gym", category: "Health" },
@@ -149,6 +152,11 @@ const Categorization = () => {
     { name: "Freelance", category: "Income" },
     { name: "Interest", category: "Income" },
     { name: "Refunds", category: "Income" },
+    
+    // Vices
+    { name: "Alcohol", category: "Vices" },
+    { name: "Cannabis", category: "Vices" },
+    { name: "Vaping", category: "Vices" },
     
     // Other
     { name: "Education", category: "Education" },

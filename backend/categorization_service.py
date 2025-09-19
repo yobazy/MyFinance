@@ -46,6 +46,11 @@ class AutoCategorizationService:
                 'BEST BUY', 'STAPLES', 'WALMART', 'TARGET', 'DOLLARAMA',
                 'WINNERS', 'MARSHALLS', 'HUDSON BAY'
             ],
+            'Convenience': [
+                '7-ELEVEN', 'CIRCLE K', 'MAC', 'COUGAR', 'QUICK MART',
+                'CONVENIENCE', 'CORNER STORE', 'GAS STATION', 'FUEL',
+                'SNACK', 'DRINK', 'CIGARETTE', 'TOBACCO', 'LOTTERY'
+            ],
             'Utilities': [
                 'HYDRO', 'BELL', 'ROGERS', 'TELUS', 'FIDO', 'VIRGIN MOBILE',
                 'SHAW', 'COGECO', 'VIDEOTRON', 'ENBRIDGE', 'UNION GAS',
@@ -64,9 +69,38 @@ class AutoCategorizationService:
                 'CINEPLEX', 'LANDMARK', 'MOVIE', 'THEATRE', 'CONCERT',
                 'STUBHUB', 'TICKETMASTER', 'LEGENDS MUSIC', 'MUSIC', 'CONCERT'
             ],
+            'Events': [
+                'TICKETMASTER', 'STUBHUB', 'EVENTBRITE', 'CONCERT', 'FESTIVAL',
+                'CONFERENCE', 'EXPO', 'SHOW', 'PERFORMANCE', 'THEATRE',
+                'SPORTS EVENT', 'GAME', 'MATCH', 'TOURNAMENT', 'EVENT'
+            ],
+            'Nightlife': [
+                'BAR', 'CLUB', 'NIGHTCLUB', 'LOUNGE', 'PUB', 'TAVERN',
+                'COCKTAIL', 'DANCE', 'NIGHTLIFE', 'DRINK', 'ALCOHOL',
+                'WINE', 'BEER', 'SPIRITS', 'NIGHT OUT'
+            ],
             'Subscriptions': [
                 'APPLE.COM', 'APPLE MUSIC', 'APPLE TV', 'APPLE STORE',
                 'GOOGLE', 'MICROSOFT', 'ADOBE', 'SUBSCRIPTION'
+            ],
+            'Alcohol': [
+                'LCBO', 'BEER STORE', 'SAQ', 'BC LIQUOR', 'ALBERTA LIQUOR',
+                'WINE', 'BEER', 'SPIRITS', 'LIQUOR', 'ALCOHOL', 'VODKA',
+                'WHISKEY', 'RUM', 'GIN', 'TEQUILA', 'CHAMPAGNE', 'COCKTAIL',
+                'BAR', 'PUB', 'TAVERN', 'BREWERY', 'WINERY', 'DISTILLERY'
+            ],
+            'Cannabis': [
+                'OCS', 'CANNABIS', 'MARIJUANA', 'WEED', 'POT', 'DISPENSARY',
+                'CANNABIS STORE', 'CANNABIS RETAIL', 'CANNABIS CO', 'CANNABIS CORP',
+                'CANNABIS INC', 'CANNABIS LTD', 'CANNABIS SHOP', 'CANNABIS OUTLET',
+                'CANNABIS MARKET', 'CANNABIS SUPPLY', 'CANNABIS EXPRESS',
+                'CANNABIS CLUB', 'CANNABIS CAFE', 'CANNABIS LOUNGE'
+            ],
+            'Vaping': [
+                'VAPE', 'VAPING', 'E-CIGARETTE', 'E-CIG', 'VAPOR', 'VAPORIZER',
+                'VAPE SHOP', 'VAPE STORE', 'VAPE OUTLET', 'VAPE SUPPLY',
+                'VAPE EXPRESS', 'VAPE MARKET', 'VAPE CORNER', 'VAPE LOUNGE',
+                'VAPE CAFE', 'VAPE BAR', 'VAPE CLUB', 'VAPE WORLD'
             ]
         }
     
