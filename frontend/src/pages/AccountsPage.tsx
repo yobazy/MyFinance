@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Container,
   Typography,
@@ -41,6 +42,7 @@ interface Account {
 }
 
 const AccountsPage = () => {
+  const location = useLocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [bank, setBank] = useState("");
   const [accountName, setAccountName] = useState("");
@@ -63,6 +65,16 @@ const AccountsPage = () => {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
+
+  // Check for URL parameter to auto-open create account dialog
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get('create') === 'true') {
+      setOpenDialog(true);
+      // Clean up the URL parameter
+      window.history.replaceState({}, '', '/accounts');
+    }
+  }, [location.search]);
 
   const refreshBalances = async () => {
     setRefreshing(true);

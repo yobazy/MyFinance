@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { 
   Container, 
   Typography, 
@@ -11,13 +12,16 @@ import {
   FormControl, 
   InputLabel, 
   Box,
-  Alert
+  Alert,
+  Divider
 } from "@mui/material";
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import AddIcon from '@mui/icons-material/Add';
 import { useTheme } from "@mui/material/styles";
 
 const FileUploader = () => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const [file, setFile] = useState(null);
     const [fileType, setFileType] = useState("TD");
     const [accounts, setAccounts] = useState([]); // Store fetched accounts
@@ -39,6 +43,13 @@ const FileUploader = () => {
 
     const handleAccountChange = (event) => {
         const selectedAccountName = event.target.value;
+        
+        // Check if "Add Account" option was selected
+        if (selectedAccountName === "add_account") {
+            navigate("/accounts?create=true");
+            return;
+        }
+        
         setAccount(selectedAccountName);
         
         // Find the selected account object to get bank info
@@ -123,6 +134,11 @@ const FileUploader = () => {
                     {account.name} ({account.bank})
                   </MenuItem>
                 ))}
+                <Divider />
+                <MenuItem value="add_account" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
+                  <AddIcon sx={{ mr: 1 }} />
+                  Add New Account
+                </MenuItem>
               </Select>
             </FormControl>
 
