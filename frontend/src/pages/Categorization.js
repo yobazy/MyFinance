@@ -997,6 +997,16 @@ const Categorization = () => {
     });
   }, []);
 
+  // Functions to expand/collapse all main categories
+  const expandAllCategories = useCallback(() => {
+    const mainCategoryIds = categoryTree.map(category => category.id);
+    setExpandedCategories(new Set(mainCategoryIds));
+  }, [categoryTree]);
+
+  const collapseAllCategories = useCallback(() => {
+    setExpandedCategories(new Set());
+  }, []);
+
 
   // Function to perform the actual update
   const performTransactionUpdate = useCallback(async (transactionId, categoryId) => {
@@ -1835,18 +1845,46 @@ const Categorization = () => {
                   <Typography variant="h6">
                     Category Hierarchy
                   </Typography>
-                  <IconButton
-                    size="small"
-                    className="expand-icon"
-                    sx={{
-                      ml: 1,
-                      '&:hover': {
-                        backgroundColor: 'action.hover'
-                      }
-                    }}
-                  >
-                    {showCategoryHierarchy ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  </IconButton>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    {showCategoryHierarchy && (
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            expandAllCategories();
+                          }}
+                          sx={{ minWidth: 'auto', px: 1, py: 0.5, fontSize: '0.75rem' }}
+                        >
+                          Expand All
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            collapseAllCategories();
+                          }}
+                          sx={{ minWidth: 'auto', px: 1, py: 0.5, fontSize: '0.75rem' }}
+                        >
+                          Collapse All
+                        </Button>
+                      </>
+                    )}
+                    <IconButton
+                      size="small"
+                      className="expand-icon"
+                      sx={{
+                        ml: 1,
+                        '&:hover': {
+                          backgroundColor: 'action.hover'
+                        }
+                      }}
+                    >
+                      {showCategoryHierarchy ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                  </Box>
                 </Box>
                 
                 <Collapse in={showCategoryHierarchy}>
@@ -2436,18 +2474,46 @@ const Categorization = () => {
                 <Typography variant="h6">
                   Category Hierarchy
                 </Typography>
-                <IconButton
-                  size="small"
-                  className="expand-icon"
-                  sx={{
-                    ml: 1,
-                    '&:hover': {
-                      backgroundColor: 'action.hover'
-                    }
-                  }}
-                >
-                  {showCategoryHierarchy ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
+                <Box display="flex" alignItems="center" gap={1}>
+                  {showCategoryHierarchy && (
+                    <>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          expandAllCategories();
+                        }}
+                        sx={{ minWidth: 'auto', px: 1, py: 0.5, fontSize: '0.75rem' }}
+                      >
+                        Expand All
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          collapseAllCategories();
+                        }}
+                        sx={{ minWidth: 'auto', px: 1, py: 0.5, fontSize: '0.75rem' }}
+                      >
+                        Collapse All
+                      </Button>
+                    </>
+                  )}
+                  <IconButton
+                    size="small"
+                    className="expand-icon"
+                    sx={{
+                      ml: 1,
+                      '&:hover': {
+                        backgroundColor: 'action.hover'
+                      }
+                    }}
+                  >
+                    {showCategoryHierarchy ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  </IconButton>
+                </Box>
               </Box>
               
               <Collapse in={showCategoryHierarchy}>
