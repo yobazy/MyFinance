@@ -91,7 +91,6 @@ const Categorization = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   
   // Preview state
-  const [previewMode, setPreviewMode] = useState(false);
   const [previewData, setPreviewData] = useState([]);
   const [previewStats, setPreviewStats] = useState(null);
   const [previewChanges, setPreviewChanges] = useState(new Map());
@@ -632,7 +631,6 @@ const Categorization = () => {
         setPreviewData(response.data.preview_data);
         setPreviewStats(response.data.page_stats);
         setPreviewPagination(response.data.pagination);
-        setPreviewMode(true);
         setPreviewChanges(new Map());
       }
     } catch (error) {
@@ -674,7 +672,7 @@ const Categorization = () => {
       }
 
       if (!transaction.suggested_category) {
-        setError("No suggested category for this transaction");
+        setError("No suggested category for this transaction. Please select a category manually.");
         return;
       }
 
@@ -829,8 +827,7 @@ const Categorization = () => {
         );
         setShowSuccess(true);
         
-        // Exit preview mode and refresh data
-        setPreviewMode(false);
+        // Clear preview data and refresh transactions
         setPreviewData([]);
         setPreviewStats(null);
         setPreviewChanges(new Map());
@@ -853,7 +850,6 @@ const Categorization = () => {
   }, [previewChanges, previewData, fetchInitialData]);
 
   const handleCancelPreview = useCallback(() => {
-    setPreviewMode(false);
     setPreviewData([]);
     setPreviewStats(null);
     setPreviewChanges(new Map());
@@ -889,12 +885,12 @@ const Categorization = () => {
 
   // Load similar counts when preview data changes
   useEffect(() => {
-    if (previewMode && previewData.length > 0) {
+    if (autoCategorizationEnabled && previewData.length > 0) {
       previewData.forEach(transaction => {
         getSimilarCount(transaction.transaction_id, transaction.description);
       });
     }
-  }, [previewMode, previewData, getSimilarCount]);
+  }, [autoCategorizationEnabled, previewData, getSimilarCount]);
 
   // Handle pagination
   const handlePageChange = useCallback((event, page) => {
@@ -1313,6 +1309,189 @@ const Categorization = () => {
     console.log('Categories count:', categories.length);
     console.log('Categories for dropdown:', categories.map(cat => ({ id: cat.id, name: cat.name })));
     
+    // If auto-categorization is enabled and we have preview data, show preview interface
+    if (autoCategorizationEnabled && previewData.length > 0) {
+      return previewData.map((transaction) => {
+        const change = previewChanges.get(transaction.transaction_id);
+        const isModified = change !== undefined;
+        const isRemoved = change?.action === 'remove';
+        const isCategorized = change?.action === 'categorize';
+        
+        return (
+          <Grid item xs={12} key={transaction.transaction_id}>
+            <Paper 
+              elevation={isModified ? 3 : 1} 
+              sx={{ 
+                p: 2, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 2,
+                transition: 'all 0.2s',
+                border: isModified ? '2px solid' : '1px solid',
+                borderColor: isRemoved ? 'error.main' : isCategorized ? 'success.main' : 'divider',
+                bgcolor: isRemoved ? 'error.light' : isCategorized ? 'success.light' : 'background.paper',
+                opacity: isRemoved ? 0.6 : 1
+              }}
+            >
+              <Box sx={{ flexGrow: 1 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={1}>
+                  <Typography variant="body1" fontWeight="medium">
+                    {transaction.description}
+                  </Typography>
+                  {transaction.suggested_category && (
+                    <Chip 
+                      label={`${Math.round(transaction.confidence * 100)}%`}
+                      size="small"
+                      color={transaction.confidence_level === 'high' ? 'success' : transaction.confidence_level === 'medium' ? 'warning' : 'error'}
+                      variant="outlined"
+                    />
+                  )}
+                  {transaction.reason === 'User rule' && (
+                    <Chip 
+                      label="User Rule"
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                  )}
+                  {transaction.reason === 'No suggestion' && (
+                    <Chip 
+                      label="No Suggestion"
+                      size="small"
+                      color="default"
+                      variant="outlined"
+                    />
+                  )}
+                  {isModified && (
+                    <Chip 
+                      label={isRemoved ? 'Removed' : 'Modified'}
+                      size="small"
+                      color={isRemoved ? 'error' : 'success'}
+                      variant="filled"
+                    />
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  {transaction.account_name} • {new Date(transaction.date).toLocaleDateString()}
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color={transaction.amount >= 0 ? "error.main" : "success.main"}
+                  fontWeight="bold"
+                >
+                  ${Math.abs(transaction.amount).toFixed(2)}
+                </Typography>
+              </Box>
+              
+              <Box display="flex" alignItems="center" gap={2}>
+                {!isRemoved && transaction.suggested_category && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Suggested Category:
+                    </Typography>
+                    <Chip 
+                      label={isCategorized ? 
+                        categories.find(c => c.id === change.categoryId)?.name || 'Unknown' :
+                        transaction.suggested_category.name
+                      }
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                )}
+                {!isRemoved && !transaction.suggested_category && (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      No Category Suggestion
+                    </Typography>
+                    <Chip 
+                      label="Manual Assignment Required"
+                      color="default"
+                      variant="outlined"
+                    />
+                  </Box>
+                )}
+                
+                <Box display="flex" gap={1}>
+                  {!isRemoved && (
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <InputLabel>Change to</InputLabel>
+                      <Select
+                        value={isCategorized ? change.categoryId : ''}
+                        onChange={(e) => handlePreviewChange(transaction.transaction_id, 'categorize', e.target.value)}
+                        label="Change to"
+                      >
+                        {categories.map((category) => (
+                          <MenuItem key={category.id} value={category.id}>
+                            {category.full_path || category.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+                  
+                  {!isRemoved && !isModified && transaction.suggested_category && (
+                    <>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        onClick={() => handleAcceptIndividual(transaction.transaction_id)}
+                        startIcon={<CheckIcon />}
+                        disabled={acceptingIndividual.has(transaction.transaction_id)}
+                      >
+                        {acceptingIndividual.has(transaction.transaction_id) ? 'Accepting...' : 'Accept'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                        onClick={() => handleApplyToSimilarClick(transaction.transaction_id, transaction.suggested_category.id)}
+                        disabled={acceptingIndividual.has(transaction.transaction_id)}
+                        sx={{ ml: 1 }}
+                      >
+                        Apply to All Similar
+                        {similarCounts.has(transaction.transaction_id) && similarCounts.get(transaction.transaction_id) > 1 && (
+                          <Chip 
+                            label={`${similarCounts.get(transaction.transaction_id)}`}
+                            size="small"
+                            sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
+                          />
+                        )}
+                      </Button>
+                    </>
+                  )}
+                  
+                  <Button
+                    variant="outlined"
+                    color={isRemoved ? 'success' : 'error'}
+                    size="small"
+                    onClick={() => handlePreviewChange(
+                      transaction.transaction_id, 
+                      isRemoved ? 'revert' : 'remove'
+                    )}
+                  >
+                    {isRemoved ? 'Restore' : 'Remove'}
+                  </Button>
+                  
+                  {isModified && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handlePreviewChange(transaction.transaction_id, 'revert')}
+                    >
+                      Revert
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
+        );
+      });
+    }
+    
+    // Default transaction display
     return transactions.map((transaction) => (
       <Grid item xs={12} key={transaction.id}>
         <Paper 
@@ -1378,7 +1557,7 @@ const Categorization = () => {
         </Paper>
       </Grid>
     ));
-  }, [transactions, categories, handleUpdateTransaction, theme.shadows]);
+  }, [transactions, categories, handleUpdateTransaction, theme.shadows, autoCategorizationEnabled, previewData, previewChanges, similarCounts, acceptingIndividual, handlePreviewChange, handleAcceptIndividual, handleApplyToSimilarClick]);
 
   if (loading) {
     return (
@@ -1937,254 +2116,6 @@ const Categorization = () => {
         </CardContent>
       </Card>
 
-      {/* Preview Mode Interface */}
-      {previewMode && (
-        <Card sx={{ mb: 2, boxShadow: theme.shadows[2], border: '2px solid', borderColor: 'secondary.main' }}>
-          <CardContent sx={{ py: 3, px: 2 }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-              <Box display="flex" alignItems="center">
-                <VisibilityIcon color="secondary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Preview Mode - Review Changes
-                </Typography>
-                <Chip 
-                  label={`${previewChanges.size} changes`} 
-                  size="small" 
-                  color="secondary" 
-                  variant="outlined"
-                  sx={{ ml: 1 }}
-                />
-              </Box>
-              <Box display="flex" gap={1}>
-                <Button
-                  variant="outlined"
-                  onClick={handleCancelPreview}
-                  disabled={applyingChanges}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={applyingChanges ? <CircularProgress size={20} /> : <AutorenewIcon />}
-                  onClick={handleApplyPreview}
-                  disabled={applyingChanges || previewChanges.size === 0}
-                >
-                  {applyingChanges ? 'Applying...' : `Apply ${previewChanges.size} Changes`}
-                </Button>
-              </Box>
-            </Box>
-
-            {previewStats && (
-              <Box sx={{ 
-                mb: 3, 
-                p: 2, 
-                bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.50', 
-                borderRadius: 1,
-                border: `1px solid ${theme.palette.divider}`
-              }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6">Preview Summary</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Page {previewPagination.currentPage} of {previewPagination.totalPages} 
-                    ({previewPagination.totalCount} total transactions)
-                  </Typography>
-                </Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">This Page</Typography>
-                    <Typography variant="h6">{previewStats.total_processed}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">High Confidence</Typography>
-                    <Typography variant="h6" color="success.main">{previewStats.high_confidence}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">Medium Confidence</Typography>
-                    <Typography variant="h6" color="warning.main">{previewStats.medium_confidence}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">Low Confidence</Typography>
-                    <Typography variant="h6" color="error.main">{previewStats.low_confidence}</Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-            )}
-
-            <Grid container spacing={2}>
-              {previewData.map((transaction) => {
-                const change = previewChanges.get(transaction.transaction_id);
-                const isModified = change !== undefined;
-                const isRemoved = change?.action === 'remove';
-                const isCategorized = change?.action === 'categorize';
-                
-                return (
-                  <Grid item xs={12} key={transaction.transaction_id}>
-                    <Paper 
-                      elevation={isModified ? 3 : 1} 
-                      sx={{ 
-                        p: 2, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 2,
-                        transition: 'all 0.2s',
-                        border: isModified ? '2px solid' : '1px solid',
-                        borderColor: isRemoved ? 'error.main' : isCategorized ? 'success.main' : 'divider',
-                        bgcolor: isRemoved ? 'error.light' : isCategorized ? 'success.light' : 'background.paper',
-                        opacity: isRemoved ? 0.6 : 1
-                      }}
-                    >
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Box display="flex" alignItems="center" gap={1} mb={1}>
-                          <Typography variant="body1" fontWeight="medium">
-                            {transaction.description}
-                          </Typography>
-                          <Chip 
-                            label={`${Math.round(transaction.confidence * 100)}%`}
-                            size="small"
-                            color={transaction.confidence_level === 'high' ? 'success' : transaction.confidence_level === 'medium' ? 'warning' : 'error'}
-                            variant="outlined"
-                          />
-                          {transaction.reason === 'User rule' && (
-                            <Chip 
-                              label="User Rule"
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
-                          )}
-                          {isModified && (
-                            <Chip 
-                              label={isRemoved ? 'Removed' : 'Modified'}
-                              size="small"
-                              color={isRemoved ? 'error' : 'success'}
-                              variant="filled"
-                            />
-                          )}
-                        </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          {transaction.account_name} • {new Date(transaction.date).toLocaleDateString()}
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          color={transaction.amount >= 0 ? "error.main" : "success.main"}
-                          fontWeight="bold"
-                        >
-                          ${Math.abs(transaction.amount).toFixed(2)}
-                        </Typography>
-                      </Box>
-                      
-                      <Box display="flex" alignItems="center" gap={2}>
-                        {!isRemoved && (
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" gutterBottom>
-                              Suggested Category:
-                            </Typography>
-                            <Chip 
-                              label={isCategorized ? 
-                                categories.find(c => c.id === change.categoryId)?.name || 'Unknown' :
-                                transaction.suggested_category.name
-                              }
-                              color="primary"
-                              variant="outlined"
-                            />
-                          </Box>
-                        )}
-                        
-                        <Box display="flex" gap={1}>
-                          {!isRemoved && (
-                            <FormControl size="small" sx={{ minWidth: 150 }}>
-                              <InputLabel>Change to</InputLabel>
-                              <Select
-                                value={isCategorized ? change.categoryId : ''}
-                                onChange={(e) => handlePreviewChange(transaction.transaction_id, 'categorize', e.target.value)}
-                                label="Change to"
-                              >
-                                {categories.map((category) => (
-                                  <MenuItem key={category.id} value={category.id}>
-                                    {category.full_path || category.name}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-                          )}
-                          
-                          {!isRemoved && !isModified && (
-                            <>
-                              <Button
-                                variant="contained"
-                                color="success"
-                                size="small"
-                                onClick={() => handleAcceptIndividual(transaction.transaction_id)}
-                                startIcon={<CheckIcon />}
-                                disabled={acceptingIndividual.has(transaction.transaction_id)}
-                              >
-                                {acceptingIndividual.has(transaction.transaction_id) ? 'Accepting...' : 'Accept'}
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                color="primary"
-                                size="small"
-                                onClick={() => handleApplyToSimilarClick(transaction.transaction_id, transaction.suggested_category.id)}
-                                disabled={acceptingIndividual.has(transaction.transaction_id)}
-                                sx={{ ml: 1 }}
-                              >
-                                Apply to All Similar
-                                {similarCounts.has(transaction.transaction_id) && similarCounts.get(transaction.transaction_id) > 1 && (
-                                  <Chip 
-                                    label={`${similarCounts.get(transaction.transaction_id)}`}
-                                    size="small"
-                                    sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
-                                  />
-                                )}
-                              </Button>
-                            </>
-                          )}
-                          
-                          <Button
-                            variant="outlined"
-                            color={isRemoved ? 'success' : 'error'}
-                            size="small"
-                            onClick={() => handlePreviewChange(
-                              transaction.transaction_id, 
-                              isRemoved ? 'revert' : 'remove'
-                            )}
-                          >
-                            {isRemoved ? 'Restore' : 'Remove'}
-                          </Button>
-                          
-                          {isModified && (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              onClick={() => handlePreviewChange(transaction.transaction_id, 'revert')}
-                            >
-                              Revert
-                            </Button>
-                          )}
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
-                );
-              })}
-            </Grid>
-
-            {/* Preview Pagination */}
-            {previewPagination.totalPages > 1 && (
-              <Box display="flex" justifyContent="center" mt={3}>
-                <Pagination
-                  count={previewPagination.totalPages}
-                  page={previewPagination.currentPage}
-                  onChange={handlePreviewPageChange}
-                  color="primary"
-                  size="large"
-                />
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Auto-Categorization Stats Dialog */}
       <Dialog 
@@ -2462,22 +2393,54 @@ const Categorization = () => {
         </CardContent>
       </Card>
 
-      {/* Transactions Section - Hidden in preview mode */}
-      {!previewMode && (
-        <Card sx={{ boxShadow: theme.shadows[1] }}>
-          <CardContent sx={{ py: 2, px: 2 }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-              <Box display="flex" alignItems="center">
-                <AttachMoneyIcon color="primary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Uncategorized Transactions
-                  {!showAll && hasMoreTransactions && (
-                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
-                      (Showing {transactions.length} of {allTransactions.length})
-                    </Typography>
-                  )}
-                </Typography>
-              </Box>
+      {/* Transactions Section */}
+      <Card sx={{ boxShadow: theme.shadows[1] }}>
+        <CardContent sx={{ py: 2, px: 2 }}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+            <Box display="flex" alignItems="center">
+              <AttachMoneyIcon color="primary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Uncategorized Transactions
+                {!showAll && hasMoreTransactions && (
+                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
+                    (Showing {transactions.length} of {allTransactions.length})
+                  </Typography>
+                )}
+              </Typography>
+              {autoCategorizationEnabled && previewChanges.size > 0 && (
+                <Chip 
+                  label={`${previewChanges.size} changes`} 
+                  size="small" 
+                  color="secondary" 
+                  variant="outlined"
+                  sx={{ ml: 1 }}
+                />
+              )}
+            </Box>
+            
+            <Box display="flex" gap={1}>
+              {autoCategorizationEnabled && previewChanges.size > 0 && (
+                <>
+                  <Button
+                    variant="outlined"
+                    onClick={handleCancelPreview}
+                    disabled={applyingChanges}
+                    size="small"
+                  >
+                    Cancel Changes
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={applyingChanges ? <CircularProgress size={20} /> : <AutorenewIcon />}
+                    onClick={handleApplyPreview}
+                    disabled={applyingChanges || previewChanges.size === 0}
+                    size="small"
+                  >
+                    {applyingChanges ? 'Applying...' : `Apply ${previewChanges.size} Changes`}
+                  </Button>
+                </>
+              )}
               
               {!showAll && hasMoreTransactions && (
                 <Button
@@ -2495,6 +2458,42 @@ const Categorization = () => {
                 </Button>
               )}
             </Box>
+          </Box>
+
+          {autoCategorizationEnabled && previewStats && (
+            <Box sx={{ 
+              mb: 3, 
+              p: 2, 
+              bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.50', 
+              borderRadius: 1,
+              border: `1px solid ${theme.palette.divider}`
+            }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">Auto-Categorization Preview</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {previewPagination.totalCount} total transactions
+                </Typography>
+              </Box>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="body2" color="text.secondary">High Confidence</Typography>
+                  <Typography variant="h6" color="success.main">{previewStats.high_confidence}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="body2" color="text.secondary">Medium Confidence</Typography>
+                  <Typography variant="h6" color="warning.main">{previewStats.medium_confidence}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="body2" color="text.secondary">Low Confidence</Typography>
+                  <Typography variant="h6" color="error.main">{previewStats.low_confidence}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="body2" color="text.secondary">No Suggestion</Typography>
+                  <Typography variant="h6" color="text.secondary">{previewStats.no_suggestion || 0}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
 
             <Grid container spacing={2}>
               {transactionItems}
@@ -2514,7 +2513,6 @@ const Categorization = () => {
             )}
           </CardContent>
         </Card>
-      )}
 
       {/* Edit Category Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>

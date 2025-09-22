@@ -199,25 +199,26 @@ def preview_auto_categorization(request):
             
             category, confidence = service.categorize_transaction(transaction)
             
+            # Always include the transaction in preview data, regardless of whether it has a suggestion
+            suggestion_data = {
+                'transaction_id': transaction.id,
+                'description': transaction.description,
+                'amount': float(transaction.amount),
+                'date': transaction.date.isoformat(),
+                'account_name': transaction.account.name if transaction.account else 'Unknown',
+                'suggested_category': {
+                    'id': category.id,
+                    'name': category.name
+                } if category else None,
+                'confidence': round(confidence, 3) if category else 0,
+                'reason': 'Auto-match' if category and confidence < 0.9 else 'User rule' if category and confidence >= 0.9 else 'No suggestion',
+                'confidence_level': 'high' if category and confidence >= 0.8 else 'medium' if category and confidence >= 0.5 else 'low' if category else 'none'
+            }
+            
+            preview_data.append(suggestion_data)
+            
+            # Update page stats
             if category:
-                suggestion_data = {
-                    'transaction_id': transaction.id,
-                    'description': transaction.description,
-                    'amount': float(transaction.amount),
-                    'date': transaction.date.isoformat(),
-                    'account_name': transaction.account.name if transaction.account else 'Unknown',
-                    'suggested_category': {
-                        'id': category.id,
-                        'name': category.name
-                    },
-                    'confidence': round(confidence, 3),
-                    'reason': 'Auto-match' if confidence < 0.9 else 'User rule',
-                    'confidence_level': 'high' if confidence >= 0.8 else 'medium' if confidence >= 0.5 else 'low'
-                }
-                
-                preview_data.append(suggestion_data)
-                
-                # Update page stats
                 if confidence >= 0.9:
                     page_stats['user_rules_applied'] += 1
                 elif confidence >= 0.8:
