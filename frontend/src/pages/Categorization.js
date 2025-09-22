@@ -121,6 +121,7 @@ const Categorization = () => {
   // Add collapsible state for sections
   const [showAutoCategorization, setShowAutoCategorization] = useState(false);
   const [showCategoryManagement, setShowCategoryManagement] = useState(true);
+  const [showCategoryHierarchy, setShowCategoryHierarchy] = useState(true);
   
   const ITEMS_PER_PAGE = 10;
   const INITIAL_LOAD = 20; // Load first 20 transactions initially
@@ -1815,10 +1816,42 @@ const Categorization = () => {
               <Divider sx={{ mb: 2 }} />
 
               <Box>
-                <Typography variant="h6" gutterBottom>
-                  Category Hierarchy
-                </Typography>
-                {categoryChips}
+                <Box 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="space-between"
+                  sx={{ 
+                    mb: showCategoryHierarchy ? 2 : 0,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      '& .expand-icon': {
+                        transform: 'scale(1.1)',
+                        transition: 'transform 0.2s ease-in-out'
+                      }
+                    }
+                  }}
+                  onClick={() => setShowCategoryHierarchy(!showCategoryHierarchy)}
+                >
+                  <Typography variant="h6">
+                    Category Hierarchy
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    className="expand-icon"
+                    sx={{
+                      ml: 1,
+                      '&:hover': {
+                        backgroundColor: 'action.hover'
+                      }
+                    }}
+                  >
+                    {showCategoryHierarchy ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  </IconButton>
+                </Box>
+                
+                <Collapse in={showCategoryHierarchy}>
+                  {categoryChips}
+                </Collapse>
               </Box>
             </Collapse>
           </CardContent>
@@ -2384,10 +2417,42 @@ const Categorization = () => {
             <Divider sx={{ mb: 2 }} />
 
             <Box>
-              <Typography variant="h6" gutterBottom>
-                Category Hierarchy
-              </Typography>
-              {categoryChips}
+              <Box 
+                display="flex" 
+                alignItems="center" 
+                justifyContent="space-between"
+                sx={{ 
+                  mb: showCategoryHierarchy ? 2 : 0,
+                  cursor: 'pointer',
+                  '&:hover': {
+                    '& .expand-icon': {
+                      transform: 'scale(1.1)',
+                      transition: 'transform 0.2s ease-in-out'
+                    }
+                  }
+                }}
+                onClick={() => setShowCategoryHierarchy(!showCategoryHierarchy)}
+              >
+                <Typography variant="h6">
+                  Category Hierarchy
+                </Typography>
+                <IconButton
+                  size="small"
+                  className="expand-icon"
+                  sx={{
+                    ml: 1,
+                    '&:hover': {
+                      backgroundColor: 'action.hover'
+                    }
+                  }}
+                >
+                  {showCategoryHierarchy ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
+              
+              <Collapse in={showCategoryHierarchy}>
+                {categoryChips}
+              </Collapse>
             </Box>
           </Collapse>
         </CardContent>
