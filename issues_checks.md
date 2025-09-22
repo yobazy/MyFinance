@@ -12,10 +12,13 @@ Issues:
 [] after accepting bulk edit, changes arent immediately reflected (only the selected one disappears, if theres other transactions of the same type)
 [] Uncat menu, category selection should be alphebatizes
 [x] old databases are removed when 
+[] set rule by specific account
 
 Checks:
 [x] Amex populates right
 [] Monthly spending populates right
+[] when I set a category and bulk apply it, the next time I add it does it remember?
+[] does the app learn from when im applying the categories
 
 
 To Do:
@@ -33,6 +36,7 @@ To Do:
 [] help docs for uploading
 [] reorg settings page
 [] top 3 of category selection should be most common categories
+[] insights > add average daily spend, weekly, monthly
 
 [] add cibc, rbc, bmo, mbna
 
