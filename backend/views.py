@@ -386,7 +386,7 @@ def get_transactions(request):
 
 @api_view(["POST"])
 def reset_database(request):
-    """Deletes all data from the database, then runs migrations."""
+    """Deletes all data from the database, then runs migrations. Preserves backup records and settings."""
     try:
         # Delete all data in the correct order to avoid foreign key constraints
         Transaction.objects.all().delete()
@@ -398,13 +398,12 @@ def reset_database(request):
         RuleGroup.objects.all().delete()
         Category.objects.all().delete()
         Account.objects.all().delete()
-        DatabaseBackup.objects.all().delete()
-        BackupSettings.objects.all().delete()
+        # Note: DatabaseBackup and BackupSettings are preserved to maintain backup history
 
         # Run migrations
         os.system("python manage.py makemigrations && python manage.py migrate")
 
-        return JsonResponse({"message": "Database reset and migrations applied! All data including categories, rules, and transactions have been deleted."})
+        return JsonResponse({"message": "Database reset and migrations applied! All data including categories, rules, and transactions have been deleted. Backup records and settings have been preserved."})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     

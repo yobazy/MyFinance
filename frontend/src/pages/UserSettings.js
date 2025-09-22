@@ -564,9 +564,10 @@ const UserSettings = () => {
             <br />• All transactions and accounts
             <br />• All categories and subcategories
             <br />• All categorization rules and rule groups
-            <br />• All backup settings and backup history
             <br /><br />
-            This action cannot be undone! Make sure you have a backup if you want to preserve your data.
+            <strong>IMPORTANT:</strong> Your backup files and backup settings will be preserved and can be used to restore your data.
+            <br /><br />
+            This action cannot be undone! Your backup files will remain available for restoration.
             <br /><br />
             Are you absolutely sure you want to reset the database?
           </Typography>
