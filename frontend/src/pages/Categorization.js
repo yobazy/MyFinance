@@ -70,10 +70,8 @@ const Categorization = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
 
   // Default categories state
   const [showDefaultCategories, setShowDefaultCategories] = useState(false);
@@ -504,7 +502,7 @@ const Categorization = () => {
     setShowAutoStats(true);
   }, [fetchCategorizationStats]);
 
-  // Load initial batch of transactions
+  // Load initial batch of transactions and trigger background loading
   const fetchInitialData = useCallback(async () => {
     try {
       setLoading(true);
@@ -521,12 +519,13 @@ const Categorization = () => {
       
       const allFetchedTransactions = transactionsResponse.data;
       
-      // Only show first 20 initially
-      const initialBatch = allFetchedTransactions.slice(0, INITIAL_LOAD);
-      setTransactions(initialBatch);
+      // Store all transactions and set up pagination
       setAllTransactions(allFetchedTransactions);
       setTotalPages(Math.ceil(allFetchedTransactions.length / ITEMS_PER_PAGE));
-      setHasMoreTransactions(allFetchedTransactions.length > INITIAL_LOAD);
+      
+      // Show initial batch for fast rendering
+      const initialBatch = allFetchedTransactions.slice(0, INITIAL_LOAD);
+      setTransactions(initialBatch);
       
       // Load auto categorization settings
       const savedEnabled = localStorage.getItem('autoCategorizationEnabled');
@@ -608,6 +607,7 @@ const Categorization = () => {
       setAutoCategorizing(false);
     }
   }, [fetchInitialData]);
+
 
   // Preview functionality
   const handleGeneratePreview = useCallback(async (page = 1) => {
@@ -864,21 +864,6 @@ const Categorization = () => {
     });
   }, []);
 
-  // Load all transactions when "View All" is clicked
-  const loadAllTransactions = useCallback(async () => {
-    if (showAll) return; // Already loaded
-    
-    try {
-      setLoadingMore(true);
-      setShowAll(true);
-      setCurrentPage(1);
-      setTransactions(allTransactions.slice(0, ITEMS_PER_PAGE));
-    } catch (error) {
-      console.error("Error loading all transactions:", error);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [allTransactions, showAll]);
 
   useEffect(() => {
     fetchInitialData();
@@ -901,10 +886,6 @@ const Categorization = () => {
     setTransactions(allTransactions.slice(startIndex, endIndex));
   }, [allTransactions]);
 
-  // Handle view all button
-  const handleViewAll = useCallback(() => {
-    loadAllTransactions();
-  }, [loadAllTransactions]);
 
   // Memoize handlers to prevent unnecessary re-renders
   const handleAddCategory = useCallback(async () => {
@@ -2532,11 +2513,6 @@ const Categorization = () => {
               <AttachMoneyIcon color="primary" sx={{ mr: 1.5, fontSize: '1.5rem' }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 Uncategorized Transactions
-                {!showAll && hasMoreTransactions && (
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
-                    (Showing {transactions.length} of {allTransactions.length})
-                  </Typography>
-                )}
               </Typography>
               {autoCategorizationEnabled && previewChanges.size > 0 && (
                 <Chip 
@@ -2573,21 +2549,6 @@ const Categorization = () => {
                 </>
               )}
               
-              {!showAll && hasMoreTransactions && (
-                <Button
-                  variant="outlined"
-                  startIcon={<VisibilityIcon />}
-                  onClick={handleViewAll}
-                  disabled={loadingMore}
-                  size="small"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500
-                  }}
-                >
-                  {loadingMore ? 'Loading...' : `View All (${allTransactions.length})`}
-                </Button>
-              )}
             </Box>
           </Box>
 
@@ -2631,7 +2592,7 @@ const Categorization = () => {
             </Grid>
 
             {/* Pagination */}
-            {showAll && totalPages > 1 && (
+            {totalPages > 1 && (
               <Box display="flex" justifyContent="center" mt={3}>
                 <Pagination
                   count={totalPages}
