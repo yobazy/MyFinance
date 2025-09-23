@@ -29,6 +29,9 @@ import {
   CreditCard as CreditCardIcon,
   Savings as SavingsIcon,
   Refresh as RefreshIcon,
+  Sort as SortIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
@@ -41,6 +44,9 @@ interface Account {
   lastUpdated: string;
 }
 
+type SortField = 'balance' | 'name' | 'bank' | 'type';
+type SortOrder = 'asc' | 'desc';
+
 const AccountsPage = () => {
   const location = useLocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -52,6 +58,8 @@ const AccountsPage = () => {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<SortField>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -205,6 +213,47 @@ const AccountsPage = () => {
     }
   };
 
+  const sortAccounts = (accounts: Account[], sortBy: SortField, sortOrder: SortOrder): Account[] => {
+    return [...accounts].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'balance':
+          comparison = (a.balance || 0) - (b.balance || 0);
+          break;
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'bank':
+          comparison = a.bank.localeCompare(b.bank);
+          break;
+        case 'type':
+          comparison = a.type.localeCompare(b.type);
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const handleSortChange = (field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortBy !== field) {
+      return <SortIcon />;
+    }
+    return sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
+  };
+
   return (
     <Container>
       <Box mb={4}>
@@ -216,7 +265,7 @@ const AccountsPage = () => {
         </Typography>
       </Box>
 
-      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
+      <Box sx={{ mb: 4, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button
           variant="contained"
           color="primary"
@@ -236,10 +285,49 @@ const AccountsPage = () => {
         >
           {refreshing ? "Refreshing..." : "Refresh Balances"}
         </Button>
+        
+        {/* Sort Controls */}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
+          <Typography variant="body2" color="text.secondary">
+            Sort by:
+          </Typography>
+          <Button
+            variant={sortBy === 'name' ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => handleSortChange('name')}
+            startIcon={getSortIcon('name')}
+          >
+            Account Name
+          </Button>
+          <Button
+            variant={sortBy === 'bank' ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => handleSortChange('bank')}
+            startIcon={getSortIcon('bank')}
+          >
+            Bank
+          </Button>
+          <Button
+            variant={sortBy === 'balance' ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => handleSortChange('balance')}
+            startIcon={getSortIcon('balance')}
+          >
+            Balance
+          </Button>
+          <Button
+            variant={sortBy === 'type' ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => handleSortChange('type')}
+            startIcon={getSortIcon('type')}
+          >
+            Type
+          </Button>
+        </Box>
       </Box>
 
       <Grid container spacing={3}>
-        {accounts.map((account) => (
+        {sortAccounts(accounts, sortBy, sortOrder).map((account) => (
           <Grid item xs={12} sm={6} md={4} key={account.id}>
             <Card 
               sx={{ 
