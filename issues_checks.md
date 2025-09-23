@@ -13,6 +13,7 @@ Issues:
 [] Uncat menu, category selection should be alphebatizes
 [x] old databases are removed when 
 [] set rule by specific account
+[] auto categorization stats are weird when nothing has been run
 
 Checks:
 [x] Amex populates right
@@ -37,6 +38,7 @@ To Do:
 [] reorg settings page
 [] top 3 of category selection should be most common categories
 [] insights > add average daily spend, weekly, monthly
+[] multiple uploads allowed?
 
 [] add cibc, rbc, bmo, mbna
 
