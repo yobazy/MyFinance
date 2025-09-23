@@ -80,7 +80,7 @@ const Categorization = () => {
   const [creatingDefaultCategories, setCreatingDefaultCategories] = useState(false);
   
   // Auto categorization state
-  const [autoCategorizationEnabled, setAutoCategorizationEnabled] = useState(true);
+  const [autoCategorizationEnabled, setAutoCategorizationEnabled] = useState(false);
   const [autoCategorizing, setAutoCategorizing] = useState(false);
   const [autoCategorizationStats, setAutoCategorizationStats] = useState(null);
   const [showAutoStats, setShowAutoStats] = useState(false);
