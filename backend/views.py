@@ -50,11 +50,29 @@ def upload_file(request):
     df = None
     try:
         if file_type == "TD":
-            # Read TD CSV with proper headers
+            # Read TD CSV and detect if headers are present
             df = pd.read_csv(file_path)
             # Clean column names
             df.columns = df.columns.str.strip()
-            process_td_data(df, account)
+            
+            # Check if this is the headerless format (DATE, DESCRIPTION, CREDIT, DEBIT, BALANCE)
+            # Look for patterns that indicate headerless format:
+            # 1. 5 columns
+            # 2. First column looks like a date (MM/DD/YYYY format)
+            # 3. Second column looks like a description (not a typical header word)
+            is_headerless = (
+                len(df.columns) == 5 and 
+                str(df.columns[0]).count('/') == 2 and  # Date format MM/DD/YYYY
+                not any(header_word in str(df.columns[1]).upper() for header_word in ['DESCRIPTION', 'MERCHANT'])
+            )
+            
+            if is_headerless:
+                # This is a headerless file, assign proper column names
+                df.columns = ['DATE', 'DESCRIPTION', 'CREDIT', 'DEBIT', 'BALANCE']
+                process_td_data_headerless(df, account)
+            else:
+                # This is the standard format with headers
+                process_td_data(df, account)
         elif file_type == "Amex":
             # Try different encodings for Amex files
             try:
@@ -141,6 +159,71 @@ def process_td_data(df, account):
     
     # Update account balance after processing all transactions
     account.update_balance()
+
+def process_td_data_headerless(df, account):
+    """Process and insert TD data from headerless CSV format (DATE, DESCRIPTION, CREDIT, DEBIT, BALANCE)."""
+    from datetime import datetime
+    
+    # Convert date column to proper format (MM/DD/YYYY -> YYYY-MM-DD)
+    def convert_date(date_str):
+        try:
+            # Handle MM/DD/YYYY format
+            return datetime.strptime(str(date_str), "%m/%d/%Y").strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+    
+    df['DATE'] = df['DATE'].astype(str).apply(convert_date)
+    
+    # Process each row
+    for row in df.itertuples(index=False):
+        if row.DATE is None or pd.isna(row.DATE):
+            continue  # Skip rows with invalid dates
+            
+        # Handle credit and debit amounts
+        credit_str = str(row.CREDIT).replace('$', '').replace(',', '') if not pd.isna(row.CREDIT) else '0'
+        debit_str = str(row.DEBIT).replace('$', '').replace(',', '') if not pd.isna(row.DEBIT) else '0'
+        
+        try:
+            credit_amount = float(credit_str) if credit_str != 'nan' and credit_str != '' else 0.0
+            debit_amount = float(debit_str) if debit_str != 'nan' and debit_str != '' else 0.0
+        except ValueError:
+            credit_amount = 0.0
+            debit_amount = 0.0
+        
+        # Calculate net amount (negative for charges/expenses, positive for payments/credits)
+        # In TD format: CREDIT column = charges (should be negative), DEBIT column = payments (should be positive)
+        net_amount = debit_amount - credit_amount
+        
+        # Convert description to uppercase for consistency
+        description_upper = str(row.DESCRIPTION).upper() if not pd.isna(row.DESCRIPTION) else ''
+        
+        # Skip empty rows
+        if not description_upper.strip():
+            continue
+        
+        # Create TDTransaction record
+        # In TD format: CREDIT column = charges (expenses), DEBIT column = payments (credits)
+        # TDTransaction: credit_amt = charges/expenses (negative amounts), debit_amt = payments/credits (positive amounts)
+        TDTransaction.objects.create(
+            date=row.DATE,
+            charge_name=description_upper,
+            credit_amt=credit_amount if credit_amount > 0 else None,  # CREDIT column = charges/expenses
+            debit_amt=debit_amount if debit_amount > 0 else None,  # DEBIT column = payments/credits
+            balance=None  # Balance column is ignored as requested
+        )
+        
+        # Create Transaction record
+        Transaction.objects.create(
+            date=row.DATE,
+            description=description_upper,
+            amount=net_amount,
+            source="TD",
+            account=account
+        )
+    
+    # Update account balance after processing all transactions
+    account.update_balance()
+
 def process_amex_data(df, account):
     """Process and insert Amex data into the database, ensuring correct formats."""
     from datetime import datetime

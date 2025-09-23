@@ -179,6 +179,9 @@ const FileUploader = () => {
                   "CSV"
                 } format</li>
                 <li>Must contain transaction date, description, and amount</li>
+                {selectedAccount?.bank === "TD" && (
+                  <li>TD files: Headers optional - supports both formats with/without column headers</li>
+                )}
                 <li>No header modifications</li>
               </ul>
             </Box>
