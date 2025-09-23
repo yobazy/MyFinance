@@ -111,6 +111,130 @@ def upload_file(request):
 
     return Response({"error": "Failed to process file"}, status=500)
 
+@api_view(['POST'])
+def upload_multiple_files(request):
+    """Handles multiple CSV/XLS file uploads and inserts data into the database."""
+    print(f"DEBUG: Request method: {request.method}")
+    print(f"DEBUG: Request FILES: {request.FILES}")
+    print(f"DEBUG: Request POST: {request.POST}")
+    
+    uploaded_files = request.FILES.getlist('files')
+    file_type = request.POST.get('file_type')
+    bank = request.POST.get('bank')
+    account_name = request.POST.get('account')
+    
+    print(f"DEBUG: uploaded_files count: {len(uploaded_files)}")
+    print(f"DEBUG: file_type: {file_type}")
+    print(f"DEBUG: bank: {bank}")
+    print(f"DEBUG: account_name: {account_name}")
+
+    if not uploaded_files:
+        return Response({"error": "No files provided"}, status=400)
+
+    if not bank or not account_name:
+        return Response({"error": "Bank and account are required"}, status=400)
+
+    # Get or create the account
+    try:
+        account = Account.objects.get(bank=bank, name=account_name)
+    except Account.DoesNotExist:
+        return Response({"error": f"Account '{account_name}' not found for bank '{bank}'"}, status=400)
+
+    results = []
+    total_rows_processed = 0
+    successful_uploads = 0
+    failed_uploads = 0
+
+    for uploaded_file in uploaded_files:
+        file_result = {
+            "filename": uploaded_file.name,
+            "success": False,
+            "rows_processed": 0,
+            "error": None
+        }
+        
+        # Save file to local directory
+        file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
+        default_storage.save(file_path, uploaded_file)
+
+        df = None
+        try:
+            if file_type == "TD":
+                # Read TD CSV and detect if headers are present
+                df = pd.read_csv(file_path)
+                # Clean column names
+                df.columns = df.columns.str.strip()
+                
+                # Check if this is the headerless format (DATE, DESCRIPTION, CREDIT, DEBIT, BALANCE)
+                is_headerless = (
+                    len(df.columns) == 5 and 
+                    str(df.columns[0]).count('/') == 2 and  # Date format MM/DD/YYYY
+                    not any(header_word in str(df.columns[1]).upper() for header_word in ['DESCRIPTION', 'MERCHANT'])
+                )
+                
+                if is_headerless:
+                    # This is a headerless file, assign proper column names
+                    df.columns = ['DATE', 'DESCRIPTION', 'CREDIT', 'DEBIT', 'BALANCE']
+                    process_td_data_headerless(df, account)
+                else:
+                    # This is the standard format with headers
+                    process_td_data(df, account)
+            elif file_type == "Amex":
+                # Try different encodings for Amex files
+                try:
+                    df = pd.read_excel(file_path, skiprows=11)
+                except (UnicodeDecodeError, Exception) as e:
+                    print(f"Excel read failed: {e}, trying CSV with different encodings")
+                    try:
+                        df = pd.read_csv(file_path, skiprows=11, encoding='latin-1')
+                    except UnicodeDecodeError:
+                        try:
+                            df = pd.read_csv(file_path, skiprows=11, encoding='cp1252')
+                        except UnicodeDecodeError:
+                            df = pd.read_csv(file_path, skiprows=11, encoding='iso-8859-1')
+                
+                df.columns = df.columns.str.lower().str.replace(' ', '_')
+                df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
+                process_amex_data(df, account)
+            elif file_type == "Scotiabank":
+                # Read Scotiabank CSV
+                df = pd.read_csv(file_path)
+                # Clean column names
+                df.columns = df.columns.str.strip()
+                process_scotiabank_data(df, account)
+            else:
+                file_result["error"] = "Unsupported file type"
+                results.append(file_result)
+                failed_uploads += 1
+                continue
+
+            if df is not None:
+                file_result["success"] = True
+                file_result["rows_processed"] = len(df)
+                total_rows_processed += len(df)
+                successful_uploads += 1
+            else:
+                file_result["error"] = "Failed to process file"
+                failed_uploads += 1
+                
+        except Exception as e:
+            file_result["error"] = f"Error processing file: {str(e)}"
+            failed_uploads += 1
+        finally:
+            # Clean up the uploaded file
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        results.append(file_result)
+
+    return Response({
+        "message": f"Upload completed: {successful_uploads} successful, {failed_uploads} failed",
+        "total_rows_processed": total_rows_processed,
+        "successful_uploads": successful_uploads,
+        "failed_uploads": failed_uploads,
+        "file_results": results
+    })
+
 def process_td_data(df, account):
     """Process and insert TD data into the database."""
     from datetime import datetime

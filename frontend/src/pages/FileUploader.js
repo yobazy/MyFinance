@@ -13,21 +13,40 @@ import {
   InputLabel, 
   Box,
   Alert,
-  Divider
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Chip,
+  LinearProgress,
+  IconButton,
+  Paper,
+  Switch,
+  FormControlLabel
 } from "@mui/material";
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useTheme } from "@mui/material/styles";
 
 const FileUploader = () => {
     const theme = useTheme();
     const navigate = useNavigate();
     const [file, setFile] = useState(null);
+    const [files, setFiles] = useState([]);
     const [fileType, setFileType] = useState("TD");
     const [accounts, setAccounts] = useState([]); // Store fetched accounts
     const [account, setAccount] = useState("");
     const [selectedAccount, setSelectedAccount] = useState(null); // Store selected account object
     const [message, setMessage] = useState("");
+    const [isMultipleMode, setIsMultipleMode] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadResults, setUploadResults] = useState([]);
 
     // Fetch all accounts on component mount
     useEffect(() => {
@@ -88,25 +107,91 @@ const FileUploader = () => {
 
     const handleFileChange = (event) => {
         if (event.target.files.length > 0) {
-            setFile(event.target.files[0]);
+            if (isMultipleMode) {
+                const newFiles = Array.from(event.target.files);
+                setFiles(prevFiles => [...prevFiles, ...newFiles]);
+            } else {
+                setFile(event.target.files[0]);
+            }
+        }
+    };
+
+    const handleRemoveFile = (index) => {
+        if (isMultipleMode) {
+            setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+        } else {
+            setFile(null);
+        }
+    };
+
+    const handleClearAllFiles = () => {
+        if (isMultipleMode) {
+            setFiles([]);
+        } else {
+            setFile(null);
+        }
+    };
+
+    const handleDragOver = (event) => {
+        event.preventDefault();
+    };
+
+    const handleDrop = (event) => {
+        event.preventDefault();
+        const droppedFiles = Array.from(event.dataTransfer.files);
+        
+        if (isMultipleMode) {
+            setFiles(prevFiles => [...prevFiles, ...droppedFiles]);
+        } else {
+            setFile(droppedFiles[0]);
         }
     };
 
   const handleUpload = async () => {
-    if (!file || !selectedAccount || !account) {
-      setMessage("Please select a file and account.");
-      return;
+    if (isMultipleMode) {
+      if (files.length === 0 || !selectedAccount || !account) {
+        setMessage("Please select files and account.");
+        return;
+      }
+    } else {
+      if (!file || !selectedAccount || !account) {
+        setMessage("Please select a file and account.");
+        return;
+      }
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("file_type", fileType);
-    formData.append("bank", selectedAccount.bank);
-    formData.append("account", account);
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadResults([]);
+    setMessage("");
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/upload/", formData);
-      setMessage(response.data.message);
+      if (isMultipleMode) {
+        // Multiple file upload
+        const formData = new FormData();
+        files.forEach(file => {
+          formData.append("files", file);
+        });
+        formData.append("file_type", fileType);
+        formData.append("bank", selectedAccount.bank);
+        formData.append("account", account);
+
+        const response = await axios.post("http://127.0.0.1:8000/api/upload-multiple/", formData);
+        setUploadResults(response.data.file_results);
+        setMessage(response.data.message);
+        setUploadProgress(100);
+      } else {
+        // Single file upload
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("file_type", fileType);
+        formData.append("bank", selectedAccount.bank);
+        formData.append("account", account);
+
+        const response = await axios.post("http://127.0.0.1:8000/api/upload/", formData);
+        setMessage(response.data.message);
+        setUploadProgress(100);
+      }
     } catch (error) {
       console.error("Upload error:", error);
       if (error.response && error.response.data && error.response.data.error) {
@@ -114,6 +199,8 @@ const FileUploader = () => {
       } else {
         setMessage(`Upload failed: ${error.message}`);
       }
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -123,9 +210,28 @@ const FileUploader = () => {
       <Typography variant="h4" gutterBottom>
         Upload Statements 📄
       </Typography>
+      
       <Card>
         <CardContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Upload Mode Toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isMultipleMode}
+                  onChange={(e) => {
+                    setIsMultipleMode(e.target.checked);
+                    if (e.target.checked) {
+                      setFile(null);
+                    } else {
+                      setFiles([]);
+                    }
+                  }}
+                />
+              }
+              label="Multiple File Upload"
+            />
+
             <FormControl fullWidth>
               <InputLabel>Account</InputLabel>
               <Select value={account} onChange={handleAccountChange}>
@@ -183,21 +289,30 @@ const FileUploader = () => {
                   <li>TD files: Headers optional - supports both formats with/without column headers</li>
                 )}
                 <li>No header modifications</li>
+                {isMultipleMode && (
+                  <li>You can select multiple files at once or add them one by one</li>
+                )}
               </ul>
             </Box>
 
-            <Box sx={{ 
-              border: '2px dashed #2563eb', 
-              borderRadius: 1, 
-              p: 3, 
-              textAlign: 'center',
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: 'rgba(37, 99, 235, 0.04)'
-              }
-            }}>
+            {/* File Upload Area */}
+            <Box 
+              sx={{ 
+                border: '2px dashed #2563eb', 
+                borderRadius: 1, 
+                p: 3, 
+                textAlign: 'center',
+                cursor: 'pointer',
+                '&:hover': {
+                  backgroundColor: 'rgba(37, 99, 235, 0.04)'
+                }
+              }}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
               <input
                 type="file"
+                multiple={isMultipleMode}
                 accept={
                   selectedAccount?.bank === "TD" ? ".csv" : 
                   selectedAccount?.bank === "AMEX" ? ".xls,.xlsx" :
@@ -215,7 +330,10 @@ const FileUploader = () => {
                   mb: 1 
                 }} />
                 <Typography variant="body1" gutterBottom>
-                  {file ? file.name : 'Drag and drop or click to select file'}
+                  {isMultipleMode 
+                    ? (files.length > 0 ? `${files.length} file(s) selected` : 'Drag and drop or click to select files')
+                    : (file ? file.name : 'Drag and drop or click to select file')
+                  }
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Supported formats: {
@@ -228,17 +346,106 @@ const FileUploader = () => {
               </label>
             </Box>
 
+            {/* File List for Multiple Upload */}
+            {isMultipleMode && files.length > 0 && (
+              <Paper sx={{ p: 2, mt: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="h6">Selected Files ({files.length})</Typography>
+                  <Button 
+                    size="small" 
+                    onClick={handleClearAllFiles}
+                    startIcon={<DeleteIcon />}
+                  >
+                    Clear All
+                  </Button>
+                </Box>
+                <List dense>
+                  {files.map((file, index) => (
+                    <ListItem key={index} sx={{ px: 0 }}>
+                      <ListItemIcon>
+                        <UploadFileIcon />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={file.name}
+                        secondary={`${(file.size / 1024).toFixed(1)} KB`}
+                      />
+                      <IconButton 
+                        edge="end" 
+                        onClick={() => handleRemoveFile(index)}
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            )}
+
+            {/* Upload Progress */}
+            {uploading && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" gutterBottom>
+                  Uploading files...
+                </Typography>
+                <LinearProgress variant="determinate" value={uploadProgress} />
+              </Box>
+            )}
+
+            {/* Upload Results */}
+            {uploadResults.length > 0 && (
+              <Paper sx={{ p: 2, mt: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Upload Results
+                </Typography>
+                <List dense>
+                  {uploadResults.map((result, index) => (
+                    <ListItem key={index} sx={{ px: 0 }}>
+                      <ListItemIcon>
+                        {result.success ? (
+                          <CheckCircleIcon color="success" />
+                        ) : (
+                          <ErrorIcon color="error" />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={result.filename}
+                        secondary={
+                          result.success 
+                            ? `${result.rows_processed} rows processed`
+                            : result.error
+                        }
+                      />
+                      {result.success && (
+                        <Chip 
+                          label="Success" 
+                          color="success" 
+                          size="small" 
+                        />
+                      )}
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            )}
+
             <Button
               variant="contained"
               onClick={handleUpload}
-              disabled={!file || !selectedAccount || !account}
+              disabled={
+                uploading || 
+                (isMultipleMode ? files.length === 0 : !file) || 
+                !selectedAccount || 
+                !account
+              }
               fullWidth
+              sx={{ mt: 2 }}
             >
-              Upload Statement
+              {isMultipleMode ? `Upload ${files.length} Statement${files.length !== 1 ? 's' : ''}` : 'Upload Statement'}
             </Button>
 
             {message && (
-              <Alert severity={message.includes("failed") ? "error" : "success"}>
+              <Alert severity={message.includes("failed") ? "error" : "success"} sx={{ mt: 2 }}>
                 {message}
               </Alert>
             )}
