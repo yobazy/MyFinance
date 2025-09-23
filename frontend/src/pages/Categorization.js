@@ -103,6 +103,12 @@ const Categorization = () => {
     hasPrevious: false
   });
   
+  // Manual categorization preview state
+  const [manualPreviewMode, setManualPreviewMode] = useState(false);
+  const [manualPreviewChanges, setManualPreviewChanges] = useState(new Map());
+  const [applyingManualChanges, setApplyingManualChanges] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState(new Map());
+  
   // Bulk categorization state
   const [showBulkConfirmDialog, setShowBulkConfirmDialog] = useState(false);
   const [pendingTransactionId, setPendingTransactionId] = useState(null);
@@ -864,6 +870,59 @@ const Categorization = () => {
     });
   }, []);
 
+  // Manual preview handlers
+  const handleManualPreviewChange = useCallback((transactionId, action, categoryId = null) => {
+    setManualPreviewChanges(prev => {
+      const newChanges = new Map(prev);
+      if (action === 'remove') {
+        newChanges.set(transactionId, { action: 'remove' });
+      } else if (action === 'categorize' && categoryId) {
+        newChanges.set(transactionId, { action: 'categorize', categoryId });
+      } else if (action === 'revert') {
+        newChanges.delete(transactionId);
+      }
+      return newChanges;
+    });
+  }, []);
+
+  const handleApplyManualPreview = useCallback(async () => {
+    try {
+      setApplyingManualChanges(true);
+      
+      const changes = Array.from(manualPreviewChanges.entries()).map(([transactionId, change]) => ({
+        transaction_id: transactionId,
+        category_id: change.categoryId,
+        action: change.action
+      }));
+      
+      const response = await axios.post("http://127.0.0.1:8000/api/auto-categorization/apply-preview/", {
+        changes: changes
+      });
+      
+      if (response.data.success) {
+        setSuccessMessage(`Applied ${response.data.applied_count} changes successfully`);
+        setShowSuccess(true);
+        setManualPreviewMode(false);
+        setManualPreviewChanges(new Map());
+        setSelectedCategories(new Map());
+        await fetchInitialData();
+      } else {
+        setError("Failed to apply changes");
+      }
+    } catch (error) {
+      console.error("Error applying manual changes:", error);
+      setError("Failed to apply changes");
+    } finally {
+      setApplyingManualChanges(false);
+    }
+  }, [manualPreviewChanges, fetchInitialData]);
+
+  const handleCancelManualPreview = useCallback(() => {
+    setManualPreviewMode(false);
+    setManualPreviewChanges(new Map());
+    setSelectedCategories(new Map());
+  }, []);
+
 
   useEffect(() => {
     fetchInitialData();
@@ -1483,73 +1542,191 @@ const Categorization = () => {
       });
     }
     
-    // Default transaction display
-    return transactions.map((transaction) => (
-      <Grid item xs={12} key={transaction.id}>
-        <Paper 
-          elevation={1} 
-          sx={{ 
-            p: 2, 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2,
-            transition: 'box-shadow 0.2s',
-            borderLeft: transaction.auto_categorized ? '4px solid #4caf50' : 'none',
-            '&:hover': {
-              boxShadow: theme.shadows[2],
-            }
-          }}
-        >
-          <Box sx={{ flexGrow: 1 }}>
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography variant="body1" fontWeight="medium">
-                {transaction.description}
+    // Default transaction display - similar to autocategorization format
+    return transactions.map((transaction) => {
+      const manualChange = manualPreviewChanges.get(transaction.id);
+      const isModified = manualChange !== undefined;
+      const isRemoved = manualChange?.action === 'remove';
+      const isCategorized = manualChange?.action === 'categorize';
+      
+      return (
+        <Grid item xs={12} key={transaction.id}>
+          <Paper 
+            elevation={isModified ? 3 : 1} 
+            sx={{ 
+              p: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2,
+              transition: 'all 0.2s',
+              borderLeft: transaction.auto_categorized ? '4px solid #4caf50' : 'none',
+              border: isModified ? '2px solid' : '1px solid',
+              borderColor: isRemoved ? 'error.main' : isCategorized ? 'success.main' : 'divider',
+              bgcolor: isRemoved ? 'error.light' : isCategorized ? 'success.light' : 'background.paper',
+              opacity: isRemoved ? 0.6 : 1
+            }}
+          >
+            <Box sx={{ flexGrow: 1 }}>
+              <Box display="flex" alignItems="center" gap={1} mb={1}>
+                <Typography variant="body1" fontWeight="medium">
+                  {transaction.description}
+                </Typography>
+                {transaction.auto_categorized && (
+                  <Chip 
+                    label={`Auto (${Math.round(transaction.confidence_score * 100)}%)`}
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                  />
+                )}
+                {!transaction.category && transaction.suggested_category_name && (
+                  <Chip 
+                    label={`Auto: ${transaction.suggested_category_name} (${Math.round((transaction.confidence_score || 0) * 100)}%)`}
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                  />
+                )}
+                {isModified && (
+                  <Chip 
+                    label={isRemoved ? 'Removed' : 'Modified'}
+                    size="small"
+                    color={isRemoved ? 'error' : 'success'}
+                    variant="filled"
+                  />
+                )}
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                {transaction.account?.name || 'Unknown Account'} • {new Date(transaction.date).toLocaleDateString()}
               </Typography>
-              {transaction.auto_categorized && (
-                <Chip 
-                  label={`Auto (${Math.round(transaction.confidence_score * 100)}%)`}
-                  size="small"
-                  color="success"
-                  variant="outlined"
-                />
-              )}
-              {!transaction.category && transaction.suggested_category_name && (
-                <Chip 
-                  label={`Auto: ${transaction.suggested_category_name} (${Math.round((transaction.confidence_score || 0) * 100)}%)`}
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                />
-              )}
+              <Typography 
+                variant="body2" 
+                color={transaction.amount >= 0 ? "error.main" : "success.main"}
+                fontWeight="bold"
+              >
+                ${Math.abs(transaction.amount).toFixed(2)}
+              </Typography>
             </Box>
-            <Typography 
-              variant="body2" 
-              color={transaction.amount >= 0 ? "error.main" : "success.main"}
-              fontWeight="bold"
-            >
-              ${Math.abs(transaction.amount).toFixed(2)}
-            </Typography>
-          </Box>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Select Category</InputLabel>
-            <Select
-              value=""
-              onChange={(e) => {
-                handleUpdateTransaction(transaction.id, e.target.value);
-              }}
-              label="Select Category"
-            >
-              {categories.map((category) => (
-                <MenuItem key={category.id} value={category.id}>
-                  {category.full_path || category.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Paper>
-      </Grid>
-    ));
-  }, [transactions, categories, handleUpdateTransaction, theme.shadows, autoCategorizationEnabled, previewData, previewChanges, similarCounts, acceptingIndividual, handlePreviewChange, handleAcceptIndividual, handleApplyToSimilarClick]);
+            
+            <Box display="flex" alignItems="center" gap={2}>
+              <Box>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Select Category:
+                </Typography>
+                <Chip 
+                  label={isCategorized ? 
+                    categories.find(c => c.id === manualChange.categoryId)?.name || 'Unknown' :
+                    'No Category Selected'
+                  }
+                  color={isCategorized ? "primary" : "default"}
+                  variant="outlined"
+                />
+              </Box>
+              
+              <Box display="flex" gap={1}>
+                {!isRemoved && (
+                  <FormControl size="small" sx={{ minWidth: 150 }}>
+                    <InputLabel>Change to</InputLabel>
+                    <Select
+                      value={isCategorized ? manualChange.categoryId : selectedCategories.get(transaction.id) || ''}
+                      onChange={(e) => {
+                        if (manualPreviewMode) {
+                          handleManualPreviewChange(transaction.id, 'categorize', e.target.value);
+                        } else {
+                          setSelectedCategories(prev => {
+                            const newMap = new Map(prev);
+                            newMap.set(transaction.id, e.target.value);
+                            return newMap;
+                          });
+                        }
+                      }}
+                      label="Change to"
+                    >
+                      {categories.map((category) => (
+                        <MenuItem key={category.id} value={category.id}>
+                          {category.full_path || category.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+                
+                {!isRemoved && !isModified && (
+                  <>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      onClick={() => {
+                        const selectedCategory = selectedCategories.get(transaction.id);
+                        if (selectedCategory) {
+                          handleUpdateTransaction(transaction.id, selectedCategory);
+                        }
+                      }}
+                      disabled={acceptingIndividual.has(transaction.id) || !selectedCategories.get(transaction.id)}
+                      startIcon={<CheckIcon />}
+                    >
+                      {acceptingIndividual.has(transaction.id) ? 'Accepting...' : 'Accept'}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="small"
+                      onClick={() => {
+                        const selectedCategory = selectedCategories.get(transaction.id);
+                        if (selectedCategory) {
+                          handleApplyToSimilarClick(transaction.id, selectedCategory);
+                        }
+                      }}
+                      disabled={acceptingIndividual.has(transaction.id) || !selectedCategories.get(transaction.id)}
+                      sx={{ ml: 1 }}
+                    >
+                      Apply to All Similar
+                      {similarCounts.has(transaction.id) && similarCounts.get(transaction.id) > 1 && (
+                        <Chip 
+                          label={`${similarCounts.get(transaction.id)}`}
+                          size="small"
+                          sx={{ ml: 1, height: 20, fontSize: '0.75rem' }}
+                        />
+                      )}
+                    </Button>
+                  </>
+                )}
+                
+                {manualPreviewMode && (
+                  <>
+                    {!isRemoved && (
+                      <Button
+                        variant="outlined"
+                        color={isRemoved ? 'success' : 'error'}
+                        size="small"
+                        onClick={() => handleManualPreviewChange(
+                          transaction.id, 
+                          isRemoved ? 'revert' : 'remove'
+                        )}
+                      >
+                        {isRemoved ? 'Restore' : 'Remove'}
+                      </Button>
+                    )}
+                    
+                    {isModified && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleManualPreviewChange(transaction.id, 'revert')}
+                      >
+                        Revert
+                      </Button>
+                    )}
+                  </>
+                )}
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
+      );
+    });
+  }, [transactions, categories, handleUpdateTransaction, theme.shadows, autoCategorizationEnabled, previewData, previewChanges, similarCounts, acceptingIndividual, handlePreviewChange, handleAcceptIndividual, handleApplyToSimilarClick, manualPreviewMode, manualPreviewChanges, handleManualPreviewChange, selectedCategories]);
 
   if (loading) {
     return (
@@ -2523,6 +2700,15 @@ const Categorization = () => {
                   sx={{ ml: 1 }}
                 />
               )}
+              {manualPreviewMode && manualPreviewChanges.size > 0 && (
+                <Chip 
+                  label={`${manualPreviewChanges.size} changes`} 
+                  size="small" 
+                  color="primary" 
+                  variant="outlined"
+                  sx={{ ml: 1 }}
+                />
+              )}
             </Box>
             
             <Box display="flex" gap={1}>
@@ -2545,6 +2731,48 @@ const Categorization = () => {
                     size="small"
                   >
                     {applyingChanges ? 'Applying...' : `Apply ${previewChanges.size} Changes`}
+                  </Button>
+                </>
+              )}
+              
+              {!autoCategorizationEnabled && !manualPreviewMode && selectedCategories.size > 0 && (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => {
+                    // Initialize manual preview changes with selected categories
+                    const initialChanges = new Map();
+                    selectedCategories.forEach((categoryId, transactionId) => {
+                      initialChanges.set(transactionId, { action: 'categorize', categoryId });
+                    });
+                    setManualPreviewChanges(initialChanges);
+                    setManualPreviewMode(true);
+                  }}
+                  size="small"
+                >
+                  Preview Changes ({selectedCategories.size})
+                </Button>
+              )}
+              
+              {manualPreviewMode && manualPreviewChanges.size > 0 && (
+                <>
+                  <Button
+                    variant="outlined"
+                    onClick={handleCancelManualPreview}
+                    disabled={applyingManualChanges}
+                    size="small"
+                  >
+                    Cancel Changes
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={applyingManualChanges ? <CircularProgress size={20} /> : <AutorenewIcon />}
+                    onClick={handleApplyManualPreview}
+                    disabled={applyingManualChanges || manualPreviewChanges.size === 0}
+                    size="small"
+                  >
+                    {applyingManualChanges ? 'Applying...' : `Apply ${manualPreviewChanges.size} Changes`}
                   </Button>
                 </>
               )}
