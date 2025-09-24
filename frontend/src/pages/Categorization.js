@@ -759,12 +759,7 @@ const Categorization = () => {
     // Get the count of similar transactions
     const count = await getSimilarCount(transactionId, transaction.description);
     
-    if (count <= 1) {
-      setError("No other similar transactions found to apply this category to.");
-      return;
-    }
-
-    // Show confirmation dialog
+    // Show confirmation dialog (even if count is 1, we'll apply to that single transaction)
     setPendingSimilarTransactionId(transactionId);
     setPendingSimilarCategoryId(categoryId);
     setPendingSimilarCount(count);
@@ -795,7 +790,7 @@ const Categorization = () => {
 
       if (response.data.success) {
         setSuccessMessage(
-          `Successfully applied category to ${response.data.updated_count} similar transactions!`
+          `Successfully applied category to ${response.data.updated_count} transaction${response.data.updated_count === 1 ? '' : 's'}!`
         );
         setShowSuccess(true);
         
@@ -1524,7 +1519,7 @@ const Categorization = () => {
                         disabled={acceptingIndividual.has(transaction.transaction_id)}
                         sx={{ ml: 1 }}
                       >
-                        Apply to All Similar
+                        Apply to all
                         {similarCounts.has(transaction.transaction_id) && similarCounts.get(transaction.transaction_id) > 1 && (
                           <Chip 
                             label={`${similarCounts.get(transaction.transaction_id)}`}
@@ -1704,7 +1699,7 @@ const Categorization = () => {
                       disabled={acceptingIndividual.has(transaction.id) || !selectedCategories.get(transaction.id)}
                       sx={{ ml: 1 }}
                     >
-                      Apply to All Similar
+                      Apply to all
                       {similarCounts.has(transaction.id) && similarCounts.get(transaction.id) > 1 && (
                         <Chip 
                           label={`${similarCounts.get(transaction.id)}`}
@@ -2907,10 +2902,10 @@ const Categorization = () => {
 
       {/* Similar Transactions Confirmation Dialog */}
       <Dialog open={showSimilarConfirmDialog} onClose={() => setShowSimilarConfirmDialog(false)}>
-        <DialogTitle>Apply to All Similar Transactions</DialogTitle>
+        <DialogTitle>Apply to All</DialogTitle>
         <DialogContent>
           <Typography>
-            This action will apply the category to {pendingSimilarCount} transactions with the same description.
+            This action will apply the category to {pendingSimilarCount} transaction{pendingSimilarCount === 1 ? '' : 's'} with the same description.
             Are you sure you want to proceed?
           </Typography>
         </DialogContent>
