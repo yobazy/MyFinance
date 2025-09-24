@@ -744,7 +744,13 @@ const Categorization = () => {
   }, []);
 
   const handleApplyToSimilarClick = useCallback(async (transactionId, categoryId) => {
-    const transaction = previewData.find(t => t.transaction_id === transactionId);
+    // Look for transaction in both previewData and regular transactions
+    let transaction = previewData.find(t => t.transaction_id === transactionId);
+    if (!transaction) {
+      // If not found in previewData, look in regular transactions
+      transaction = transactions.find(t => t.id === transactionId);
+    }
+    
     if (!transaction) {
       setError("Transaction not found");
       return;
@@ -763,13 +769,19 @@ const Categorization = () => {
     setPendingSimilarCategoryId(categoryId);
     setPendingSimilarCount(count);
     setShowSimilarConfirmDialog(true);
-  }, [previewData, getSimilarCount]);
+  }, [previewData, transactions, getSimilarCount]);
 
   const handleApplyToSimilar = useCallback(async () => {
     try {
       setAcceptingIndividual(prev => new Set(prev).add(pendingSimilarTransactionId));
       
-      const transaction = previewData.find(t => t.transaction_id === pendingSimilarTransactionId);
+      // Look for transaction in both previewData and regular transactions
+      let transaction = previewData.find(t => t.transaction_id === pendingSimilarTransactionId);
+      if (!transaction) {
+        // If not found in previewData, look in regular transactions
+        transaction = transactions.find(t => t.id === pendingSimilarTransactionId);
+      }
+      
       if (!transaction) {
         setError("Transaction not found");
         return;
@@ -787,8 +799,14 @@ const Categorization = () => {
         );
         setShowSuccess(true);
         
-        // Refresh the preview data to reflect the changes
-        handleGeneratePreview(previewPagination.currentPage);
+        // Refresh data to reflect the changes
+        if (autoCategorizationEnabled && previewData.length > 0) {
+          // If we're in preview mode, refresh the preview data
+          handleGeneratePreview(previewPagination.currentPage);
+        } else {
+          // If we're in regular mode, refresh the transactions
+          fetchInitialData();
+        }
       } else {
         setError(response.data.error || "Failed to apply to similar transactions");
       }
@@ -806,7 +824,7 @@ const Categorization = () => {
       setPendingSimilarCategoryId(null);
       setPendingSimilarCount(0);
     }
-  }, [previewData, previewPagination.currentPage, handleGeneratePreview, pendingSimilarTransactionId, pendingSimilarCategoryId]);
+  }, [previewData, transactions, previewPagination.currentPage, handleGeneratePreview, pendingSimilarTransactionId, pendingSimilarCategoryId, autoCategorizationEnabled, fetchInitialData]);
 
   const handleApplyPreview = useCallback(async () => {
     try {
@@ -928,14 +946,19 @@ const Categorization = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // Load similar counts when preview data changes
+  // Load similar counts when preview data changes or when regular transactions change
   useEffect(() => {
     if (autoCategorizationEnabled && previewData.length > 0) {
       previewData.forEach(transaction => {
         getSimilarCount(transaction.transaction_id, transaction.description);
       });
+    } else if (!autoCategorizationEnabled && transactions.length > 0) {
+      // Load similar counts for regular uncategorized transactions
+      transactions.forEach(transaction => {
+        getSimilarCount(transaction.id, transaction.description);
+      });
     }
-  }, [autoCategorizationEnabled, previewData, getSimilarCount]);
+  }, [autoCategorizationEnabled, previewData, transactions, getSimilarCount]);
 
   // Handle pagination
   const handlePageChange = useCallback((event, page) => {
