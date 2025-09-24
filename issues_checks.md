@@ -14,6 +14,8 @@ Issues:
 [x] old databases are removed when 
 [] set rule by specific account
 [] auto categorization stats are weird when nothing has been run
+[] multiple uploads needs work
+[x] When we apply to all similar transactions on the Uncategorized Transactions section, rather than refreshing the page, can we just update on page?
 
 Checks:
 [x] Amex populates right
@@ -38,7 +40,7 @@ To Do:
 [] reorg settings page
 [] top 3 of category selection should be most common categories
 [] insights > add average daily spend, weekly, monthly
-[] multiple uploads allowed?
+[x] multiple uploads allowed?
 
 [] add cibc, rbc, bmo, mbna
 
