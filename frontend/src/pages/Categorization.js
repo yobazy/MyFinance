@@ -1594,7 +1594,7 @@ const Categorization = () => {
                 )}
                 {!transaction.category && transaction.suggested_category_name && (
                   <Chip 
-                    label={`Auto: ${transaction.suggested_category_name} (${Math.round((transaction.confidence_score || 0) * 100)}%)`}
+                    label={`Suggested: ${transaction.suggested_category_name} (${Math.round((transaction.confidence_score || 0) * 100)}%)`}
                     size="small"
                     color="warning"
                     variant="outlined"
