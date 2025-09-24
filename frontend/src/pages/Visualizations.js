@@ -19,12 +19,16 @@ import {
   InputLabel,
   Grid,
   Chip,
-  Alert
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper
 } from "@mui/material";
 import { 
-  PieChart, 
-  Pie, 
-  Cell, 
   Tooltip as RechartsTooltip, 
   LineChart, 
   Line, 
@@ -435,38 +439,60 @@ const Visualizations = () => {
                   </Box>
                 </Box>
                 {data?.category_spending && data.category_spending.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie 
-                        data={data.category_spending
-                          .filter(item => includeUncategorized || item.category__name !== null)
-                          .map(item => ({
-                            ...item,
-                            category__name: item.category__name || 'Uncategorized',
-                            total_amount: parseFloat(item.total_amount) || 0
-                          }))
-                        } 
-                        dataKey="total_amount" 
-                        nameKey="category__name" 
-                        cx="50%" 
-                        cy="50%" 
-                        outerRadius={100} 
-                        fill={COLORS[0]} 
-                        label={({ name, percent }) => `${name} ${formatPercentage(percent)}`}
-                        labelLine={false}
-                      >
-                        {data.category_spending
-                          .filter(item => includeUncategorized || item.category__name !== null)
-                          .map((item, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                      </Pie>
-                      <RechartsTooltip 
-                        contentStyle={tooltipStyle}
-                        formatter={(value, name) => [formatCurrency(value), name]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                    <Table stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Category</TableCell>
+                          <TableCell align="right">Amount</TableCell>
+                          <TableCell align="right">Percentage</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(() => {
+                          const filteredData = data.category_spending
+                            .filter(item => includeUncategorized || item.category__name !== null)
+                            .map(item => ({
+                              ...item,
+                              category__name: item.category__name || 'Uncategorized',
+                              total_amount: parseFloat(item.total_amount) || 0
+                            }));
+                          
+                          const totalAmount = filteredData.reduce((sum, item) => sum + item.total_amount, 0);
+                          
+                          return filteredData.map((item, index) => {
+                            const percentage = totalAmount > 0 ? (item.total_amount / totalAmount) * 100 : 0;
+                            return (
+                              <TableRow key={`row-${index}`} hover>
+                                <TableCell>
+                                  <Box display="flex" alignItems="center">
+                                    <Box
+                                      width={12}
+                                      height={12}
+                                      borderRadius="50%"
+                                      bgcolor={COLORS[index % COLORS.length]}
+                                      mr={1}
+                                    />
+                                    {item.category__name}
+                                  </Box>
+                                </TableCell>
+                                <TableCell align="right">
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {formatCurrency(item.total_amount)}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell align="right">
+                                  <Typography variant="body2" color="text.secondary">
+                                    {formatPercentage(percentage / 100)}
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          });
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 ) : (
                   <Box display="flex" justifyContent="center" alignItems="center" height={300}>
                     <Typography variant="body1" color="text.secondary">
