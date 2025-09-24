@@ -1475,27 +1475,15 @@ const Categorization = () => {
                     />
                   </Box>
                 )}
-                {!isRemoved && !transaction.suggested_category && (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      No Category Suggestion
-                    </Typography>
-                    <Chip 
-                      label="Manual Assignment Required"
-                      color="default"
-                      variant="outlined"
-                    />
-                  </Box>
-                )}
                 
                 <Box display="flex" gap={1}>
                   {!isRemoved && (
                     <FormControl size="small" sx={{ minWidth: 150 }}>
-                      <InputLabel>Change to</InputLabel>
+                      <InputLabel>Select category</InputLabel>
                       <Select
                         value={isCategorized ? change.categoryId : ''}
                         onChange={(e) => handlePreviewChange(transaction.transaction_id, 'categorize', e.target.value)}
-                        label="Change to"
+                        label="Select category"
                       >
                         {categories.map((category) => (
                           <MenuItem key={category.id} value={category.id}>
@@ -1651,24 +1639,11 @@ const Categorization = () => {
             </Box>
             
             <Box display="flex" alignItems="center" gap={2}>
-              <Box>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Select Category:
-                </Typography>
-                <Chip 
-                  label={isCategorized ? 
-                    categories.find(c => c.id === manualChange.categoryId)?.name || 'Unknown' :
-                    'No Category Selected'
-                  }
-                  color={isCategorized ? "primary" : "default"}
-                  variant="outlined"
-                />
-              </Box>
               
               <Box display="flex" gap={1}>
                 {!isRemoved && (
                   <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Change to</InputLabel>
+                    <InputLabel>Select category</InputLabel>
                     <Select
                       value={isCategorized ? manualChange.categoryId : selectedCategories.get(transaction.id) || ''}
                       onChange={(e) => {
@@ -1682,7 +1657,7 @@ const Categorization = () => {
                           });
                         }
                       }}
-                      label="Change to"
+                      label="Select category"
                     >
                       {categories.map((category) => (
                         <MenuItem key={category.id} value={category.id}>
@@ -2754,7 +2729,7 @@ const Categorization = () => {
             </Box>
             
             <Box display="flex" gap={1}>
-              {autoCategorizationEnabled && previewChanges.size > 0 && (
+              {autoCategorizationEnabled && previewData.length > 0 && (
                 <>
                   <Button
                     variant="outlined"
@@ -2796,7 +2771,7 @@ const Categorization = () => {
                 </Button>
               )}
               
-              {manualPreviewMode && manualPreviewChanges.size > 0 && (
+              {manualPreviewMode && (
                 <>
                   <Button
                     variant="outlined"
