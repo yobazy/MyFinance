@@ -1465,6 +1465,13 @@ const Categorization = () => {
                       }
                       color="primary"
                       variant="outlined"
+                      onClick={() => {
+                        if (!isCategorized && transaction.suggested_category) {
+                          // Set the suggested category in the preview changes
+                          handlePreviewChange(transaction.transaction_id, 'categorize', transaction.suggested_category.id);
+                        }
+                      }}
+                      sx={{ cursor: !isCategorized ? 'pointer' : 'default', '&:hover': { backgroundColor: !isCategorized ? 'primary.light' : undefined } }}
                     />
                   </Box>
                 )}
@@ -1603,6 +1610,23 @@ const Categorization = () => {
                     size="small"
                     color="warning"
                     variant="outlined"
+                    onClick={() => {
+                      // Find the category that matches the suggested category name
+                      const suggestedCategory = categories.find(cat => 
+                        cat.name === transaction.suggested_category_name || 
+                        cat.full_path === transaction.suggested_category_name
+                      );
+                      
+                      if (suggestedCategory) {
+                        // Update the selected categories state
+                        setSelectedCategories(prev => {
+                          const newMap = new Map(prev);
+                          newMap.set(transaction.id, suggestedCategory.id);
+                          return newMap;
+                        });
+                      }
+                    }}
+                    sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'warning.light' } }}
                   />
                 )}
                 {isModified && (
