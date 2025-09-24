@@ -45,6 +45,7 @@ interface DashboardData {
     account__bank?: string;
   }>;
   monthlySpending: number;
+  lastTransactionDate: string | null;
 }
 
 const Dashboard = () => {
@@ -197,7 +198,7 @@ const Dashboard = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Monthly Spending {selectedAccountId !== 'all' && '(Filtered)'}
+                  Monthly spending as of: {dashboardData.lastTransactionDate ? new Date(dashboardData.lastTransactionDate).toLocaleDateString() : 'No transactions'} {selectedAccountId !== 'all' && '(Filtered)'}
                 </Typography>
                 <Typography variant="h3">
                   ${dashboardData.monthlySpending.toLocaleString()}

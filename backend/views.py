@@ -998,10 +998,15 @@ def get_dashboard_data(request):
             amount__lt=0  # Only count expenses
         ).aggregate(total=Sum('amount'))['total'] or 0
 
+        # Get the last transaction date
+        last_transaction = transactions_queryset.order_by('-date').first()
+        last_transaction_date = last_transaction.date if last_transaction else None
+
         return Response({
             'totalBalance': float(total_balance),
             'recentTransactions': list(recent_transactions),
-            'monthlySpending': abs(float(monthly_spending))  # Convert to positive number
+            'monthlySpending': abs(float(monthly_spending)),  # Convert to positive number
+            'lastTransactionDate': last_transaction_date
         })
     except Exception as e:
         return Response({'error': str(e)}, status=500)
