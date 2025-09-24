@@ -227,12 +227,22 @@ const Visualizations = () => {
   // Safe formatter functions
   const formatCurrency = (value) => {
     const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-    return `$${numValue.toFixed(2)}`;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(numValue);
   };
 
   const formatCurrencyShort = (value) => {
     const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-    return `$${numValue.toFixed(0)}`;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(numValue);
   };
 
   const formatPercentage = (value) => {
