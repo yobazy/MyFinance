@@ -1615,7 +1615,7 @@ const Categorization = () => {
                 )}
               </Box>
               <Typography variant="body2" color="text.secondary">
-                {transaction.account?.name || 'Unknown Account'} • {new Date(transaction.date).toLocaleDateString()}
+                {transaction.account_name} • {new Date(transaction.date).toLocaleDateString()}
               </Typography>
               <Typography 
                 variant="body2" 
