@@ -24,8 +24,8 @@ const isDev = process.env.NODE_ENV === 'development';
 function createWindow() {
   // Create the browser window
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1600,
+    height: 1000,
     minWidth: 1200,
     minHeight: 800,
     webPreferences: {
@@ -36,7 +36,16 @@ function createWindow() {
     },
     icon: path.join(__dirname, '../frontend/public/favicon.ico'),
     show: false, // Don't show until ready
-    titleBarStyle: 'default'
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    frame: true,
+    transparent: false,
+    vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
+    visualEffectState: process.platform === 'darwin' ? 'active' : undefined,
+    titleBarOverlay: process.platform === 'darwin' ? {
+      color: '#1a1a1a',
+      symbolColor: '#f5f5f5',
+      height: 28
+    } : undefined
   });
 
   // Load the app
@@ -177,6 +186,21 @@ function createMenu() {
             mainWindow.webContents.send('menu-import-data');
           }
         },
+        {
+          label: 'Export Data',
+          accelerator: 'CmdOrCtrl+E',
+          click: () => {
+            mainWindow.webContents.send('menu-export-data');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Preferences',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => {
+            mainWindow.webContents.send('menu-preferences');
+          }
+        },
         { type: 'separator' },
         {
           role: 'quit',
@@ -195,7 +219,56 @@ function createMenu() {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'togglefullscreen' },
+        { type: 'separator' },
+        {
+          label: 'Toggle Sidebar',
+          accelerator: 'CmdOrCtrl+B',
+          click: () => {
+            mainWindow.webContents.send('menu-toggle-sidebar');
+          }
+        }
+      ]
+    },
+    {
+      label: 'Navigation',
+      submenu: [
+        {
+          label: 'Dashboard',
+          accelerator: 'CmdOrCtrl+1',
+          click: () => {
+            mainWindow.webContents.send('menu-navigate', '/');
+          }
+        },
+        {
+          label: 'Accounts',
+          accelerator: 'CmdOrCtrl+2',
+          click: () => {
+            mainWindow.webContents.send('menu-navigate', '/accounts');
+          }
+        },
+        {
+          label: 'Transactions',
+          accelerator: 'CmdOrCtrl+3',
+          click: () => {
+            mainWindow.webContents.send('menu-navigate', '/transactions');
+          }
+        },
+        {
+          label: 'Analytics',
+          accelerator: 'CmdOrCtrl+4',
+          click: () => {
+            mainWindow.webContents.send('menu-navigate', '/visualizations');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Upload Data',
+          accelerator: 'CmdOrCtrl+U',
+          click: () => {
+            mainWindow.webContents.send('menu-navigate', '/upload');
+          }
+        }
       ]
     },
     {

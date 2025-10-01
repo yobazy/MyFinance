@@ -1,5 +1,5 @@
 import React from "react";
-import { HashRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { 
   AppBar, 
   Toolbar, 
@@ -9,7 +9,17 @@ import {
   Menu,
   MenuItem,
   useMediaQuery,
-  Box
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Typography,
+  Collapse,
+  Tooltip
 } from "@mui/material";
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -23,6 +33,8 @@ import RuleIcon from '@mui/icons-material/Rule';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpIcon from '@mui/icons-material/Help';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import Dashboard from "./pages/Dashboard.tsx";
 import AccountsPage from "./pages/AccountsPage.tsx";
 import FileUploader from "./pages/FileUploader";
@@ -35,6 +47,7 @@ import HelpPage from "./pages/HelpPage.tsx";
 import { ThemeProvider } from "@mui/material/styles";
 import { getTheme } from "./theme";
 import { CssBaseline } from "@mui/material";
+import StatusBar from "./components/StatusBar";
 
 // Backup check function
 const checkAndCreateAutoBackup = async () => {
@@ -64,18 +77,39 @@ const checkAndCreateAutoBackup = async () => {
 };
 
 const App = () => {
-  const [anchorEl, setAnchorEl] = React.useState(null);
-  const [manageAnchorEl, setManageAnchorEl] = React.useState(null);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [manageOpen, setManageOpen] = React.useState(false);
   const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
   const theme = React.useMemo(() => getTheme(mode), [mode]);
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
   
   React.useEffect(() => {
     const handleThemeChange = (event) => {
       setMode(event.detail);
     };
 
+    const handleMenuAction = (event, action, data) => {
+      switch (action) {
+        case 'menu-navigate':
+          window.location.hash = data;
+          break;
+        case 'menu-toggle-sidebar':
+          setMobileOpen(!mobileOpen);
+          break;
+        case 'menu-preferences':
+          window.location.hash = '/user-settings';
+          break;
+        default:
+          break;
+      }
+    };
+
     window.addEventListener('themeChange', handleThemeChange);
+    
+    // Listen for Electron menu actions
+    if (window.electronAPI) {
+      window.electronAPI.onMenuAction(handleMenuAction);
+    }
     
     // Check for auto backup when app loads
     checkAndCreateAutoBackup();
@@ -83,227 +117,292 @@ const App = () => {
     return () => {
       window.removeEventListener('themeChange', handleThemeChange);
     };
-  }, []);
+  }, [mobileOpen]);
 
-  const handleMenu = (event) => {
-    setAnchorEl(event.currentTarget);
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
   };
 
-  const handleClose = () => {
-    setAnchorEl(null);
+  const handleManageToggle = () => {
+    setManageOpen(!manageOpen);
   };
 
-  const handleManageMenu = (event) => {
-    setManageAnchorEl(event.currentTarget);
-  };
+  const drawerWidth = 280;
 
-  const handleManageClose = () => {
-    setManageAnchorEl(null);
-  };
-
-  const NavButton = ({ to, icon, label }) => (
-    <Button
-      color="inherit"
-      component={Link}
-      to={to}
-      startIcon={icon}
-      sx={{ ml: 1 }}
-    >
-      {label}
-    </Button>
-  );
-
-const navItems = [
+  const mainNavItems = [
     { to: "/", icon: <DashboardIcon />, label: "Dashboard" },
     { to: "/accounts", icon: <AccountBalanceIcon />, label: "Accounts" },
     { to: "/upload", icon: <UploadFileIcon />, label: "Upload" },
     { to: "/transactions", icon: <ReceiptIcon />, label: "Transactions" },
     { to: "/visualizations", icon: <BarChartIcon />, label: "Analytics" },
+  ];
+
+  const manageNavItems = [
+    { to: "/categorization", icon: <CategoryIcon />, label: "Categories" },
+    { to: "/rules", icon: <RuleIcon />, label: "Rules" },
+  ];
+
+  const bottomNavItems = [
     { to: "/help", icon: <HelpIcon />, label: "Help" },
     { to: "/user-settings", icon: <SettingsIcon />, label: "Settings" },
   ];
+
+  const DrawerContent = () => {
+    const location = useLocation();
+    
+    return (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Logo Section */}
+      <Box sx={{ p: 3, textAlign: 'center', borderBottom: 1, borderColor: 'divider' }}>
+        <img 
+          src={mode === 'dark' ? './logo_dark.svg' : './logo_light.svg'} 
+          alt="MyFinance" 
+          style={{ 
+            height: '40px', 
+            width: 'auto',
+            cursor: 'pointer',
+            objectFit: 'contain'
+          }}
+          onClick={() => window.location.href = '/'}
+        />
+        <Typography variant="h6" sx={{ mt: 1, fontWeight: 600, color: 'text.primary' }}>
+          MyFinance
+        </Typography>
+      </Box>
+
+      {/* Main Navigation */}
+      <List sx={{ flexGrow: 1, pt: 2 }}>
+        {mainNavItems.map((item) => (
+          <ListItem key={item.to} disablePadding sx={{ px: 2, mb: 0.5 }}>
+            <ListItemButton
+              component={Link}
+              to={item.to}
+              selected={location.pathname === item.to}
+              sx={{
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                  },
+                  '& .MuiListItemIcon-root': {
+                    color: 'primary.contrastText',
+                  },
+                },
+                '&:hover': {
+                  backgroundColor: 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText 
+                primary={item.label}
+                primaryTypographyProps={{
+                  fontSize: '0.95rem',
+                  fontWeight: location.pathname === item.to ? 600 : 400,
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+        ))}
+
+        {/* Manage Section */}
+        <ListItem disablePadding sx={{ px: 2, mt: 2 }}>
+          <ListItemButton onClick={handleManageToggle} sx={{ borderRadius: 2 }}>
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <ManageAccountsIcon />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Manage"
+              primaryTypographyProps={{ fontSize: '0.95rem', fontWeight: 500 }}
+            />
+            {manageOpen ? <ExpandLess /> : <ExpandMore />}
+          </ListItemButton>
+        </ListItem>
+
+        <Collapse in={manageOpen} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {manageNavItems.map((item) => (
+              <ListItem key={item.to} disablePadding sx={{ px: 2, pl: 6 }}>
+                <ListItemButton
+                  component={Link}
+                  to={item.to}
+                  selected={location.pathname === item.to}
+                  sx={{
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      backgroundColor: 'primary.main',
+                      color: 'primary.contrastText',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                      },
+                      '& .MuiListItemIcon-root': {
+                        color: 'primary.contrastText',
+                      },
+                    },
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.label}
+                    primaryTypographyProps={{
+                      fontSize: '0.9rem',
+                      fontWeight: location.pathname === item.to ? 600 : 400,
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Collapse>
+      </List>
+
+      {/* Bottom Navigation */}
+      <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 1 }}>
+        <List>
+          {bottomNavItems.map((item) => (
+            <ListItem key={item.to} disablePadding sx={{ px: 2, mb: 0.5 }}>
+              <ListItemButton
+                component={Link}
+                to={item.to}
+                selected={location.pathname === item.to}
+                sx={{
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    backgroundColor: 'primary.main',
+                    color: 'primary.contrastText',
+                    '&:hover': {
+                      backgroundColor: 'primary.dark',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.contrastText',
+                    },
+                  },
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontSize: '0.95rem',
+                    fontWeight: location.pathname === item.to ? 600 : 400,
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+    </Box>
+    );
+  };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <AppBar position="static">
-          <Toolbar sx={{ minHeight: '56px', py: 0, overflow: 'visible' }}>
-            <Box sx={{ flexGrow: isMobile ? 0 : 1, display: 'flex', alignItems: 'center' }}>
-              <img 
-                src={mode === 'dark' ? './logo_dark.svg' : './logo_light.svg'} 
-                alt="MyFinance" 
-                style={{ 
-                  height: '120px', 
-                  width: 'auto',
-                  cursor: 'pointer',
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                  clipPath: 'inset(40% 0 40% 0)',
-                  // border: '2px solid white', // for debugging
-                  marginTop: '-30px',
-                  marginBottom: '-30px'
-                }}
-                onClick={() => window.location.href = '/'}
-              />
-            </Box>
+        <Box sx={{ display: 'flex', height: '100vh' }}>
+          {/* Desktop Sidebar */}
+          {!isMobile && (
+            <Drawer
+              variant="permanent"
+              sx={{
+                width: drawerWidth,
+                flexShrink: 0,
+                '& .MuiDrawer-paper': {
+                  width: drawerWidth,
+                  boxSizing: 'border-box',
+                  borderRight: 1,
+                  borderColor: 'divider',
+                },
+              }}
+            >
+              <DrawerContent />
+            </Drawer>
+          )}
 
-            {isMobile ? (
-              <>
-                <IconButton
-                  size="large"
-                  edge="end"
-                  color="inherit"
-                  aria-label="menu"
-                  onClick={handleMenu}
-                  sx={{ ml: 'auto' }}
-                >
-                  <MenuIcon />
-                </IconButton>
-                <Menu
-                  anchorEl={anchorEl}
-                  open={Boolean(anchorEl)}
-                  onClose={handleClose}
-                >
-                  {navItems.slice(0, -1).map((item) => (
-                    <MenuItem 
-                      key={item.to} 
-                      component={Link} 
-                      to={item.to}
-                      onClick={handleClose}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                    >
-                      {item.icon}
-                      {item.label}
-                    </MenuItem>
-                  ))}
-                  <MenuItem 
-                    onClick={handleManageMenu}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          {/* Mobile Drawer */}
+          {isMobile && (
+            <Drawer
+              variant="temporary"
+              open={mobileOpen}
+              onClose={handleDrawerToggle}
+              ModalProps={{
+                keepMounted: true, // Better open performance on mobile.
+              }}
+              sx={{
+                '& .MuiDrawer-paper': {
+                  boxSizing: 'border-box',
+                  width: drawerWidth,
+                },
+              }}
+            >
+              <DrawerContent />
+            </Drawer>
+          )}
+
+          {/* Main Content */}
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Top App Bar for Mobile */}
+            {isMobile && (
+              <AppBar position="static" elevation={1}>
+                <Toolbar>
+                  <IconButton
+                    color="inherit"
+                    aria-label="open drawer"
+                    edge="start"
+                    onClick={handleDrawerToggle}
+                    sx={{ mr: 2 }}
                   >
-                    <ManageAccountsIcon />
-                    Manage
-                    <ArrowDropDownIcon />
-                  </MenuItem>
-                  <MenuItem 
-                    component={Link} 
-                    to={navItems[navItems.length - 1].to}
-                    onClick={handleClose}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    {navItems[navItems.length - 1].icon}
-                    {navItems[navItems.length - 1].label}
-                  </MenuItem>
-                </Menu>
-                <Menu
-                  anchorEl={manageAnchorEl}
-                  open={Boolean(manageAnchorEl)}
-                  onClose={handleManageClose}
-                >
-                  <MenuItem 
-                    component={Link} 
-                    to="/categorization"
-                    onClick={handleManageClose}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <CategoryIcon />
-                    Categories
-                  </MenuItem>
-                  <MenuItem 
-                    component={Link} 
-                    to="/rules"
-                    onClick={handleManageClose}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <RuleIcon />
-                    Rules
-                  </MenuItem>
-                </Menu>
-              </>
-            ) : (
-              <Box sx={{ display: 'flex' }}>
-                {navItems.slice(0, -1).map((item) => (
-                  <NavButton
-                    key={item.to}
-                    to={item.to}
-                    icon={item.icon}
-                    label={item.label}
-                  />
-                ))}
-                <Button
-                  color="inherit"
-                  startIcon={<ManageAccountsIcon />}
-                  endIcon={<ArrowDropDownIcon />}
-                  onClick={handleManageMenu}
-                  sx={{ ml: 1 }}
-                >
-                  Manage
-                </Button>
-                <NavButton
-                  to={navItems[navItems.length - 1].to}
-                  icon={navItems[navItems.length - 1].icon}
-                  label={navItems[navItems.length - 1].label}
-                />
-              </Box>
+                    <MenuIcon />
+                  </IconButton>
+                  <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+                    MyFinance
+                  </Typography>
+                </Toolbar>
+              </AppBar>
             )}
-          </Toolbar>
-        </AppBar>
 
-        {/* Manage Dropdown Menu for Desktop */}
-        <Menu
-          anchorEl={manageAnchorEl}
-          open={Boolean(manageAnchorEl)}
-          onClose={handleManageClose}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'left',
-          }}
-          disableAutoFocusItem
-          disableRestoreFocus
-          sx={{
-            '& .MuiPaper-root': {
-              marginTop: '0px', // No gap to prevent flickering
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            }
-          }}
-        >
-          <MenuItem 
-            component={Link} 
-            to="/categorization"
-            onClick={handleManageClose}
-            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <CategoryIcon />
-            Categories
-          </MenuItem>
-          <MenuItem 
-            component={Link} 
-            to="/rules"
-            onClick={handleManageClose}
-            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <RuleIcon />
-            Rules
-          </MenuItem>
-        </Menu>
-
-        <Container sx={{ mt: 4 }}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/upload" element={<FileUploader />} />
-            <Route path="/accounts" element={<AccountsPage />} />
-            <Route path="/categorization" element={<Categorization />} />
-            <Route path="/rules" element={<RuleManagement />} />
-            <Route path="/visualizations" element={<Visualizations />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="/user-settings" element={<UserSettings />} />
-          </Routes>
-        </Container>
+            {/* Page Content */}
+            <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, pb: 5 }}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/upload" element={<FileUploader />} />
+                <Route path="/accounts" element={<AccountsPage />} />
+                <Route path="/categorization" element={<Categorization />} />
+                <Route path="/rules" element={<RuleManagement />} />
+                <Route path="/visualizations" element={<Visualizations />} />
+                <Route path="/transactions" element={<Transactions />} />
+                <Route path="/help" element={<HelpPage />} />
+                <Route path="/user-settings" element={<UserSettings />} />
+              </Routes>
+            </Box>
+          </Box>
+          
+          {/* Desktop Status Bar */}
+          {!isMobile && <StatusBar />}
+        </Box>
       </Router>
     </ThemeProvider>
   );

@@ -10,8 +10,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Menu actions
   onMenuAction: (callback) => {
-    ipcRenderer.on('menu-new-transaction', callback);
-    ipcRenderer.on('menu-import-data', callback);
+    ipcRenderer.on('menu-new-transaction', () => callback(null, 'menu-new-transaction'));
+    ipcRenderer.on('menu-import-data', () => callback(null, 'menu-import-data'));
+    ipcRenderer.on('menu-export-data', () => callback(null, 'menu-export-data'));
+    ipcRenderer.on('menu-preferences', () => callback(null, 'menu-preferences'));
+    ipcRenderer.on('menu-toggle-sidebar', () => callback(null, 'menu-toggle-sidebar'));
+    ipcRenderer.on('menu-navigate', (event, path) => callback(null, 'menu-navigate', path));
   },
   
   // Remove listeners
