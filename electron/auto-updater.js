@@ -1,6 +1,8 @@
-const { autoUpdater } = require('electron-updater');
 const { dialog, app } = require('electron');
 const path = require('path');
+
+// Import autoUpdater only when needed to avoid initialization errors
+let autoUpdater = null;
 
 class AutoUpdaterService {
   constructor(mainWindow) {
@@ -12,6 +14,17 @@ class AutoUpdaterService {
   }
 
   setupAutoUpdater() {
+    // Import autoUpdater only when app is ready
+    if (!autoUpdater) {
+      try {
+        const { autoUpdater: updater } = require('electron-updater');
+        autoUpdater = updater;
+      } catch (error) {
+        console.error('Failed to load electron-updater:', error);
+        return;
+      }
+    }
+
     // Configure auto-updater
     autoUpdater.autoDownload = false; // Don't auto-download, let user choose
     autoUpdater.autoInstallOnAppQuit = true; // Install on app quit
