@@ -187,7 +187,7 @@ const AccountsPage = () => {
       case "AMEX":
         return (
           <img 
-            src="/bank_amex_icon.svg" 
+            src="./bank_amex_icon.svg" 
             alt="American Express Logo" 
             style={{ width: '24px', height: '24px', objectFit: 'contain' }}
           />
@@ -195,7 +195,7 @@ const AccountsPage = () => {
       case "TD":
         return (
           <img 
-            src="/bank_td_icon.svg" 
+            src="./bank_td_icon.svg" 
             alt="TD Bank Logo" 
             style={{ width: '24px', height: '24px', objectFit: 'contain' }}
           />
@@ -203,7 +203,7 @@ const AccountsPage = () => {
       case "SCOTIA":
         return (
           <img 
-            src="/bank_scotia_icon.svg" 
+            src="./bank_scotia_icon.svg" 
             alt="Scotiabank Logo" 
             style={{ width: '24px', height: '24px', objectFit: 'contain' }}
           />

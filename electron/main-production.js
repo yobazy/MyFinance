@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // Debug logging
 console.log('Electron app object:', app);
@@ -15,6 +16,7 @@ if (!app) {
 
 // Keep a global reference of the window object
 let mainWindow;
+let backendProcess;
 
 function createWindow() {
   console.log('Creating Electron window...');
@@ -117,6 +119,95 @@ function createWindow() {
   });
 }
 
+function startBackend() {
+  return new Promise((resolve, reject) => {
+    const pythonPath = process.platform === 'win32' ? 'python' : 'python3';
+    const projectRoot = path.join(__dirname, '..');
+    
+    console.log('Starting Django backend...');
+    
+    backendProcess = spawn(pythonPath, ['manage.py', 'runserver', '8000', '--noreload'], {
+      cwd: projectRoot,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    backendProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log('Backend:', output);
+      
+      // Check if server is ready - Django shows different messages
+      if (output.includes('Starting development server') || 
+          output.includes('Quit the server with') ||
+          output.includes('Watching for file changes') ||
+          output.includes('System check identified no issues')) {
+        console.log('✅ Backend server is ready');
+        resolve();
+      }
+    });
+
+    backendProcess.stderr.on('data', (data) => {
+      const error = data.toString();
+      console.error('Backend Error:', error);
+      
+      // Handle port already in use error
+      if (error.includes('That port is already in use')) {
+        console.log('Port 8000 is in use, trying port 8001...');
+        backendProcess.kill();
+        
+        // Try alternative port
+        backendProcess = spawn(pythonPath, ['manage.py', 'runserver', '8001', '--noreload'], {
+          cwd: projectRoot,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        backendProcess.stdout.on('data', (data) => {
+          const output = data.toString();
+          console.log('Backend (port 8001):', output);
+          
+          if (output.includes('Starting development server') || 
+              output.includes('Quit the server with') ||
+              output.includes('Watching for file changes') ||
+              output.includes('System check identified no issues')) {
+            console.log('✅ Backend server is ready (port 8001)');
+            resolve();
+          }
+        });
+        
+        backendProcess.stderr.on('data', (data) => {
+          const error = data.toString();
+          console.error('Backend Error (port 8001):', error);
+          
+          if (!error.includes('WARNINGS') && !error.includes('Unrecognized')) {
+            reject(new Error(error));
+          }
+        });
+        
+        return;
+      }
+      
+      // Some Django warnings are sent to stderr but aren't fatal
+      if (!error.includes('WARNINGS') && !error.includes('Unrecognized')) {
+        reject(new Error(error));
+      }
+    });
+
+    backendProcess.on('error', (error) => {
+      console.error('Failed to start backend:', error);
+      reject(error);
+    });
+
+    backendProcess.on('close', (code) => {
+      console.log(`Backend process exited with code ${code}`);
+    });
+
+    // Timeout after 20 seconds
+    setTimeout(() => {
+      console.log('⚠️  Backend startup timeout - proceeding anyway');
+      resolve(); // Don't reject, just proceed
+    }, 20000);
+  });
+}
+
 function createMenu() {
   const template = [
     {
@@ -210,23 +301,43 @@ function createMenu() {
 }
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log('✅ Electron app is ready');
   
-  // Create window and menu
-  createWindow();
-  createMenu();
+  try {
+    // Start backend first
+    await startBackend();
+    
+    // Create window and menu
+    createWindow();
+    createMenu();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error) {
+    console.error('Failed to start application:', error);
+    app.quit();
+  }
 });
 
 app.on('window-all-closed', () => {
+  // Clean up backend process
+  if (backendProcess) {
+    backendProcess.kill();
+  }
+  
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  // Ensure backend process is killed
+  if (backendProcess) {
+    backendProcess.kill();
   }
 });
 

@@ -30,7 +30,7 @@ const HelpPage = () => {
     {
       name: "TD Bank",
       code: "TD",
-      icon: "/bank_td_icon.svg",
+      icon: "./bank_td_icon.svg",
       supportedFormats: ["CSV"],
       helpLinks: [
         {
@@ -51,7 +51,7 @@ const HelpPage = () => {
     {
       name: "American Express",
       code: "AMEX",
-      icon: "/bank_amex_icon.svg",
+      icon: "./bank_amex_icon.svg",
       supportedFormats: ["XLS", "XLSX"],
       helpLinks: [
         {
@@ -72,7 +72,7 @@ const HelpPage = () => {
     {
       name: "Scotiabank",
       code: "SCOTIA",
-      icon: "/bank_scotia_icon.svg",
+      icon: "./bank_scotia_icon.svg",
       supportedFormats: ["CSV", "XLS", "TXT", "TTX"],
       helpLinks: [
         {

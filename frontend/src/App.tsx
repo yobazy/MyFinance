@@ -119,7 +119,7 @@ const navItems = [
           <Toolbar sx={{ minHeight: '56px', py: 0, overflow: 'visible' }}>
             <Box sx={{ flexGrow: isMobile ? 0 : 1, display: 'flex', alignItems: 'center' }}>
               <img 
-                src={mode === 'dark' ? '/logo_dark.svg' : '/logo_light.svg'} 
+                src={mode === 'dark' ? './logo_dark.svg' : './logo_light.svg'} 
                 alt="MyFinance" 
                 style={{ 
                   height: '120px', 
