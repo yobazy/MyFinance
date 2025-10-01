@@ -1,6 +1,6 @@
 {
   "name": "my-finance-dash",
-  "version": "1.0.0",
+  "version": "0.1.0-alpha.1",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "main": "electron/main-production.js",
   "homepage": "./",
@@ -22,7 +22,17 @@
     "frontend": "cd frontend && PORT=3001 npm start",
     "build-frontend": "cd frontend && npm run build",
     "build-electron": "npm run build-frontend && npx electron-builder",
-    "dist": "npm run build-frontend && npx electron-builder --publish=never"
+    "dist": "npm run build-frontend && npx electron-builder --publish=never",
+    "release:patch": "npm version patch --no-git-tag-version && npm run release:build",
+    "release:minor": "npm version minor --no-git-tag-version && npm run release:build",
+    "release:major": "npm version major --no-git-tag-version && npm run release:build",
+    "release:alpha": "npm version prerelease --preid=alpha --no-git-tag-version && npm run release:build",
+    "release:beta": "npm version prerelease --preid=beta --no-git-tag-version && npm run release:build",
+    "release:rc": "npm version prerelease --preid=rc --no-git-tag-version && npm run release:build",
+    "release:build": "npm run build-frontend && npx electron-builder --publish=never && npm run release:notes",
+    "release:notes": "node scripts/generate-release-notes.js",
+    "release:clean": "rm -rf dist/ && rm -rf frontend/build/",
+    "release:prepare": "npm run release:clean && npm run test:quick && npm run release:build"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
@@ -35,7 +45,8 @@
     "appId": "com.myfinance.dashboard",
     "productName": "MyFinance Dashboard",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "assets"
     },
     "files": [
       "electron/**/*",
@@ -49,7 +60,12 @@
       "!backend/__pycache__/**/*",
       "!backend/migrations/**/*",
       "!backend/build/**/*",
-      "!backend/dist/**/*"
+      "!backend/dist/**/*",
+      "!**/node_modules/**/*",
+      "!**/.git/**/*",
+      "!**/test_files/**/*",
+      "!**/uploads/**/*",
+      "!**/backups/**/*"
     ],
     "extraResources": [
       {
@@ -66,13 +82,53 @@
     ],
     "mac": {
       "category": "public.app-category.finance",
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "assets/icon.ico"
     },
     "linux": {
-      "target": "AppImage"
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "dmg": {
+      "title": "MyFinance Dashboard",
+      "background": "assets/dmg-background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "your-github-username",
+      "repo": "my-finance-dash"
     }
   },
   "keywords": [
