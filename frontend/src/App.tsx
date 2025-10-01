@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { 
   AppBar, 
   Toolbar, 
@@ -39,8 +39,20 @@ import { CssBaseline } from "@mui/material";
 // Backup check function
 const checkAndCreateAutoBackup = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/backup/check-auto/');
-    if (response.ok) {
+    // Try multiple ports in case backend starts on different port
+    const ports = ['8000', '8001'];
+    let response = null;
+    
+    for (const port of ports) {
+      try {
+        response = await fetch(`http://localhost:${port}/api/backup/check-auto/`);
+        if (response.ok) break;
+      } catch (e) {
+        console.log(`Backend not available on port ${port}`);
+      }
+    }
+    
+    if (response && response.ok) {
       const data = await response.json();
       if (data.backup_created) {
         console.log('Auto backup created:', data.backup);

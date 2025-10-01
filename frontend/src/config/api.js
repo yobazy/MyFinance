@@ -17,6 +17,29 @@ const getApiBaseUrl = () => {
   return 'http://127.0.0.1:8000';
 };
 
+// Helper function to try multiple ports for backend connection
+export const findBackendPort = async () => {
+  const ports = ['8000', '8001'];
+  
+  for (const port of ports) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/accounts/`, {
+        method: 'GET',
+        timeout: 2000
+      });
+      if (response.ok) {
+        console.log(`✅ Backend found on port ${port}`);
+        return `http://127.0.0.1:${port}`;
+      }
+    } catch (error) {
+      console.log(`❌ Backend not available on port ${port}`);
+    }
+  }
+  
+  console.log('❌ No backend found on any port');
+  return getApiBaseUrl(); // Fallback to default
+};
+
 export const API_BASE_URL = getApiBaseUrl();
 
 // Helper function to make API calls with proper error handling
