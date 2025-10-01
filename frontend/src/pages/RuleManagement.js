@@ -31,45 +31,20 @@ import {
   TableRow,
   Switch,
   FormControlLabel,
-  Tabs,
-  Tab,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Tooltip,
-  Badge,
-  LinearProgress,
-  Snackbar,
-  Slider,
-  FormGroup,
-  Checkbox,
-  Collapse,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  ListItemIcon
+  Snackbar
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   PlayArrow as TestIcon,
-  Visibility as ViewIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Rule as RuleIcon,
-  Category as CategoryIcon,
   Assessment as StatsIcon,
   SmartToy as AutoIcon,
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  FilterList as FilterIcon,
   Search as SearchIcon,
-  Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
   Schedule as ScheduleIcon,
   AttachMoney as MoneyIcon,
@@ -79,7 +54,6 @@ import {
 } from "@mui/icons-material";
 
 const RuleManagement = () => {
-  const theme = useTheme();
   const [rules, setRules] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -121,8 +95,6 @@ const RuleManagement = () => {
   const [sortBy, setSortBy] = useState("priority");
   const [sortOrder, setSortOrder] = useState("desc");
   
-  // Tab state
-  const [activeTab, setActiveTab] = useState(0);
   
   // Stats state
   const [ruleStats, setRuleStats] = useState(null);

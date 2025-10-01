@@ -3,11 +3,7 @@ import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-ro
 import { 
   AppBar, 
   Toolbar, 
-  Button, 
-  Container,
   IconButton,
-  Menu,
-  MenuItem,
   useMediaQuery,
   Box,
   Drawer,
@@ -16,10 +12,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
   Typography,
-  Collapse,
-  Tooltip
+  Collapse
 } from "@mui/material";
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -32,7 +26,6 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import RuleIcon from '@mui/icons-material/Rule';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpIcon from '@mui/icons-material/Help';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import Dashboard from "./pages/Dashboard.tsx";

@@ -87,22 +87,6 @@ const FileUploader = () => {
         }
     };
     
-    const handleCreateAccount = async () => {
-        if (!selectedAccount) {
-          setMessage("Please select an account first.");
-          return;
-        }
-    
-        try {
-          const response = await axios.post("http://127.0.0.1:8000/api/accounts/create/", { 
-            bank: selectedAccount.bank, 
-            name: account 
-          });
-          setMessage(`Account "${account}" created successfully!`);
-        } catch (error) {
-          setMessage("Failed to create account.");
-        }
-    };
 
 
     const handleFileChange = (event) => {

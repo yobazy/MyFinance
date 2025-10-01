@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { 
   FormControlLabel, 
   Switch,
   Typography,
   Box,
-  Divider,
   Paper,
   TextField,
   Button,
@@ -39,7 +38,6 @@ import {
   Schedule as ScheduleIcon,
   SystemUpdate as UpdateIcon,
   CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
   Refresh as RefreshIcon
 } from "@mui/icons-material";
 import useAutoUpdater from "../hooks/useAutoUpdater";
@@ -77,6 +75,41 @@ const UserSettings = () => {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, backupId: null });
   const [resetConfirmDialog, setResetConfirmDialog] = useState({ open: false });
 
+  const showSnackbar = useCallback((message, severity) => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
+
+  // Backup-related functions
+  const fetchBackupSettings = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/backup/settings/');
+      const data = await response.json();
+      setBackupSettings(data);
+    } catch (error) {
+      showSnackbar('Failed to fetch backup settings', 'error');
+    }
+  }, [showSnackbar]);
+
+  const fetchBackups = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/backup/list/');
+      const data = await response.json();
+      setBackups(data);
+    } catch (error) {
+      showSnackbar('Failed to fetch backups', 'error');
+    }
+  }, [showSnackbar]);
+
+  const fetchBackupStats = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/backup/stats/');
+      const data = await response.json();
+      setBackupStats(data);
+    } catch (error) {
+      showSnackbar('Failed to fetch backup statistics', 'error');
+    }
+  }, [showSnackbar]);
+
   useEffect(() => {
     // Load theme preference on component mount
     const savedTheme = localStorage.getItem('theme');
@@ -86,7 +119,7 @@ const UserSettings = () => {
     fetchBackupSettings();
     fetchBackups();
     fetchBackupStats();
-  }, []);
+  }, [fetchBackupSettings, fetchBackupStats, fetchBackups]);
 
   const handleThemeToggle = () => {
     const newTheme = !darkMode ? 'dark' : 'light';
@@ -108,37 +141,6 @@ const UserSettings = () => {
     } catch (error) {
       setMessage("Failed to reset database.");
       setResetConfirmDialog({ open: false });
-    }
-  };
-
-  // Backup-related functions
-  const fetchBackupSettings = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/backup/settings/');
-      const data = await response.json();
-      setBackupSettings(data);
-    } catch (error) {
-      showSnackbar('Failed to fetch backup settings', 'error');
-    }
-  };
-
-  const fetchBackups = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/backup/list/');
-      const data = await response.json();
-      setBackups(data);
-    } catch (error) {
-      showSnackbar('Failed to fetch backups', 'error');
-    }
-  };
-
-  const fetchBackupStats = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/backup/stats/');
-      const data = await response.json();
-      setBackupStats(data);
-    } catch (error) {
-      showSnackbar('Failed to fetch backup statistics', 'error');
     }
   };
 
@@ -260,10 +262,6 @@ const UserSettings = () => {
     } catch (error) {
       showSnackbar('Failed to download backup', 'error');
     }
-  };
-
-  const showSnackbar = (message, severity) => {
-    setSnackbar({ open: true, message, severity });
   };
 
   const formatFileSize = (bytes) => {

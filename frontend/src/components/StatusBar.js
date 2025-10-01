@@ -4,9 +4,7 @@ import {
   Wifi, 
   WifiOff, 
   CloudSync, 
-  CloudSyncOutlined,
-  Security,
-  SecurityOutlined 
+  Security
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 

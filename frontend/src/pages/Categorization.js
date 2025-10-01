@@ -67,7 +67,6 @@ const Categorization = () => {
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -648,11 +647,6 @@ const Categorization = () => {
     }
   }, [confidenceThreshold]);
 
-  const handlePreviewPageChange = useCallback((event, page) => {
-    // Extract just the page number to avoid circular references
-    const pageNumber = Number(page);
-    handleGeneratePreview(pageNumber);
-  }, [handleGeneratePreview]);
 
   const handlePreviewChange = useCallback((transactionId, action, categoryId = null) => {
     setPreviewChanges(prev => {
@@ -1743,7 +1737,7 @@ const Categorization = () => {
         </Grid>
       );
     });
-  }, [transactions, categories, handleUpdateTransaction, theme.shadows, autoCategorizationEnabled, previewData, previewChanges, similarCounts, acceptingIndividual, handlePreviewChange, handleAcceptIndividual, handleApplyToSimilarClick, manualPreviewMode, manualPreviewChanges, handleManualPreviewChange, selectedCategories]);
+  }, [transactions, categories, handleUpdateTransaction, autoCategorizationEnabled, previewData, previewChanges, similarCounts, acceptingIndividual, handlePreviewChange, handleAcceptIndividual, handleApplyToSimilarClick, manualPreviewMode, manualPreviewChanges, handleManualPreviewChange, selectedCategories]);
 
   if (loading) {
     return (

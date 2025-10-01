@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { 
   Container, 
   Table, 
@@ -23,9 +23,6 @@ import {
   Chip,
   TableSortLabel,
   Pagination,
-  IconButton,
-  Toolbar,
-  Divider,
   Alert,
   Collapse,
   Stack
@@ -41,8 +38,6 @@ import {
   Category as CategoryIcon,
   AccountBalance as AccountIcon,
   DateRange as DateIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from "@mui/material/styles";
