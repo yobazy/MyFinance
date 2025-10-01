@@ -2,16 +2,74 @@
   "name": "my-finance-dash",
   "version": "1.0.0",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
+  "main": "electron/main-production.js",
+  "homepage": "./",
   "scripts": {
     "screenshots": "node scripts/screenshot-automation.js",
     "screenshots:update": "node scripts/screenshot-automation.js --update",
     "screenshots:all": "node scripts/screenshot-automation.js --all",
-    "screenshots:help": "echo 'Available commands: npm run screenshots, npm run screenshots:update, npm run screenshots:all'"
+    "screenshots:help": "echo 'Available commands: npm run screenshots, npm run screenshots:update, npm run screenshots:all'",
+    "electron": "npx electron .",
+    "electron-dev": "concurrently \"npm run backend\" \"npm run frontend\" \"wait-on http://localhost:3001 && npx electron .\"",
+    "electron-start": "node start-electron.js",
+    "start-simple": "node start-simple.js",
+    "start-minimal": "node start-minimal.js",
+    "start-with-build": "node start-with-build.js",
+    "test-electron": "node test-electron-only.js",
+    "test-react": "node test-react-electron.js",
+    "test-manual": "node test-manual.js",
+    "backend": "python manage.py runserver",
+    "frontend": "cd frontend && PORT=3001 npm start",
+    "build-frontend": "cd frontend && npm run build",
+    "build-electron": "npm run build-frontend && npx electron-builder",
+    "dist": "npm run build-frontend && npx electron-builder --publish=never"
   },
   "devDependencies": {
-    "playwright": "^1.40.0"
+    "playwright": "^1.40.0",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0",
+    "concurrently": "^9.0.0",
+    "wait-on": "^8.0.0"
   },
-  "keywords": ["finance", "dashboard", "automation", "screenshots"],
+  "build": {
+    "appId": "com.myfinance.dashboard",
+    "productName": "MyFinance Dashboard",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/build/**/*",
+      "backend/**/*",
+      "db.sqlite3",
+      "myfinance.db",
+      "settings.json",
+      "requirements.txt",
+      "manage.py",
+      "!backend/__pycache__/**/*",
+      "!backend/migrations/**/*",
+      "!backend/build/**/*",
+      "!backend/dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": ["**/*", "!__pycache__/**/*", "!migrations/**/*", "!build/**/*", "!dist/**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "keywords": ["finance", "dashboard", "automation", "screenshots", "electron"],
   "author": "",
   "license": "ISC"
 }
