@@ -26,7 +26,8 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
-  Grid
+  Grid,
+  LinearProgress
 } from "@mui/material";
 import {
   Backup as BackupIcon,
@@ -35,12 +36,31 @@ import {
   Download as DownloadIcon,
   Settings as SettingsIcon,
   Storage as StorageIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  SystemUpdate as UpdateIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Refresh as RefreshIcon
 } from "@mui/icons-material";
+import useAutoUpdater from "../hooks/useAutoUpdater";
 
 const UserSettings = () => {
   const [message, setMessage] = useState("");
   const [darkMode, setDarkMode] = useState(false);
+  
+  // Auto-updater hook
+  const {
+    currentVersion,
+    updateInfo,
+    isChecking,
+    isDownloading,
+    downloadProgress,
+    updateError,
+    updateStatus,
+    checkForUpdates,
+    downloadUpdate,
+    installUpdate
+  } = useAutoUpdater();
   
   // Backup settings state
   const [backupSettings, setBackupSettings] = useState({
@@ -272,6 +292,87 @@ const UserSettings = () => {
       <Typography variant="h4" gutterBottom>
         User Settings
       </Typography>
+      
+      {/* Application Version and Updates */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <UpdateIcon />
+          Application Updates
+        </Typography>
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            <strong>Current Version:</strong> {currentVersion || 'Loading...'}
+          </Typography>
+          
+          {updateInfo && (
+            <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+              <strong>Latest Version Available:</strong> {updateInfo.version}
+            </Typography>
+          )}
+          
+          {updateError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Update Error: {updateError}
+            </Alert>
+          )}
+          
+          {updateStatus === 'available' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              A new version is available! Click "Download Update" to get the latest version.
+            </Alert>
+          )}
+          
+          {updateStatus === 'downloaded' && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Update downloaded successfully! Click "Install Update" to restart and apply the update.
+            </Alert>
+          )}
+          
+          {isDownloading && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Downloading update... {Math.round(downloadProgress)}%
+              </Typography>
+              <LinearProgress variant="determinate" value={downloadProgress} />
+            </Box>
+          )}
+        </Box>
+        
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            startIcon={isChecking ? <CircularProgress size={20} /> : <RefreshIcon />}
+            onClick={checkForUpdates}
+            disabled={isChecking || isDownloading}
+          >
+            {isChecking ? 'Checking...' : 'Check for Updates'}
+          </Button>
+          
+          {updateStatus === 'available' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={isDownloading ? <CircularProgress size={20} /> : <DownloadIcon />}
+              onClick={downloadUpdate}
+              disabled={isDownloading}
+            >
+              {isDownloading ? 'Downloading...' : 'Download Update'}
+            </Button>
+          )}
+          
+          {updateStatus === 'downloaded' && (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleIcon />}
+              onClick={installUpdate}
+            >
+              Install Update & Restart
+            </Button>
+          )}
+        </Box>
+      </Paper>
       
       <Grid container spacing={3}>
         {/* Appearance Settings */}

@@ -129,8 +129,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-github-username",
-      "repo": "my-finance-dash"
+      "owner": "yobazy",
+      "repo": "MyFinance"
     }
   },
   "keywords": [
@@ -141,5 +141,8 @@
     "electron"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  }
 }

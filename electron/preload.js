@@ -8,6 +8,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
   getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
   
+  // Auto-updater
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  
+  // Auto-updater event listeners
+  onUpdateChecking: (callback) => ipcRenderer.on('update-checking', callback),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', callback),
+  onUpdateNotAvailable: (callback) => ipcRenderer.on('update-not-available', callback),
+  onUpdateError: (callback) => ipcRenderer.on('update-error', callback),
+  onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback),
+  
   // Menu actions
   onMenuAction: (callback) => {
     ipcRenderer.on('menu-new-transaction', () => callback(null, 'menu-new-transaction'));

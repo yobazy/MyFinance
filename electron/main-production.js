@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const AutoUpdaterService = require('./auto-updater');
 
 // Debug logging
 console.log('Electron app object:', app);
@@ -17,6 +18,7 @@ if (!app) {
 // Keep a global reference of the window object
 let mainWindow;
 let backendProcess;
+let autoUpdaterService;
 
 function createWindow() {
   console.log('Creating Electron window...');
@@ -111,6 +113,9 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Initialize auto-updater after window is created
+  autoUpdaterService = new AutoUpdaterService(mainWindow);
 
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -356,6 +361,25 @@ ipcMain.handle('get-app-version', () => {
 
 ipcMain.handle('get-app-path', () => {
   return app.getAppPath();
+});
+
+// Auto-updater IPC handlers
+ipcMain.handle('check-for-updates', () => {
+  if (autoUpdaterService) {
+    autoUpdaterService.checkForUpdates();
+  }
+});
+
+ipcMain.handle('download-update', () => {
+  if (autoUpdaterService) {
+    autoUpdaterService.downloadUpdate();
+  }
+});
+
+ipcMain.handle('install-update', () => {
+  if (autoUpdaterService) {
+    autoUpdaterService.installUpdate();
+  }
 });
 
 // Handle database operations if needed
