@@ -4,7 +4,7 @@ const path = require('path');
 
 // Configuration
 const CONFIG = {
-  baseUrl: 'http://localhost:3000',
+  baseUrl: 'http://localhost:3001', // Fixed: Updated to match frontend port
   backendUrl: 'http://localhost:8000',
   screenshotsDir: './screenshots',
   viewport: { width: 1600, height: 900 }, // Reduced from 1920x1080 for better zoom
@@ -19,44 +19,50 @@ const SCREENSHOTS = [
     name: 'home-dashboard',
     path: '/',
     description: 'Main dashboard with financial overview',
-    waitFor: '.dashboard-container, .MuiContainer-root'
+    waitFor: '.MuiContainer-root, .MuiCard-root, .MuiGrid-root'
   },
   {
     name: 'file-upload',
     path: '/upload',
     description: 'File upload interface for bank statements',
-    waitFor: '.upload-container, .MuiBox-root'
+    waitFor: '.MuiContainer-root, .MuiBox-root, .MuiCard-root'
   },
   {
     name: 'transactions-list',
     path: '/transactions',
     description: 'Transactions list and management (first 20 results)',
-    waitFor: '.transactions-container, .MuiTableContainer-root',
+    waitFor: '.MuiContainer-root, .MuiTableContainer-root, .MuiTable-root',
     customAction: 'limitTransactions' // Custom action to limit transactions
   },
   {
     name: 'categories-management',
     path: '/categorization',
     description: 'Transaction categorization and management',
-    waitFor: '.categorization-container, .MuiCard-root, .MuiContainer-root'
+    waitFor: '.MuiContainer-root, .MuiCard-root, .MuiTableContainer-root'
   },
   {
     name: 'analytics-visualizations',
-    path: '/visualizations', // Fixed: was /analytics
+    path: '/visualizations',
     description: 'Analytics and data visualizations',
-    waitFor: '.analytics-container, .recharts-wrapper, .MuiContainer-root'
+    waitFor: '.MuiContainer-root, .recharts-wrapper, .MuiCard-root'
   },
   {
     name: 'accounts-management',
     path: '/accounts',
     description: 'Bank accounts management',
-    waitFor: '.accounts-container, .MuiCard-root'
+    waitFor: '.MuiContainer-root, .MuiCard-root, .MuiTableContainer-root'
+  },
+  {
+    name: 'rules-management',
+    path: '/rules',
+    description: 'Transaction rules and automation management',
+    waitFor: '.MuiContainer-root, .MuiCard-root, .MuiTableContainer-root'
   },
   {
     name: 'settings-page',
-    path: '/user-settings', // Fixed: was /settings
+    path: '/user-settings',
     description: 'Application settings and preferences',
-    waitFor: '.settings-container, .MuiFormControl-root, .MuiBox-root'
+    waitFor: '.MuiContainer-root, .MuiFormControl-root, .MuiBox-root'
   }
 ];
 
@@ -181,25 +187,36 @@ class ScreenshotAutomation {
     }
   }
 
-  async captureScreenshot(screenshot) {
+  async captureScreenshot(screenshot, attempt = 1) {
     const { name, path: urlPath, description, waitFor, customAction } = screenshot;
     const fullUrl = `${CONFIG.baseUrl}${urlPath}`;
     
-    console.log(`📸 Capturing: ${name} (${description})`);
+    console.log(`📸 Capturing: ${name} (${description}) ${attempt > 1 ? `[Attempt ${attempt}]` : ''}`);
     
     try {
-      // Navigate to the page
+      // Navigate to the page with retry logic
       await this.page.goto(fullUrl, { 
         waitUntil: 'networkidle',
-        timeout: 15000 
+        timeout: 20000 // Increased timeout
       });
       
       // Wait for specific elements if specified
       if (waitFor) {
-        try {
-          await this.page.waitForSelector(waitFor, { timeout: 10000 });
-        } catch (error) {
-          console.log(`⚠️  Could not find selector ${waitFor}, proceeding anyway...`);
+        const selectors = waitFor.split(', ');
+        let found = false;
+        
+        for (const selector of selectors) {
+          try {
+            await this.page.waitForSelector(selector.trim(), { timeout: 8000 });
+            found = true;
+            break;
+          } catch (error) {
+            continue;
+          }
+        }
+        
+        if (!found) {
+          console.log(`⚠️  Could not find any of the selectors: ${waitFor}, proceeding anyway...`);
         }
       }
       
@@ -232,6 +249,13 @@ class ScreenshotAutomation {
       return true;
     } catch (error) {
       console.error(`❌ Failed to capture ${name}:`, error.message);
+      
+      // Retry logic
+      if (attempt < CONFIG.retryAttempts) {
+        console.log(`🔄 Retrying ${name} (attempt ${attempt + 1}/${CONFIG.retryAttempts})...`);
+        await this.page.waitForTimeout(2000); // Wait before retry
+        return await this.captureScreenshot(screenshot, attempt + 1);
+      }
       
       this.results.push({
         name,

@@ -52,7 +52,8 @@ The tool captures screenshots of the following pages:
 4. **Categories Management** (`/categorization`) - Transaction categorization and management
 5. **Analytics & Visualizations** (`/visualizations`) - Analytics and data visualizations
 6. **Accounts Management** (`/accounts`) - Bank accounts management
-7. **Settings Page** (`/user-settings`) - Application settings and preferences
+7. **Rules Management** (`/rules`) - Transaction rules and automation management
+8. **Settings Page** (`/user-settings`) - Application settings and preferences
 
 ## ⚙️ Configuration
 
@@ -78,6 +79,7 @@ Screenshots are saved to the `./screenshots/` directory with descriptive filenam
 - `categories-management.png`
 - `analytics-visualizations.png`
 - `accounts-management.png`
+- `rules-management.png`
 - `settings-page.png`
 
 A detailed report is generated at `./screenshots/screenshot-report.md` with:
@@ -104,7 +106,7 @@ Update the `CONFIG` object in `scripts/screenshot-automation.js`:
 
 ```javascript
 const CONFIG = {
-  baseUrl: 'http://localhost:3000',
+  baseUrl: 'http://localhost:3001', // Updated to match frontend port
   backendUrl: 'http://localhost:8000',
   screenshotsDir: './screenshots',
   viewport: { width: 1600, height: 900 },
