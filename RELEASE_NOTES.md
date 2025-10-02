@@ -1,10 +1,10 @@
 # MyFinance Dashboard v0.1.0-alpha.5
 
 ## Release Date
-2025-10-01
+2025-10-02
 
 ## Changes
-- dmg fixes
+- Initial alpha release
 
 ## Installation
 Download the appropriate installer for your platform from the `dist/` folder:

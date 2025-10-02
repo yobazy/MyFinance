@@ -73,6 +73,14 @@ jobs:
       - name: Generate Release Notes
         run: node scripts/generate-release-notes.js
       
+      - name: Verify Release Files
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Checking for release files..."
+          ls -la dist/
+          echo "DMG files found:"
+          find dist/ -name "*.dmg" -exec echo "  {}" \;
+      
       - name: Upload Release Assets
         uses: actions/upload-artifact@v4
         with:
@@ -87,11 +95,12 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/**/*.dmg
-            dist/**/*.zip
+            dist/*.dmg
+            dist/*.blockmap
             RELEASE_NOTES.md
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          body_path: RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
