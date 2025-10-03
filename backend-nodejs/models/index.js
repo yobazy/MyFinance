@@ -1,4 +1,4 @@
-const { sequelize } = require('../config/database');
+const { sequelize, testConnection } = require('../config/database');
 const { DataTypes } = require('sequelize');
 
 // Import all models
@@ -48,6 +48,7 @@ const syncDatabase = async () => {
 
 module.exports = {
   sequelize,
+  testConnection,
   ...models,
   syncDatabase
 };

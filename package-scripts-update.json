@@ -1,2 +1,0 @@
-    "build-backend": "chmod +x build-backend.sh && ./build-backend.sh",
-    "release:build": "npm run build-backend && npm run build-frontend && npx electron-builder --publish=never && npm run release:notes",
