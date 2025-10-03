@@ -94,7 +94,7 @@ if db_config.get("storage_type") == "local":
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(os.path.dirname(os.path.abspath(__file__)), "myfinance.db"),
+            'NAME': os.path.join(BASE_DIR, "db.sqlite3"),
         }
     }
 else:  # Hybrid (PostgreSQL)

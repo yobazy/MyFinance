@@ -29,7 +29,8 @@
     "release:alpha": "npm version prerelease --preid=alpha --no-git-tag-version && npm run release:build",
     "release:beta": "npm version prerelease --preid=beta --no-git-tag-version && npm run release:build",
     "release:rc": "npm version prerelease --preid=rc --no-git-tag-version && npm run release:build",
-    "release:build": "npm run build-frontend && npx electron-builder --publish=never && npm run release:notes",
+    "build-backend": "./build-backend-fixed.sh",
+    "release:build": "npm run build-backend && npm run build-frontend && npx electron-builder --publish=never && npm run release:notes",
     "release:notes": "node scripts/generate-release-notes.js",
     "release:clean": "rm -rf dist/ && rm -rf frontend/build/",
     "release:prepare": "npm run release:clean && npm run test:quick && npm run release:build"
@@ -51,9 +52,8 @@
     "files": [
       "electron/**/*",
       "frontend/build/**/*",
-      "backend/**/*",
+      "dist/myfinance-backend",
       "db.sqlite3",
-      "myfinance.db",
       "settings.json",
       "requirements.txt",
       "manage.py",
@@ -65,7 +65,9 @@
       "!**/.git/**/*",
       "!**/test_files/**/*",
       "!**/uploads/**/*",
-      "!**/backups/**/*"
+      "!**/backups/**/*",
+      "!myfinance-backend.spec",
+      "!build-backend-fixed.sh"
     ],
     "extraResources": [
       {

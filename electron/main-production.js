@@ -126,12 +126,40 @@ function createWindow() {
 
 function startBackend() {
   return new Promise((resolve, reject) => {
-    const pythonPath = process.platform === 'win32' ? 'python' : 'python3';
-    const projectRoot = path.join(__dirname, '..');
-    
     console.log('Starting Django backend...');
     
-    backendProcess = spawn(pythonPath, ['manage.py', 'runserver', '8000', '--noreload'], {
+    // Determine if we're in development or production
+    const isPackaged = app.isPackaged;
+    const projectRoot = path.join(__dirname, '..');
+    
+    let backendExecutable;
+    let args;
+    
+    if (isPackaged) {
+      // Production: Use standalone executable
+      console.log('🔧 Production mode: Using standalone backend executable');
+      backendExecutable = path.join(process.resourcesPath, 'myfinance-backend');
+      args = ['runserver', '8000', '--noreload'];
+      
+      // Check if standalone executable exists
+      if (!fs.existsSync(backendExecutable)) {
+        console.error('❌ Standalone backend executable not found:', backendExecutable);
+        reject(new Error('Standalone backend executable not found'));
+        return;
+      }
+      
+      console.log('✅ Found standalone backend executable:', backendExecutable);
+    } else {
+      // Development: Use system Python
+      console.log('🔧 Development mode: Using system Python');
+      const pythonPath = process.platform === 'win32' ? 'python' : 'python3';
+      backendExecutable = pythonPath;
+      args = ['manage.py', 'runserver', '8000', '--noreload'];
+    }
+    
+    console.log('Starting backend with:', backendExecutable, args);
+    
+    backendProcess = spawn(backendExecutable, args, {
       cwd: projectRoot,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -160,7 +188,11 @@ function startBackend() {
         backendProcess.kill();
         
         // Try alternative port
-        backendProcess = spawn(pythonPath, ['manage.py', 'runserver', '8001', '--noreload'], {
+        const altArgs = isPackaged ? 
+          ['runserver', '8001', '--noreload'] : 
+          ['manage.py', 'runserver', '8001', '--noreload'];
+          
+        backendProcess = spawn(backendExecutable, altArgs, {
           cwd: projectRoot,
           stdio: ['pipe', 'pipe', 'pipe']
         });
