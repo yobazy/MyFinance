@@ -9,7 +9,6 @@ a = Analysis(
     datas=[
         ('backend', 'backend'),
         ('db.sqlite3', '.'),
-        ('myfinance.db', '.'),
         ('settings.json', '.'),
     ],
     hiddenimports=[
