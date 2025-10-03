@@ -165,6 +165,14 @@ function startBackend() {
         return;
       }
       
+      // Make sure the executable has execute permissions
+      try {
+        fs.chmodSync(backendExecutable, '755');
+        console.log('✅ Set executable permissions on backend');
+      } catch (error) {
+        console.log('⚠️  Could not set executable permissions:', error.message);
+      }
+      
       console.log('✅ Found standalone backend executable:', backendExecutable);
       args = ['runserver', '8000', '--noreload'];
     } else {
@@ -176,11 +184,22 @@ function startBackend() {
     }
     
     console.log('Starting backend with:', backendExecutable, args);
+    console.log('Working directory:', projectRoot);
+    console.log('Executable exists:', fs.existsSync(backendExecutable));
+    console.log('Executable permissions:', fs.statSync(backendExecutable).mode.toString(8));
+    
+    // Set Django environment variables
+    const env = {
+      ...process.env,
+      DJANGO_SETTINGS_MODULE: 'backend.settings',
+      PYTHONPATH: projectRoot
+    };
     
     backendProcess = spawn(backendExecutable, args, {
       cwd: projectRoot,
       stdio: ['pipe', 'pipe', 'pipe'],
-      detached: false // Ensure process is properly managed
+      detached: false, // Ensure process is properly managed
+      env: env
     });
 
     let serverReady = false;
@@ -255,11 +274,16 @@ function startBackend() {
     backendProcess.on('error', (error) => {
       console.error('Failed to start backend:', error);
       console.log('⚠️  Backend failed to start but continuing...');
+      console.log('Error details:', error.message, error.code, error.syscall);
       resolve(); // Don't reject, just proceed
     });
 
-    backendProcess.on('close', (code) => {
-      console.log(`Backend process exited with code ${code}`);
+    backendProcess.on('close', (code, signal) => {
+      console.log(`Backend process exited with code ${code}, signal ${signal}`);
+    });
+
+    backendProcess.on('spawn', () => {
+      console.log('✅ Backend process spawned successfully');
     });
 
     // Timeout after 15 seconds - shorter timeout for better UX
