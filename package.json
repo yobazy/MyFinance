@@ -1,6 +1,6 @@
 {
   "name": "my-finance-dash",
-  "version": "0.1.0-alpha.11",
+  "version": "0.1.0-alpha.12",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "main": "electron/main-production.js",
   "homepage": "./",
@@ -101,14 +101,23 @@
           {
             "CFBundleTypeName": "CSV Files",
             "CFBundleTypeRole": "Editor",
-            "LSItemContentTypes": ["public.comma-separated-values-text"],
-            "CFBundleTypeExtensions": ["csv"]
+            "LSItemContentTypes": [
+              "public.comma-separated-values-text"
+            ],
+            "CFBundleTypeExtensions": [
+              "csv"
+            ]
           },
           {
             "CFBundleTypeName": "Excel Files",
             "CFBundleTypeRole": "Editor",
-            "LSItemContentTypes": ["public.spreadsheet"],
-            "CFBundleTypeExtensions": ["xls", "xlsx"]
+            "LSItemContentTypes": [
+              "public.spreadsheet"
+            ],
+            "CFBundleTypeExtensions": [
+              "xls",
+              "xlsx"
+            ]
           }
         ]
       }
