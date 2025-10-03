@@ -1,6 +1,6 @@
 {
   "name": "my-finance-dash",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "main": "electron/main-production.js",
   "homepage": "./",
@@ -123,25 +123,7 @@
       "createStartMenuShortcut": true
     },
     "dmg": {
-      "title": "MyFinance Dashboard",
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "window": {
-        "width": 540,
-        "height": 380
-      },
-      "background": null,
-      "icon": null
+      "title": "MyFinance Dashboard"
     },
     "publish": {
       "provider": "github",
