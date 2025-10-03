@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 Standalone Django server starter for MyFinance Dashboard
-This script bypasses Django's management command system to avoid PyInstaller issues
+This script uses a custom WSGI server to avoid PyInstaller issues with Django's runserver
 """
 
 import os
 import sys
 import django
-from django.core.management import execute_from_command_line
 from django.core.wsgi import get_wsgi_application
+from wsgiref.simple_server import make_server
 
 def main():
     print("🚀 Starting MyFinance Dashboard Backend...")
@@ -21,13 +21,25 @@ def main():
         django.setup()
         print("✅ Django setup complete")
         
-        # Start the development server
-        print("🌐 Starting Django development server on port 8000...")
+        # Get port from command line arguments or default to 8000
+        port = 8000
+        if len(sys.argv) > 1:
+            try:
+                port = int(sys.argv[1])
+            except ValueError:
+                print(f"⚠️  Invalid port '{sys.argv[1]}', using default port 8000")
+        
+        print(f"🌐 Starting Django WSGI server on port {port}...")
         print("📡 Server will be available at: http://localhost:8000")
         print("🔄 Use Ctrl+C to stop the server")
         
-        # Use execute_from_command_line to start the server
-        execute_from_command_line(['start_server.py', 'runserver', '8000', '--noreload'])
+        # Get WSGI application
+        application = get_wsgi_application()
+        
+        # Create and start the server
+        with make_server('127.0.0.1', port, application) as httpd:
+            print(f"✅ Server running on http://127.0.0.1:{port}/")
+            httpd.serve_forever()
         
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")

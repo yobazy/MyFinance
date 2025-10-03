@@ -97,6 +97,10 @@
       {
         "from": "manage.py",
         "to": "manage.py"
+      },
+      {
+        "from": "simple_backend.py",
+        "to": "simple_backend.py"
       }
     ],
     "mac": {

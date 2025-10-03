@@ -3,22 +3,13 @@
 block_cipher = None
 
 a = Analysis(
-    ['start_server.py'],
+    ['test_simple.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('backend', 'backend'),
         ('db.sqlite3', '.'),
-        ('settings.json', '.'),
-        ('manage.py', '.'),
     ],
-    hiddenimports=[
-        'django',
-        'djangorestframework',
-        'corsheaders',
-        'pandas',
-        'xlrd',
-    ],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -38,7 +29,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='myfinance-backend',
+    name='test-simple',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

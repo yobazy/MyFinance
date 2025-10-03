@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const child_process = require('child_process');
 const AutoUpdaterService = require('./auto-updater');
 
 // Debug logging
@@ -136,45 +137,43 @@ function startBackend() {
     let args;
     
     if (isPackaged) {
-      // Production: Use standalone executable
-      console.log('🔧 Production mode: Using standalone backend executable');
-      console.log('📁 Resources path:', process.resourcesPath);
-      console.log('📁 App path:', app.getAppPath());
-      console.log('📁 Process cwd:', process.cwd());
+      // Production: Use Python script instead of PyInstaller executable
+      console.log('🔧 Production mode: Using Python script backend');
       
-      // Try multiple possible locations for the backend executable
-      const possiblePaths = [
-        path.join(process.resourcesPath, 'myfinance-backend'),
-        path.join(app.getAppPath(), 'myfinance-backend'),
-        path.join(process.resourcesPath, '..', 'myfinance-backend'),
-        path.join(__dirname, '..', 'myfinance-backend'),
-        path.join(process.cwd(), 'myfinance-backend')
+      // Try to find Python executable
+      const pythonPaths = [
+        'python3',
+        'python',
+        '/usr/bin/python3',
+        '/usr/bin/python',
+        '/usr/local/bin/python3',
+        '/usr/local/bin/python',
       ];
       
-      console.log('🔍 Checking possible backend paths:');
-      possiblePaths.forEach((p, i) => {
-        console.log(`  ${i + 1}. ${p} - ${fs.existsSync(p) ? '✅ EXISTS' : '❌ NOT FOUND'}`);
-      });
+      let pythonExecutable = null;
+      for (const pythonPath of pythonPaths) {
+        try {
+          const result = child_process.execSync(`${pythonPath} --version`, { timeout: 5000 });
+          if (result) {
+            pythonExecutable = pythonPath;
+            console.log(`✅ Found Python: ${pythonPath}`);
+            break;
+          }
+        } catch (error) {
+          // Continue to next path
+        }
+      }
       
-      backendExecutable = possiblePaths.find(p => fs.existsSync(p));
-      
-      if (!backendExecutable) {
-        console.error('❌ Standalone backend executable not found in any location');
+      if (!pythonExecutable) {
+        console.error('❌ Python executable not found');
         console.log('⚠️  Proceeding without backend - app will show connection error');
         resolve();
         return;
       }
       
-      // Make sure the executable has execute permissions
-      try {
-        fs.chmodSync(backendExecutable, '755');
-        console.log('✅ Set executable permissions on backend');
-      } catch (error) {
-        console.log('⚠️  Could not set executable permissions:', error.message);
-      }
-      
-      console.log('✅ Found standalone backend executable:', backendExecutable);
-      args = ['runserver', '8000', '--noreload'];
+      // Use the simple backend script
+      backendExecutable = pythonExecutable;
+      args = [path.join(process.resourcesPath, 'simple_backend.py'), '8000'];
     } else {
       // Development: Use system Python
       console.log('🔧 Development mode: Using system Python');

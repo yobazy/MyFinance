@@ -111,9 +111,29 @@ else:  # Hybrid (PostgreSQL)
 
 # Fallback to SQLite if no PostgreSQL settings are provided
 if not db_config.get("db_name"):
+    # Try multiple possible database locations for packaged app
+    possible_db_paths = [
+        os.path.join(BASE_DIR, "db.sqlite3"),  # Development: project root
+        os.path.join(os.path.dirname(BASE_DIR), "db.sqlite3"),  # Packaged: Resources dir
+        "db.sqlite3",  # Current directory
+        os.path.join(os.getcwd(), "db.sqlite3"),  # Working directory
+    ]
+    
+    db_path = None
+    for path in possible_db_paths:
+        if os.path.exists(path):
+            db_path = path
+            print(f"📁 Found database at: {db_path}")
+            break
+    
+    if not db_path:
+        # Create database in current working directory if none found
+        db_path = os.path.join(os.getcwd(), "db.sqlite3")
+        print(f"⚠️  No existing database found, will create at: {db_path}")
+    
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, "db.sqlite3"),
+        'NAME': db_path,
     }
 
 # Password validation
