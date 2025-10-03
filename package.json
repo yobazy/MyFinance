@@ -1,8 +1,8 @@
 {
   "name": "my-finance-dash",
-  "version": "0.1.0-alpha.19",
+  "version": "0.3.0",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
-  "main": "electron/main-production.js",
+  "main": "electron/main-nodejs.js",
   "homepage": "./",
   "scripts": {
     "screenshots": "node scripts/screenshot-automation.js",
@@ -31,7 +31,7 @@
     "release:alpha": "npm version prerelease --preid=alpha --no-git-tag-version && npm run release:build",
     "release:beta": "npm version prerelease --preid=beta --no-git-tag-version && npm run release:build",
     "release:rc": "npm version prerelease --preid=rc --no-git-tag-version && npm run release:build",
-    "build-backend": "./build-backend-fixed.sh",
+    "build-backend": "cd backend-nodejs && npm install",
     "release:build": "npm run build-backend && npm run build-frontend && npx electron-builder --publish=never && npm run release:notes",
     "release:notes": "node scripts/generate-release-notes.js",
     "release:clean": "rm -rf dist/ && rm -rf frontend/build/",
@@ -51,6 +51,9 @@
     "directories": {
       "output": "dist",
       "buildResources": "assets"
+    },
+    "dmg": {
+      "filesystem": "HFS+"
     },
     "files": [
       "electron/**/*",
@@ -93,8 +96,7 @@
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "x64"
           ]
         }
       ],
