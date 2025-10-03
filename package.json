@@ -53,9 +53,7 @@
     "files": [
       "electron/**/*",
       "frontend/build/**/*",
-      "db.sqlite3",
       "requirements.txt",
-      "manage.py",
       "!backend/__pycache__/**/*",
       "!backend/migrations/**/*",
       "!backend/build/**/*",
@@ -68,7 +66,9 @@
       "!myfinance-backend.spec",
       "!build-backend-fixed.sh",
       "!dist/myfinance-backend",
-      "!settings.json"
+      "!settings.json",
+      "!db.sqlite3",
+      "!manage.py"
     ],
     "extraResources": [
       {
@@ -89,6 +89,14 @@
       {
         "from": "settings.json",
         "to": "settings.json"
+      },
+      {
+        "from": "db.sqlite3",
+        "to": "db.sqlite3"
+      },
+      {
+        "from": "manage.py",
+        "to": "manage.py"
       }
     ],
     "mac": {
