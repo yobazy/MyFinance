@@ -9,6 +9,7 @@ import sys
 import subprocess
 import signal
 import time
+import json
 
 def signal_handler(sig, frame):
     print('\n🛑 Shutting down backend...')
@@ -16,6 +17,9 @@ def signal_handler(sig, frame):
 
 def main():
     print("🚀 Starting MyFinance Dashboard Backend...")
+    print(f"Python executable: {sys.executable}")
+    print(f"Script location: {__file__}")
+    print(f"Current working directory: {os.getcwd()}")
     
     # Set up signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
@@ -38,12 +42,35 @@ def main():
         print("🔄 Use Ctrl+C to stop the server")
         
         # Start Django server using subprocess
-        cmd = [sys.executable, 'manage.py', 'runserver', f'127.0.0.1:{port}', '--noreload']
+        # Change to the directory containing manage.py
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        manage_py_path = os.path.join(script_dir, 'manage.py')
+        
+        print(f"📁 Script directory: {script_dir}")
+        print(f"📁 Looking for manage.py at: {manage_py_path}")
+        
+        if not os.path.exists(manage_py_path):
+            print(f"❌ manage.py not found at: {manage_py_path}")
+            print(f"📁 Contents of script directory:")
+            for item in os.listdir(script_dir):
+                print(f"  - {item}")
+            sys.exit(1)
+        
+        # Check if we can import Django
+        try:
+            import django
+            print(f"✅ Django version: {django.get_version()}")
+        except ImportError as e:
+            print(f"❌ Django import failed: {e}")
+            sys.exit(1)
+        
+        cmd = [sys.executable, manage_py_path, 'runserver', f'127.0.0.1:{port}', '--noreload']
         
         print(f"🔧 Running command: {' '.join(cmd)}")
+        print(f"📁 Working directory: {script_dir}")
         
         # Start the server
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=script_dir)
         
         # Stream output
         for line in iter(process.stdout.readline, ''):

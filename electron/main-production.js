@@ -211,7 +211,10 @@ function startBackend() {
       if ((output.includes('Starting development server') || 
           output.includes('Quit the server with') ||
           output.includes('Watching for file changes') ||
-          output.includes('System check identified no issues')) && !serverReady) {
+          output.includes('System check identified no issues') ||
+          output.includes('Starting Django server on port') ||
+          output.includes('Running migrations') ||
+          output.includes('Django version')) && !serverReady) {
         console.log('✅ Backend server is ready');
         serverReady = true;
         resolve();
