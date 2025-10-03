@@ -41,6 +41,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { getTheme } from "./theme";
 import { CssBaseline } from "@mui/material";
 import StatusBar from "./components/StatusBar";
+import LoadingScreen from "./components/LoadingScreen";
 
 // Backup check function
 const checkAndCreateAutoBackup = async () => {
@@ -73,6 +74,7 @@ const App = () => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [manageOpen, setManageOpen] = React.useState(false);
   const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
+  const [isLoading, setIsLoading] = React.useState(true);
   const theme = React.useMemo(() => getTheme(mode), [mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
   
@@ -106,6 +108,11 @@ const App = () => {
     
     // Check for auto backup when app loads
     checkAndCreateAutoBackup();
+    
+    // Simulate loading time for better UX
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 3000);
     
     return () => {
       window.removeEventListener('themeChange', handleThemeChange);
@@ -306,7 +313,10 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
+      {isLoading ? (
+        <LoadingScreen onComplete={() => setIsLoading(false)} />
+      ) : (
+        <Router>
         <Box sx={{ display: 'flex', height: '100vh' }}>
           {/* Desktop Sidebar */}
           {!isMobile && (
@@ -396,7 +406,8 @@ const App = () => {
           {/* Desktop Status Bar */}
           {!isMobile && <StatusBar />}
         </Box>
-      </Router>
+        </Router>
+      )}
     </ThemeProvider>
   );
 };

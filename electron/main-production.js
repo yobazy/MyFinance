@@ -144,7 +144,9 @@ function startBackend() {
       // Check if standalone executable exists
       if (!fs.existsSync(backendExecutable)) {
         console.error('❌ Standalone backend executable not found:', backendExecutable);
-        reject(new Error('Standalone backend executable not found'));
+        // Don't reject, just proceed without backend
+        console.log('⚠️  Proceeding without backend - app will show connection error');
+        resolve();
         return;
       }
       
@@ -161,19 +163,23 @@ function startBackend() {
     
     backendProcess = spawn(backendExecutable, args, {
       cwd: projectRoot,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false // Ensure process is properly managed
     });
+
+    let serverReady = false;
 
     backendProcess.stdout.on('data', (data) => {
       const output = data.toString();
       console.log('Backend:', output);
       
       // Check if server is ready - Django shows different messages
-      if (output.includes('Starting development server') || 
+      if ((output.includes('Starting development server') || 
           output.includes('Quit the server with') ||
           output.includes('Watching for file changes') ||
-          output.includes('System check identified no issues')) {
+          output.includes('System check identified no issues')) && !serverReady) {
         console.log('✅ Backend server is ready');
+        serverReady = true;
         resolve();
       }
     });
@@ -194,18 +200,20 @@ function startBackend() {
           
         backendProcess = spawn(backendExecutable, altArgs, {
           cwd: projectRoot,
-          stdio: ['pipe', 'pipe', 'pipe']
+          stdio: ['pipe', 'pipe', 'pipe'],
+          detached: false
         });
         
         backendProcess.stdout.on('data', (data) => {
           const output = data.toString();
           console.log('Backend (port 8001):', output);
           
-          if (output.includes('Starting development server') || 
+          if ((output.includes('Starting development server') || 
               output.includes('Quit the server with') ||
               output.includes('Watching for file changes') ||
-              output.includes('System check identified no issues')) {
+              output.includes('System check identified no issues')) && !serverReady) {
             console.log('✅ Backend server is ready (port 8001)');
+            serverReady = true;
             resolve();
           }
         });
@@ -215,7 +223,7 @@ function startBackend() {
           console.error('Backend Error (port 8001):', error);
           
           if (!error.includes('WARNINGS') && !error.includes('Unrecognized')) {
-            reject(new Error(error));
+            console.log('⚠️  Backend error but continuing...');
           }
         });
         
@@ -224,24 +232,27 @@ function startBackend() {
       
       // Some Django warnings are sent to stderr but aren't fatal
       if (!error.includes('WARNINGS') && !error.includes('Unrecognized')) {
-        reject(new Error(error));
+        console.log('⚠️  Backend warning but continuing...');
       }
     });
 
     backendProcess.on('error', (error) => {
       console.error('Failed to start backend:', error);
-      reject(error);
+      console.log('⚠️  Backend failed to start but continuing...');
+      resolve(); // Don't reject, just proceed
     });
 
     backendProcess.on('close', (code) => {
       console.log(`Backend process exited with code ${code}`);
     });
 
-    // Timeout after 20 seconds
+    // Timeout after 15 seconds - shorter timeout for better UX
     setTimeout(() => {
-      console.log('⚠️  Backend startup timeout - proceeding anyway');
-      resolve(); // Don't reject, just proceed
-    }, 20000);
+      if (!serverReady) {
+        console.log('⚠️  Backend startup timeout - proceeding anyway');
+        resolve(); // Don't reject, just proceed
+      }
+    }, 15000);
   });
 }
 
@@ -342,10 +353,13 @@ app.whenReady().then(async () => {
   console.log('✅ Electron app is ready');
   
   try {
-    // Start backend first
-    await startBackend();
+    // Start backend first (non-blocking)
+    startBackend().catch(error => {
+      console.error('Backend startup failed:', error);
+      console.log('⚠️  Continuing without backend...');
+    });
     
-    // Create window and menu
+    // Create window and menu immediately
     createWindow();
     createMenu();
 
@@ -356,7 +370,8 @@ app.whenReady().then(async () => {
     });
   } catch (error) {
     console.error('Failed to start application:', error);
-    app.quit();
+    // Don't quit, just log the error and continue
+    console.log('⚠️  Application started with errors but continuing...');
   }
 });
 

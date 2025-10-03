@@ -1,6 +1,6 @@
 {
   "name": "my-finance-dash",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.11",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "main": "electron/main-production.js",
   "homepage": "./",
@@ -45,6 +45,7 @@
   "build": {
     "appId": "com.myfinance.dashboard",
     "productName": "MyFinance Dashboard",
+    "icon": "assets/icon.png",
     "directories": {
       "output": "dist",
       "buildResources": "assets"
@@ -94,7 +95,23 @@
         }
       ],
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "CSV Files",
+            "CFBundleTypeRole": "Editor",
+            "LSItemContentTypes": ["public.comma-separated-values-text"],
+            "CFBundleTypeExtensions": ["csv"]
+          },
+          {
+            "CFBundleTypeName": "Excel Files",
+            "CFBundleTypeRole": "Editor",
+            "LSItemContentTypes": ["public.spreadsheet"],
+            "CFBundleTypeExtensions": ["xls", "xlsx"]
+          }
+        ]
+      }
     },
     "win": {
       "target": [

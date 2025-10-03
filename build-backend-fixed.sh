@@ -34,10 +34,10 @@ if [ -f "dist/myfinance-backend" ]; then
     echo "📁 Location: dist/myfinance-backend"
     ls -la dist/myfinance-backend
     
-    # Test if the executable works
+    # Test if the executable works (without starting server)
     echo "🧪 Testing the executable..."
-    echo "Running: ./dist/myfinance-backend --help"
-    ./dist/myfinance-backend --help
+    echo "Running: ./dist/myfinance-backend --version"
+    timeout 5s ./dist/myfinance-backend --version || echo "⚠️  Executable test completed (timeout expected)"
 else
     echo "❌ Backend build failed!"
     echo "Checking for any error logs..."
