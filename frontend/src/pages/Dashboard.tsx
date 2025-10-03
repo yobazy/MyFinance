@@ -22,7 +22,7 @@ import {
   Upload as UploadIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import backendManager from "../utils/backendManager";
 
 interface Account {
   id: number;
@@ -57,8 +57,9 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/api/accounts/");
-        setAccounts(response.data.accounts || []);
+        const response = await backendManager.get("/api/accounts/");
+        const data = await response.json();
+        setAccounts(data.accounts || []);
       } catch (error) {
         console.error("Error fetching accounts:", error);
         setAccounts([]);
@@ -73,8 +74,9 @@ const Dashboard = () => {
       try {
         setLoading(true);
         const params = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
-        const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/${params}`);
-        setDashboardData(response.data);
+        const response = await backendManager.get(`/api/dashboard/${params}`);
+        const data = await response.json();
+        setDashboardData(data);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);

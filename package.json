@@ -53,7 +53,6 @@
     "files": [
       "electron/**/*",
       "frontend/build/**/*",
-      "dist/myfinance-backend",
       "db.sqlite3",
       "settings.json",
       "requirements.txt",
@@ -68,7 +67,8 @@
       "!**/uploads/**/*",
       "!**/backups/**/*",
       "!myfinance-backend.spec",
-      "!build-backend-fixed.sh"
+      "!build-backend-fixed.sh",
+      "!dist/myfinance-backend"
     ],
     "extraResources": [
       {
@@ -81,6 +81,10 @@
           "!build/**/*",
           "!dist/**/*"
         ]
+      },
+      {
+        "from": "dist/myfinance-backend",
+        "to": "myfinance-backend"
       }
     ],
     "mac": {

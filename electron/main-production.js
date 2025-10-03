@@ -138,19 +138,35 @@ function startBackend() {
     if (isPackaged) {
       // Production: Use standalone executable
       console.log('🔧 Production mode: Using standalone backend executable');
-      backendExecutable = path.join(process.resourcesPath, 'myfinance-backend');
-      args = ['runserver', '8000', '--noreload'];
+      console.log('📁 Resources path:', process.resourcesPath);
+      console.log('📁 App path:', app.getAppPath());
+      console.log('📁 Process cwd:', process.cwd());
       
-      // Check if standalone executable exists
-      if (!fs.existsSync(backendExecutable)) {
-        console.error('❌ Standalone backend executable not found:', backendExecutable);
-        // Don't reject, just proceed without backend
+      // Try multiple possible locations for the backend executable
+      const possiblePaths = [
+        path.join(process.resourcesPath, 'myfinance-backend'),
+        path.join(app.getAppPath(), 'myfinance-backend'),
+        path.join(process.resourcesPath, '..', 'myfinance-backend'),
+        path.join(__dirname, '..', 'myfinance-backend'),
+        path.join(process.cwd(), 'myfinance-backend')
+      ];
+      
+      console.log('🔍 Checking possible backend paths:');
+      possiblePaths.forEach((p, i) => {
+        console.log(`  ${i + 1}. ${p} - ${fs.existsSync(p) ? '✅ EXISTS' : '❌ NOT FOUND'}`);
+      });
+      
+      backendExecutable = possiblePaths.find(p => fs.existsSync(p));
+      
+      if (!backendExecutable) {
+        console.error('❌ Standalone backend executable not found in any location');
         console.log('⚠️  Proceeding without backend - app will show connection error');
         resolve();
         return;
       }
       
       console.log('✅ Found standalone backend executable:', backendExecutable);
+      args = ['runserver', '8000', '--noreload'];
     } else {
       // Development: Use system Python
       console.log('🔧 Development mode: Using system Python');
