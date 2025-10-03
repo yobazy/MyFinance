@@ -38,15 +38,10 @@ jobs:
           node-version: '23'
           cache: 'npm'
       
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      
-      - name: Install Python dependencies
+      - name: Install Node.js Backend dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          cd backend-nodejs
+          npm ci
       
       - name: Install Node dependencies
         run: npm ci
@@ -59,10 +54,22 @@ jobs:
       - name: Build Frontend
         run: npm run build-frontend
       
-      - name: Run Tests (if available)
+      - name: Run Backend Tests
         run: |
-          # Add your test commands here when ready
-          echo "Tests would run here"
+          # Start backend in background
+          cd backend-nodejs
+          npm start &
+          BACKEND_PID=$!
+          
+          # Wait for backend to start
+          sleep 10
+          
+          # Run tests
+          cd ..
+          node test-nodejs-backend.js
+          
+          # Stop backend
+          kill $BACKEND_PID
         continue-on-error: true
       
       - name: Build Electron App

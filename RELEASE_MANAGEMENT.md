@@ -4,6 +4,8 @@
 
 This guide covers the complete release management process for MyFinance Dashboard, including versioning, building, testing, and distribution.
 
+**🚀 Updated for Node.js Backend**: This release management now supports the new Node.js backend architecture.
+
 ## Version Strategy
 
 We use [Semantic Versioning (SemVer)](https://semver.org/) with the following format:
@@ -112,11 +114,16 @@ The project includes GitHub Actions workflows for automated releases:
 ### Daily Development
 
 ```bash
-# Start development environment
-npm run electron-dev
+# Start development environment with Node.js backend
+npm run start-nodejs
 
-# Run tests (when available)
-npm test
+# Or start individual components
+npm run backend-nodejs  # Start Node.js backend
+npm run frontend        # Start React frontend
+npm run electron        # Start Electron app
+
+# Run tests
+node test-nodejs-backend.js
 
 # Update screenshots
 npm run screenshots
@@ -136,10 +143,11 @@ npm run release:prepare
 
 ### Common Issues
 
-1. **Build Fails**: Check Node.js and Python versions
-2. **Missing Dependencies**: Run `npm ci` and `pip install -r requirements.txt`
-3. **Git Issues**: Ensure working directory is clean
-4. **Version Conflicts**: Check both `package.json` files have same version
+1. **Build Fails**: Check Node.js version (Python no longer required)
+2. **Missing Dependencies**: Run `npm ci` and `cd backend-nodejs && npm ci`
+3. **Backend Issues**: Test with `node test-nodejs-backend.js`
+4. **Git Issues**: Ensure working directory is clean
+5. **Version Conflicts**: Check both `package.json` files have same version
 
 ### Recovery
 

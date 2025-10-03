@@ -1,13 +1,15 @@
 # MyFinance Dashboard
 
-MyFinance Dashboard is a comprehensive personal finance management application built with **React** frontend and **Django** backend, packaged as a **cross-platform Electron desktop app**. This modern application allows users to upload bank statements, categorize transactions, and generate detailed financial insights and visualizations.
+MyFinance Dashboard is a comprehensive personal finance management application built with **React** frontend and **Node.js** backend, packaged as a **cross-platform Electron desktop app**. This modern application allows users to upload bank statements, categorize transactions, and generate detailed financial insights and visualizations.
 
 ## Architecture
 
 - **Frontend**: React with Material-UI components
-- **Backend**: Django REST API with SQLite database
+- **Backend**: Node.js with Express.js and Sequelize ORM
 - **Desktop App**: Electron wrapper for cross-platform deployment
 - **Data Storage**: Local SQLite database (configurable)
+
+**🚀 Recently Migrated**: The backend has been migrated from Django to Node.js for better performance and simplified deployment.
 
 ---
 
@@ -95,43 +97,50 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 ## Installation & Setup
 
 ### Prerequisites
-- Python 3.8+
-- Node.js 16+
+- Node.js 18+ (Python no longer required!)
 - npm or yarn
 - Electron (for desktop app)
 
-### Backend Setup
+### Quick Setup
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
    cd MyFinance
    ```
 
-2. **Set up Python environment**:
+2. **Install Node.js backend dependencies**:
    ```bash
-   # Create virtual environment
-   python -m venv venv
-   
-   # Activate virtual environment
-   # On macOS/Linux:
-   source venv/bin/activate
-   # On Windows:
-   venv\Scripts\activate
+   ./install-nodejs-backend.sh
    ```
 
-3. **Install Python dependencies**:
+3. **Start the application**:
    ```bash
-   pip install -r requirements.txt
+   npm run start-nodejs
    ```
 
-4. **Run Django migrations**:
+### Manual Setup
+1. **Install backend dependencies**:
    ```bash
-   python manage.py migrate
+   cd backend-nodejs
+   npm install
+   cd ..
    ```
 
-5. **Start the Django backend server**:
+2. **Install frontend dependencies**:
    ```bash
-   python manage.py runserver
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+3. **Test the backend**:
+   ```bash
+   node test-nodejs-backend.js
+   ```
+
+4. **Start the Node.js backend server**:
+   ```bash
+   npm run backend-nodejs
    ```
    The API will be available at `http://127.0.0.1:8000/`
 
@@ -180,17 +189,17 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 ### Getting Started
 
 #### Option 1: Desktop App (Recommended)
-1. **Run the Electron app**:
+1. **Run the Electron app with Node.js backend**:
    ```bash
-   npm run electron
+   npm run start-nodejs
    ```
-   The app will automatically start the backend server and open the desktop application.
+   The app will automatically start the Node.js backend server and open the desktop application.
 
 #### Option 2: Web Application
 1. **Launch both servers** (backend and frontend):
    ```bash
-   # Terminal 1: Backend
-   python manage.py runserver
+   # Terminal 1: Node.js Backend
+   npm run backend-nodejs
    
    # Terminal 2: Frontend
    cd frontend && npm start

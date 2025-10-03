@@ -55,38 +55,28 @@
     "files": [
       "electron/**/*",
       "frontend/build/**/*",
-      "requirements.txt",
-      "!backend/__pycache__/**/*",
-      "!backend/migrations/**/*",
-      "!backend/build/**/*",
-      "!backend/dist/**/*",
+      "backend-nodejs/**/*",
+      "!backend-nodejs/node_modules/**/*",
+      "!backend-nodejs/uploads/**/*",
+      "!backend-nodejs/backups/**/*",
+      "!backend-nodejs/db.sqlite3",
       "!**/node_modules/**/*",
       "!**/.git/**/*",
       "!**/test_files/**/*",
-      "!**/uploads/**/*",
-      "!**/backups/**/*",
-      "!myfinance-backend.spec",
-      "!build-backend-fixed.sh",
-      "!dist/myfinance-backend",
       "!settings.json",
-      "!db.sqlite3",
-      "!manage.py"
+      "!db.sqlite3"
     ],
     "extraResources": [
       {
-        "from": "backend",
-        "to": "backend",
+        "from": "backend-nodejs",
+        "to": "backend-nodejs",
         "filter": [
           "**/*",
-          "!__pycache__/**/*",
-          "!migrations/**/*",
-          "!build/**/*",
-          "!dist/**/*"
+          "!node_modules/**/*",
+          "!uploads/**/*",
+          "!backups/**/*",
+          "!db.sqlite3"
         ]
-      },
-      {
-        "from": "dist/myfinance-backend",
-        "to": "myfinance-backend"
       },
       {
         "from": "settings.json",
@@ -95,14 +85,6 @@
       {
         "from": "db.sqlite3",
         "to": "db.sqlite3"
-      },
-      {
-        "from": "manage.py",
-        "to": "manage.py"
-      },
-      {
-        "from": "simple_backend.py",
-        "to": "simple_backend.py"
       }
     ],
     "mac": {
