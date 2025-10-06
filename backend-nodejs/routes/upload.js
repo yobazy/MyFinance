@@ -239,31 +239,32 @@ async function processAmexData(filePath, account) {
   let rowsProcessed = 0;
 
   for (const row of data) {
-    if (!row.date || !row.description) continue;
+    // Use correct column names from Amex file structure
+    if (!row.Date || !row.Description) continue;
 
     // Convert dates
-    const date = new Date(row.date);
-    const dateProcessed = new Date(row.date_processed || row.date);
+    const date = new Date(row.Date);
+    const dateProcessed = new Date(row['Date Processed'] || row.Date);
     
     if (isNaN(date.getTime()) || isNaN(dateProcessed.getTime())) continue;
 
     // Handle amount
-    const amountStr = String(row.amount || 0).replace(/[$,\s]/g, '');
+    const amountStr = String(row.Amount || 0).replace(/[$,\s]/g, '');
     const amount = parseFloat(amountStr) || 0;
 
     // Convert description to uppercase
-    const description = String(row.description).toUpperCase();
+    const description = String(row.Description).toUpperCase();
 
     // Create AmexTransaction record
     await AmexTransaction.create({
       date: date.toISOString().split('T')[0],
       dateProcessed: dateProcessed.toISOString().split('T')[0],
       description: description,
-      cardmember: row.cardmember || '',
+      cardmember: row.Cardmember || '',
       amount: amount,
       commission: parseFloat(row.commission) || 0,
       excRate: parseFloat(row.exc_rate) || 0,
-      merchant: row.merchant || ''
+      merchant: row.Merchant || ''
     });
 
     // Create Transaction record
