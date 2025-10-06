@@ -63,7 +63,9 @@ router.get('/check-auto', async (req, res) => {
           fileName: backupFileName,
           filePath: backupPath.replace('.gz', ''),
           fileSize: fs.statSync(backupPath.replace('.gz', '')).size,
-          backupType: 'auto'
+          backupType: 'auto',
+          isCompressed: false,
+          notes: 'Auto backup'
         });
         
         return res.json({ 
@@ -149,18 +151,21 @@ router.put('/settings', async (req, res) => {
 // Get all backups
 router.get('/', async (req, res) => {
   try {
-    const backups = await DatabaseBackup.findAll({
-      order: [['created_at', 'DESC']]
-    });
-
+    const { sequelize } = require('../config/database');
+    const [backups] = await sequelize.query(`
+      SELECT id, file_name, backup_type, file_path, file_size, is_compressed, notes, created_at, updated_at 
+      FROM backend_databasebackup 
+      ORDER BY created_at DESC
+    `);
+    
     const backupsWithSize = backups.map(backup => ({
       id: backup.id,
-      backupType: backup.backupType,
-      filePath: backup.filePath,
-      fileSize: backup.fileSize,
-      fileSizeMb: Math.round(backup.fileSize / (1024 * 1024) * 100) / 100,
-      createdAt: backup.createdAt,
-      isCompressed: backup.isCompressed,
+      backupType: backup.backup_type,
+      filePath: backup.file_path,
+      fileSize: backup.file_size,
+      fileSizeMb: Math.round(backup.file_size / (1024 * 1024) * 100) / 100,
+      createdAt: backup.created_at,
+      isCompressed: backup.is_compressed === 1,
       notes: backup.notes
     }));
 
@@ -174,18 +179,21 @@ router.get('/', async (req, res) => {
 // Get all backups (alias for /list)
 router.get('/list', async (req, res) => {
   try {
-    const backups = await DatabaseBackup.findAll({
-      order: [['created_at', 'DESC']]
-    });
+    const { sequelize } = require('../config/database');
+    const [backups] = await sequelize.query(`
+      SELECT id, file_name, backup_type, file_path, file_size, is_compressed, notes, created_at, updated_at 
+      FROM backend_databasebackup 
+      ORDER BY created_at DESC
+    `);
 
     const backupsWithSize = backups.map(backup => ({
       id: backup.id,
-      backupType: backup.backupType,
-      filePath: backup.filePath,
-      fileSize: backup.fileSize,
-      fileSizeMb: Math.round(backup.fileSize / (1024 * 1024) * 100) / 100,
-      createdAt: backup.createdAt,
-      isCompressed: backup.isCompressed,
+      backupType: backup.backup_type,
+      filePath: backup.file_path,
+      fileSize: backup.file_size,
+      fileSizeMb: Math.round(backup.file_size / (1024 * 1024) * 100) / 100,
+      createdAt: backup.created_at,
+      isCompressed: backup.is_compressed === 1,
       notes: backup.notes
     }));
 
@@ -263,6 +271,7 @@ router.post('/create', async (req, res) => {
 
       // Create backup record
       const backup = await DatabaseBackup.create({
+        fileName: filename,
         backupType: 'manual',
         filePath: filePath.replace('.gz', ''),
         fileSize: fileSize,

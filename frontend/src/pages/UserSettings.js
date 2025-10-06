@@ -86,10 +86,10 @@ const UserSettings = () => {
       const data = await response.json();
       // Ensure all values are defined to prevent controlled/uncontrolled input issues
       setBackupSettings({
-        max_backups: data.max_backups ?? 5,
-        auto_backup_enabled: data.auto_backup_enabled ?? true,
-        backup_frequency_hours: data.backup_frequency_hours ?? 24,
-        backup_location: data.backup_location ?? 'backups/'
+        max_backups: data.maxBackups ?? 5,
+        auto_backup_enabled: data.autoBackupEnabled ?? true,
+        backup_frequency_hours: data.backupFrequencyHours ?? 24,
+        backup_location: data.backupLocation ?? 'backups/'
       });
     } catch (error) {
       showSnackbar('Failed to fetch backup settings', 'error');
@@ -158,7 +158,12 @@ const UserSettings = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(backupSettings),
+        body: JSON.stringify({
+          maxBackups: backupSettings.max_backups,
+          autoBackupEnabled: backupSettings.auto_backup_enabled,
+          backupFrequencyHours: backupSettings.backup_frequency_hours,
+          backupLocation: backupSettings.backup_location
+        }),
       });
 
       if (response.ok) {
@@ -228,7 +233,7 @@ const UserSettings = () => {
   const deleteBackup = async (backupId) => {
     setBackupLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/backup/delete/${backupId}/`, {
+      const response = await fetch(`http://localhost:8000/api/backup/${backupId}/`, {
         method: 'DELETE',
       });
 
@@ -484,25 +489,20 @@ const UserSettings = () => {
                   
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <Typography variant="body2">
-                      <strong>Total Backups:</strong> {backupStats.total_backups || 0}
+                      <strong>Total Backups:</strong> {backupStats.totalBackups || 0}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Total Size:</strong> {backupStats.total_size_mb || 0} MB
+                      <strong>Total Size:</strong> {backupStats.totalSizeMb || 0} MB
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Max Backups:</strong> {backupStats.max_backups || 0}
+                      <strong>Max Backups:</strong> {backupSettings.max_backups || 0}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Auto Backup:</strong> {backupStats.auto_backup_enabled ? 'Enabled' : 'Disabled'}
+                      <strong>Auto Backup:</strong> {backupSettings.auto_backup_enabled ? 'Enabled' : 'Disabled'}
                     </Typography>
-                    {backupStats.last_backup && (
+                    {backupStats.lastBackup && (
                       <Typography variant="body2">
-                        <strong>Last Backup:</strong> {formatDate(backupStats.last_backup)}
-                      </Typography>
-                    )}
-                    {backupStats.next_auto_backup && (
-                      <Typography variant="body2">
-                        <strong>Next Auto Backup:</strong> {formatDate(backupStats.next_auto_backup)}
+                        <strong>Last Backup:</strong> {formatDate(backupStats.lastBackup.createdAt)}
                       </Typography>
                     )}
                   </Box>
@@ -562,14 +562,14 @@ const UserSettings = () => {
                       <TableRow key={backup.id}>
                         <TableCell>
                           <Chip
-                            label={backup.backup_type}
-                            color={getBackupTypeColor(backup.backup_type)}
+                            label={backup.backupType}
+                            color={getBackupTypeColor(backup.backupType)}
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>{formatDate(backup.created_at)}</TableCell>
-                        <TableCell>{formatFileSize(backup.file_size)}</TableCell>
-                        <TableCell>{backup.is_compressed ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>{formatDate(backup.createdAt)}</TableCell>
+                        <TableCell>{formatFileSize(backup.fileSize)}</TableCell>
+                        <TableCell>{backup.isCompressed ? 'Yes' : 'No'}</TableCell>
                         <TableCell>{backup.notes || '-'}</TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -710,3 +710,4 @@ const UserSettings = () => {
 };
 
 export default UserSettings;
+
