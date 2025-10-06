@@ -7,23 +7,28 @@ module.exports = (sequelize, DataTypes) => {
     },
     fileName: {
       type: DataTypes.STRING(255),
-      allowNull: false
+      allowNull: false,
+      field: 'file_name'
     },
     backupType: {
       type: DataTypes.ENUM('auto', 'manual', 'scheduled'),
-      defaultValue: 'manual'
+      defaultValue: 'manual',
+      field: 'backup_type'
     },
     filePath: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: false,
+      field: 'file_path'
     },
     fileSize: {
       type: DataTypes.BIGINT,
-      allowNull: false
+      allowNull: false,
+      field: 'file_size'
     },
     isCompressed: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'is_compressed'
     },
     notes: {
       type: DataTypes.TEXT,
@@ -32,11 +37,11 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'backend_databasebackup',
     timestamps: true,
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
-        fields: ['createdAt']
+        fields: ['created_at']
       }
     ]
   });

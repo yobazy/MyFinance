@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
     ruleId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'rule_id',
       references: {
         model: 'backend_categorizationrule',
         key: 'id'
@@ -16,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
     transactionId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'transaction_id',
       references: {
         model: 'backend_transaction',
         key: 'id'
@@ -23,22 +25,25 @@ module.exports = (sequelize, DataTypes) => {
     },
     matchedAt: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
+      defaultValue: DataTypes.NOW,
+      field: 'matched_at'
     },
     confidenceScore: {
       type: DataTypes.FLOAT,
-      defaultValue: 1.0
+      defaultValue: 1.0,
+      field: 'confidence_score'
     },
     wasApplied: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'was_applied'
     }
   }, {
     tableName: 'backend_ruleusage',
     timestamps: false,
     indexes: [
       {
-        fields: ['matchedAt']
+        fields: ['matched_at']
       }
     ]
   });

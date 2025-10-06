@@ -45,7 +45,7 @@ router.get('/check-auto', async (req, res) => {
         
         // Clean up old backups if needed
         const existingBackups = await DatabaseBackup.findAll({
-          order: [['createdAt', 'DESC']]
+          order: [['created_at', 'DESC']]
         });
         
         if (existingBackups.length >= settings.maxBackups) {
@@ -150,7 +150,7 @@ router.put('/settings', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const backups = await DatabaseBackup.findAll({
-      order: [['createdAt', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
     const backupsWithSize = backups.map(backup => ({
@@ -167,6 +167,57 @@ router.get('/', async (req, res) => {
     res.json(backupsWithSize);
   } catch (error) {
     console.error('Error fetching backups:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all backups (alias for /list)
+router.get('/list', async (req, res) => {
+  try {
+    const backups = await DatabaseBackup.findAll({
+      order: [['created_at', 'DESC']]
+    });
+
+    const backupsWithSize = backups.map(backup => ({
+      id: backup.id,
+      backupType: backup.backupType,
+      filePath: backup.filePath,
+      fileSize: backup.fileSize,
+      fileSizeMb: Math.round(backup.fileSize / (1024 * 1024) * 100) / 100,
+      createdAt: backup.createdAt,
+      isCompressed: backup.isCompressed,
+      notes: backup.notes
+    }));
+
+    res.json(backupsWithSize);
+  } catch (error) {
+    console.error('Error fetching backups:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get backup statistics
+router.get('/stats', async (req, res) => {
+  try {
+    const totalBackups = await DatabaseBackup.count();
+    const totalSize = await DatabaseBackup.sum('fileSize') || 0;
+    const lastBackup = await DatabaseBackup.findOne({
+      order: [['created_at', 'DESC']],
+      attributes: ['created_at', 'fileSize']
+    });
+
+    res.json({
+      totalBackups,
+      totalSize,
+      totalSizeMb: Math.round(totalSize / (1024 * 1024) * 100) / 100,
+      lastBackup: lastBackup ? {
+        createdAt: lastBackup.created_at,
+        fileSize: lastBackup.fileSize,
+        fileSizeMb: Math.round(lastBackup.fileSize / (1024 * 1024) * 100) / 100
+      } : null
+    });
+  } catch (error) {
+    console.error('Error fetching backup stats:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -308,7 +359,7 @@ router.post('/:backupId/restore', async (req, res) => {
 async function cleanupOldBackups(settings) {
   try {
     const backups = await DatabaseBackup.findAll({
-      order: [['createdAt', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
     if (backups.length > settings.maxBackups) {
