@@ -363,6 +363,42 @@ router.delete('/:backupId', async (req, res) => {
   }
 });
 
+// Download backup file
+router.get('/:backupId/download', async (req, res) => {
+  try {
+    const { backupId } = req.params;
+
+    const backup = await DatabaseBackup.findByPk(backupId);
+    if (!backup) {
+      return res.status(404).json({ error: 'Backup not found' });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(backup.filePath)) {
+      return res.status(404).json({ error: 'Backup file not found on disk' });
+    }
+
+    // Set appropriate headers for file download
+    res.setHeader('Content-Disposition', `attachment; filename="${backup.fileName}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(backup.filePath);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (error) => {
+      console.error('Error streaming backup file:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Error reading backup file' });
+      }
+    });
+
+  } catch (error) {
+    console.error('Error downloading backup:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Restore from backup
 router.post('/:backupId/restore', async (req, res) => {
   try {

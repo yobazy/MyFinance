@@ -266,7 +266,7 @@ class BackupMonitoringService {
       const stats = fs.statSync(backupDir);
       
       // Calculate total backup size
-      const totalBackupSize = await DatabaseBackup.sum('fileSize') || 0;
+      const totalBackupSize = await DatabaseBackup.sum('file_size') || 0;
       const totalBackupSizeMB = Math.round(totalBackupSize / (1024 * 1024) * 100) / 100;
 
       if (totalBackupSize > this.alertThresholds.maxBackupSize) {
@@ -398,7 +398,7 @@ class BackupMonitoringService {
         where: { status: 'completed' },
         order: [['created_at', 'DESC']],
         limit: 10,
-        attributes: ['fileSize', 'createdAt']
+        attributes: ['file_size', 'createdAt']
       });
 
       if (recentBackups.length < 3) {
@@ -410,7 +410,7 @@ class BackupMonitoringService {
       }
 
       // Calculate size trend
-      const sizes = recentBackups.map(backup => backup.fileSize);
+      const sizes = recentBackups.map(backup => backup.file_size);
       const avgSize = sizes.reduce((sum, size) => sum + size, 0) / sizes.length;
       const latestSize = sizes[0];
       const sizeIncrease = ((latestSize - avgSize) / avgSize) * 100;
@@ -495,7 +495,7 @@ class BackupMonitoringService {
         'id',
         'fileName',
         'backupType',
-        'fileSize',
+        'file_size',
         'isCompressed',
         'isEncrypted',
         'status',
@@ -521,17 +521,17 @@ class BackupMonitoringService {
       DatabaseBackup.count(),
       DatabaseBackup.count({ where: { status: 'completed' } }),
       DatabaseBackup.count({ where: { status: 'failed' } }),
-      DatabaseBackup.sum('fileSize'),
+      DatabaseBackup.sum('file_size'),
       DatabaseBackup.findAll({
         attributes: [
-          [sequelize.fn('AVG', sequelize.col('fileSize')), 'avgSize']
+          [sequelize.fn('AVG', sequelize.col('file_size')), 'avgSize']
         ],
         where: { status: 'completed' }
       }),
       DatabaseBackup.findOne({
         where: { status: 'completed' },
         order: [['created_at', 'DESC']],
-        attributes: ['createdAt', 'fileSize']
+        attributes: ['createdAt', 'file_size']
       })
     ]);
 
@@ -547,8 +547,8 @@ class BackupMonitoringService {
       avgSize: Math.round(avgSizeValue / (1024 * 1024) * 100) / 100,
       lastBackup: lastBackup ? {
         createdAt: lastBackup.createdAt,
-        fileSize: lastBackup.fileSize,
-        fileSizeMB: Math.round(lastBackup.fileSize / (1024 * 1024) * 100) / 100
+        fileSize: lastBackup.file_size,
+        fileSizeMB: Math.round(lastBackup.file_size / (1024 * 1024) * 100) / 100
       } : null
     };
   }

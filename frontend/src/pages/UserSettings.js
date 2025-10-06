@@ -82,7 +82,7 @@ const UserSettings = () => {
   // Backup-related functions
   const fetchBackupSettings = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/backup/settings/');
+      const response = await fetch('http://localhost:8000/api/backup/settings');
       const data = await response.json();
       // Ensure all values are defined to prevent controlled/uncontrolled input issues
       setBackupSettings({
@@ -98,17 +98,20 @@ const UserSettings = () => {
 
   const fetchBackups = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/backup/list/');
+      const response = await fetch('http://localhost:8000/api/backup');
       const data = await response.json();
-      setBackups(data);
+      // The API returns { backups: [...], pagination: {...} }
+      setBackups(Array.isArray(data.backups) ? data.backups : []);
     } catch (error) {
       showSnackbar('Failed to fetch backups', 'error');
+      // Set empty array on error to prevent map error
+      setBackups([]);
     }
   }, [showSnackbar]);
 
   const fetchBackupStats = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/backup/stats/');
+      const response = await fetch('http://localhost:8000/api/backup/stats');
       const data = await response.json();
       setBackupStats(data);
     } catch (error) {
@@ -153,7 +156,7 @@ const UserSettings = () => {
   const updateBackupSettings = async () => {
     setBackupLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/backup/settings/', {
+      const response = await fetch('http://localhost:8000/api/backup/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +185,7 @@ const UserSettings = () => {
   const createBackup = async () => {
     setBackupLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/backup/create/', {
+      const response = await fetch('http://localhost:8000/api/backup/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +214,7 @@ const UserSettings = () => {
   const restoreBackup = async (backupId) => {
     setBackupLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/backup/restore/${backupId}/`, {
+      const response = await fetch(`http://localhost:8000/api/backup/${backupId}/restore`, {
         method: 'POST',
       });
 
@@ -233,7 +236,7 @@ const UserSettings = () => {
   const deleteBackup = async (backupId) => {
     setBackupLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/backup/${backupId}/`, {
+      const response = await fetch(`http://localhost:8000/api/backup/${backupId}`, {
         method: 'DELETE',
       });
 
@@ -255,7 +258,7 @@ const UserSettings = () => {
 
   const downloadBackup = async (backupId) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/backup/download/${backupId}/`);
+      const response = await fetch(`http://localhost:8000/api/backup/${backupId}/download`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -268,7 +271,8 @@ const UserSettings = () => {
         document.body.removeChild(a);
         showSnackbar('Backup downloaded successfully', 'success');
       } else {
-        showSnackbar('Failed to download backup', 'error');
+        const error = await response.json();
+        showSnackbar(error.error || 'Failed to download backup', 'error');
       }
     } catch (error) {
       showSnackbar('Failed to download backup', 'error');

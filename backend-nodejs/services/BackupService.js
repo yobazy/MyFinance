@@ -526,17 +526,17 @@ class BackupService {
   async getBackupStats() {
     try {
       const totalBackups = await DatabaseBackup.count();
-      const totalSize = await DatabaseBackup.sum('fileSize') || 0;
+      const totalSize = await DatabaseBackup.sum('file_size') || 0;
       const lastBackup = await DatabaseBackup.findOne({
         order: [['created_at', 'DESC']],
-        attributes: ['created_at', 'fileSize', 'checksum', 'status']
+        attributes: ['created_at', 'file_size', 'checksum', 'status']
       });
 
       const backupsByType = await DatabaseBackup.findAll({
         attributes: [
           'backupType',
           [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('fileSize')), 'totalSize']
+          [sequelize.fn('SUM', sequelize.col('file_size')), 'totalSize']
         ],
         group: ['backupType']
       });
@@ -547,8 +547,8 @@ class BackupService {
         totalSizeMb: Math.round(totalSize / (1024 * 1024) * 100) / 100,
         lastBackup: lastBackup ? {
           createdAt: lastBackup.created_at,
-          fileSize: lastBackup.fileSize,
-          fileSizeMb: Math.round(lastBackup.fileSize / (1024 * 1024) * 100) / 100,
+          fileSize: lastBackup.file_size,
+          fileSizeMb: Math.round(lastBackup.file_size / (1024 * 1024) * 100) / 100,
           checksum: lastBackup.checksum,
           status: lastBackup.status
         } : null,
