@@ -47,8 +47,10 @@ module.exports = (sequelize, DataTypes) => {
 
   // Instance methods
   Account.prototype.calculateBalance = async function() {
-    const result = await models.Transaction.sum('amount', {
-      where: { account_id: this.id }
+    const sequelize = this.sequelize;
+    const Transaction = sequelize.models.Transaction;
+    const result = await Transaction.sum('amount', {
+      where: { accountId: this.id }
     });
     return result || 0;
   };

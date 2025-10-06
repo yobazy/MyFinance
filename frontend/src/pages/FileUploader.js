@@ -41,6 +41,7 @@ const FileUploader = () => {
     const [fileType, setFileType] = useState("TD");
     const [accounts, setAccounts] = useState([]); // Store fetched accounts
     const [account, setAccount] = useState("");
+    const [selectedAccountId, setSelectedAccountId] = useState(""); // Store selected account ID
     const [selectedAccount, setSelectedAccount] = useState(null); // Store selected account object
     const [message, setMessage] = useState("");
     const [isMultipleMode, setIsMultipleMode] = useState(false);
@@ -61,22 +62,23 @@ const FileUploader = () => {
     }, []);
 
     const handleAccountChange = (event) => {
-        const selectedAccountName = event.target.value;
+        const selectedAccountId = event.target.value;
         
         // Check if "Add Account" option was selected
-        if (selectedAccountName === "add_account") {
+        if (selectedAccountId === "add_account") {
             navigate("/accounts?create=true");
             return;
         }
         
-        setAccount(selectedAccountName);
+        // Find the selected account object by ID
+        const accountObj = accounts.find(acc => acc.id.toString() === selectedAccountId);
         
-        // Find the selected account object to get bank info
-        const accountObj = accounts.find(acc => acc.name === selectedAccountName);
-        setSelectedAccount(accountObj);
-        
-        // Automatically set file type based on account's bank
         if (accountObj) {
+            setAccount(accountObj.name);
+            setSelectedAccountId(selectedAccountId);
+            setSelectedAccount(accountObj);
+            
+            // Automatically set file type based on account's bank
             if (accountObj.bank === "AMEX") {
                 setFileType("Amex");
             } else if (accountObj.bank === "TD") {
@@ -133,12 +135,12 @@ const FileUploader = () => {
 
   const handleUpload = async () => {
     if (isMultipleMode) {
-      if (files.length === 0 || !selectedAccount || !account) {
+      if (files.length === 0 || !selectedAccount || !selectedAccountId) {
         setMessage("Please select files and account.");
         return;
       }
     } else {
-      if (!file || !selectedAccount || !account) {
+      if (!file || !selectedAccount || !selectedAccountId) {
         setMessage("Please select a file and account.");
         return;
       }
@@ -158,7 +160,7 @@ const FileUploader = () => {
         });
         formData.append("file_type", fileType);
         formData.append("bank", selectedAccount.bank);
-        formData.append("account", account);
+        formData.append("account", selectedAccount.name);
 
         const response = await axios.post("http://127.0.0.1:8000/api/upload-multiple/", formData);
         setUploadResults(response.data.file_results);
@@ -170,7 +172,7 @@ const FileUploader = () => {
         formData.append("file", file);
         formData.append("file_type", fileType);
         formData.append("bank", selectedAccount.bank);
-        formData.append("account", account);
+        formData.append("account", selectedAccount.name);
 
         const response = await axios.post("http://127.0.0.1:8000/api/upload/", formData);
         setMessage(response.data.message);
@@ -218,9 +220,9 @@ const FileUploader = () => {
 
             <FormControl fullWidth>
               <InputLabel>Account</InputLabel>
-              <Select value={account} onChange={handleAccountChange}>
+              <Select value={selectedAccountId} onChange={handleAccountChange}>
                 {accounts.map((account) => (
-                  <MenuItem key={account.id} value={account.name}>
+                  <MenuItem key={account.id} value={account.id.toString()}>
                     {account.name} ({account.bank})
                   </MenuItem>
                 ))}
