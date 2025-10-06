@@ -234,7 +234,33 @@ async function processAmexData(filePath, account) {
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet, { range: 11 }); // Skip first 11 rows
+  
+  // Try to find the data section - look for rows with actual transaction data
+  let data = [];
+  let startRow = 0;
+  
+  // First, try the current approach (skip first 11 rows)
+  try {
+    data = XLSX.utils.sheet_to_json(worksheet, { range: 11 });
+    if (data.length > 0 && data[0].Date && data[0].Description) {
+      startRow = 11;
+    }
+  } catch (e) {
+    // If that fails, try without range
+  }
+  
+  // If the first approach didn't work, try to find the data section
+  if (data.length === 0 || !data[0].Date || !data[0].Description) {
+    const allData = XLSX.utils.sheet_to_json(worksheet);
+    for (let i = 0; i < allData.length; i++) {
+      const row = allData[i];
+      if (row.Date && row.Description && row.Amount) {
+        data = allData.slice(i);
+        startRow = i;
+        break;
+      }
+    }
+  }
 
   let rowsProcessed = 0;
 
@@ -242,41 +268,75 @@ async function processAmexData(filePath, account) {
     // Use correct column names from Amex file structure
     if (!row.Date || !row.Description) continue;
 
-    // Convert dates
-    const date = new Date(row.Date);
-    const dateProcessed = new Date(row['Date Processed'] || row.Date);
+    // Convert dates - handle different date formats
+    let date, dateProcessed;
     
-    if (isNaN(date.getTime()) || isNaN(dateProcessed.getTime())) continue;
+    try {
+      // Try parsing as Excel date number first
+      if (typeof row.Date === 'number') {
+        date = new Date((row.Date - 25569) * 86400 * 1000);
+      } else {
+        date = new Date(row.Date);
+      }
+      
+      if (row['Date Processed']) {
+        if (typeof row['Date Processed'] === 'number') {
+          dateProcessed = new Date((row['Date Processed'] - 25569) * 86400 * 1000);
+        } else {
+          dateProcessed = new Date(row['Date Processed']);
+        }
+      } else {
+        dateProcessed = date;
+      }
+    } catch (e) {
+      continue;
+    }
+    
+    if (isNaN(date.getTime()) || isNaN(dateProcessed.getTime())) {
+      continue;
+    }
 
-    // Handle amount
-    const amountStr = String(row.Amount || 0).replace(/[$,\s]/g, '');
+    // Handle amount - remove currency symbols and parse
+    let amountStr = String(row.Amount || 0);
+    // Remove currency symbols, commas, and spaces
+    amountStr = amountStr.replace(/[$,\s]/g, '');
+    // Handle negative amounts (like "-$508.80")
+    const isNegative = amountStr.startsWith('-');
+    if (isNegative) {
+      amountStr = amountStr.substring(1);
+    }
     const amount = parseFloat(amountStr) || 0;
+    const finalAmount = isNegative ? -amount : amount;
 
     // Convert description to uppercase
     const description = String(row.Description).toUpperCase();
 
-    // Create AmexTransaction record
-    await AmexTransaction.create({
-      date: date.toISOString().split('T')[0],
-      dateProcessed: dateProcessed.toISOString().split('T')[0],
-      description: description,
-      cardmember: row.Cardmember || '',
-      amount: amount,
-      commission: parseFloat(row.commission) || 0,
-      excRate: parseFloat(row.exc_rate) || 0,
-      merchant: row.Merchant || ''
-    });
+    try {
+      // Create AmexTransaction record with available fields
+      await AmexTransaction.create({
+        date: date.toISOString().split('T')[0],
+        dateProcessed: dateProcessed.toISOString().split('T')[0],
+        description: description,
+        cardmember: row.Cardmember || row['Additional Information'] || '',
+        amount: finalAmount,
+        commission: parseFloat(row.commission) || 0,
+        excRate: parseFloat(row.exc_rate) || 0,
+        merchant: row.Merchant || row['Additional Information'] || ''
+      });
 
-    // Create Transaction record
-    await Transaction.create({
-      date: date.toISOString().split('T')[0],
-      description: description,
-      amount: amount,
-      source: 'Amex',
-      accountId: account.id
-    });
+      // Create Transaction record
+      await Transaction.create({
+        date: date.toISOString().split('T')[0],
+        description: description,
+        amount: finalAmount,
+        source: 'Amex',
+        accountId: account.id
+      });
 
-    rowsProcessed++;
+      rowsProcessed++;
+    } catch (dbError) {
+      console.error('Database error for row:', dbError.message);
+    }
   }
 
   // Update account balance
