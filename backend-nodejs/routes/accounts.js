@@ -134,20 +134,26 @@ router.delete('/:accountId/delete', async (req, res) => {
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Check if account has transactions
+    // Count transactions before deletion for response message
     const transactionCount = await Transaction.count({
       where: { account_id: accountId }
     });
 
+    // Delete all transactions associated with this account first
     if (transactionCount > 0) {
-      return res.status(400).json({ 
-        error: `Cannot delete account with ${transactionCount} transactions. Please delete transactions first.` 
+      await Transaction.destroy({
+        where: { account_id: accountId }
       });
     }
 
+    // Delete the account
     await account.destroy();
 
-    res.json({ message: 'Account deleted successfully' });
+    const message = transactionCount > 0 
+      ? `Account and ${transactionCount} associated transactions deleted successfully`
+      : 'Account deleted successfully';
+
+    res.json({ message });
   } catch (error) {
     console.error('Error deleting account:', error);
     res.status(500).json({ error: error.message });

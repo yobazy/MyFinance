@@ -501,9 +501,9 @@ const AccountsPage = () => {
             Are you sure you want to delete the account "{accountToDelete?.name}"?
           </Typography>
           {accountToDelete && accountToDelete.transactionCount && accountToDelete.transactionCount > 0 && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mt: 2 }}>
               This account has {accountToDelete.transactionCount} transactions. 
-              You must delete all transactions first before deleting the account.
+              All transactions will be automatically deleted along with the account.
             </Alert>
           )}
         </DialogContent>
@@ -513,7 +513,6 @@ const AccountsPage = () => {
             onClick={confirmDelete} 
             color="error" 
             variant="contained"
-            disabled={Boolean(accountToDelete?.transactionCount && accountToDelete.transactionCount > 0)}
           >
             Delete
           </Button>
