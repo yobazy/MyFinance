@@ -49,9 +49,9 @@ interface Transaction {
   amount: string;
   source: string;
   account: number;
-  account_name: string;
+  accountName?: string | null;
   category?: string | null;
-  category_name?: string | null;
+  categoryName?: string | null;
 }
 
 interface Filters {
@@ -104,12 +104,12 @@ const Transactions = () => {
   );
   
   const uniqueAccounts = useMemo(() => 
-    [...new Set((allTransactions || []).map(t => t.account_name).filter(Boolean))].sort(),
+    [...new Set((allTransactions || []).map(t => t.accountName).filter(Boolean))].sort(),
     [allTransactions]
   );
   
   const uniqueCategories = useMemo(() => 
-    [...new Set((allTransactions || []).map(t => t.category_name).filter((cat): cat is string => Boolean(cat)))].sort(),
+    [...new Set((allTransactions || []).map(t => t.categoryName).filter((cat): cat is string => Boolean(cat)))].sort(),
     [allTransactions]
   );
 
@@ -150,16 +150,16 @@ const Transactions = () => {
       }
       
       // Account filter
-      if (filters.account && transaction.account_name !== filters.account) {
+      if (filters.account && transaction.accountName !== filters.account) {
         return false;
       }
       
       // Category filter
       if (filters.category) {
-        if (filters.category === 'uncategorized' && transaction.category_name) {
+        if (filters.category === 'uncategorized' && transaction.categoryName) {
           return false;
         }
-        if (filters.category !== 'uncategorized' && transaction.category_name !== filters.category) {
+        if (filters.category !== 'uncategorized' && transaction.categoryName !== filters.category) {
           return false;
         }
       }
