@@ -33,6 +33,21 @@ module.exports = (sequelize, DataTypes) => {
     notes: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    checksum: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+      field: 'checksum'
+    },
+    isEncrypted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: 'is_encrypted'
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'completed', 'failed'),
+      defaultValue: 'completed',
+      field: 'status'
     }
   }, {
     tableName: 'backend_databasebackup',

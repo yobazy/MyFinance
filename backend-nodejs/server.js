@@ -19,6 +19,11 @@ const dashboardRoutes = require('./routes/dashboard');
 const ruleRoutes = require('./routes/rules');
 const backupRoutes = require('./routes/backup');
 
+// Import backup services
+const BackupScheduler = require('./services/BackupScheduler');
+const BackupMonitoringService = require('./services/BackupMonitoringService');
+const CloudStorageService = require('./services/CloudStorageService');
+
 const app = express();
 const PORT = process.env.PORT || 8000;
 
@@ -124,11 +129,43 @@ const startServer = async () => {
     // Sync database
     await syncDatabase();
     
+    // Initialize backup system
+    console.log('🔄 Initializing backup system...');
+    try {
+      // Start backup scheduler
+      await BackupScheduler.start();
+      console.log('✅ Backup scheduler started');
+      
+      // Start monitoring service
+      await BackupMonitoringService.start();
+      console.log('✅ Backup monitoring started');
+      
+      // Initialize cloud storage if configured
+      const { BackupSettings } = require('./models');
+      const settings = await BackupSettings.findOne();
+      if (settings && settings.cloudStorageEnabled && settings.cloudProvider) {
+        try {
+          const cloudConfig = settings.cloudConfig ? JSON.parse(settings.cloudConfig) : {};
+          await CloudStorageService.initialize({ [settings.cloudProvider]: cloudConfig });
+          console.log(`✅ Cloud storage initialized: ${settings.cloudProvider}`);
+        } catch (cloudError) {
+          console.warn('⚠️  Cloud storage initialization failed:', cloudError.message);
+        }
+      }
+      
+      console.log('✅ Backup system initialized successfully');
+    } catch (backupError) {
+      console.warn('⚠️  Backup system initialization failed:', backupError.message);
+      console.log('   Server will continue without backup features');
+    }
+    
     // Start server
     app.listen(PORT, () => {
       console.log(`🚀 MyFinance Backend Server running on port ${PORT}`);
       console.log(`📡 API available at: http://localhost:${PORT}/api`);
       console.log(`🏥 Health check at: http://localhost:${PORT}/health`);
+      console.log(`💾 Backup API at: http://localhost:${PORT}/api/backup`);
+      console.log(`📊 Backup monitoring at: http://localhost:${PORT}/api/backup/monitoring`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -139,12 +176,32 @@ const startServer = async () => {
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down server...');
+  
+  // Stop backup services
+  try {
+    BackupScheduler.stop();
+    BackupMonitoringService.stop();
+    console.log('✅ Backup services stopped');
+  } catch (error) {
+    console.warn('⚠️  Error stopping backup services:', error.message);
+  }
+  
   await sequelize.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\n🛑 Shutting down server...');
+  
+  // Stop backup services
+  try {
+    BackupScheduler.stop();
+    BackupMonitoringService.stop();
+    console.log('✅ Backup services stopped');
+  } catch (error) {
+    console.warn('⚠️  Error stopping backup services:', error.message);
+  }
+  
   await sequelize.close();
   process.exit(0);
 });

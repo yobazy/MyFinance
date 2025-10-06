@@ -1,10 +1,50 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { body, validationResult } = require('express-validator');
 const { BackupSettings, DatabaseBackup } = require('../models');
 const { sequelize } = require('../config/database');
+const BackupService = require('../services/BackupService');
+const BackupScheduler = require('../services/BackupScheduler');
+const CloudStorageService = require('../services/CloudStorageService');
+const BackupMonitoringService = require('../services/BackupMonitoringService');
 
 const router = express.Router();
+
+// Validation middleware
+const validateBackupCreation = [
+  body('notes').optional().isString().trim().isLength({ max: 1000 }),
+  body('compress').optional().isBoolean(),
+  body('encrypt').optional().isBoolean(),
+  body('encryptionKey').optional().isString().isLength({ min: 8, max: 255 })
+];
+
+const validateSettingsUpdate = [
+  body('maxBackups').optional().isInt({ min: 1, max: 100 }),
+  body('autoBackupEnabled').optional().isBoolean(),
+  body('backupFrequencyHours').optional().isInt({ min: 1, max: 168 }), // Max 1 week
+  body('backupLocation').optional().isString().isLength({ min: 1, max: 500 }),
+  body('compressionEnabled').optional().isBoolean(),
+  body('encryptionEnabled').optional().isBoolean(),
+  body('encryptionKey').optional().isString().isLength({ min: 8, max: 255 }),
+  body('retentionDays').optional().isInt({ min: 1, max: 3650 }), // Max 10 years
+  body('maxBackupSize').optional().isInt({ min: 1024 * 1024, max: 1024 * 1024 * 1024 * 100 }), // 1MB to 100GB
+  body('cloudStorageEnabled').optional().isBoolean(),
+  body('cloudProvider').optional().isIn(['aws_s3', 'google_cloud', 'azure']),
+  body('cloudConfig').optional().isObject()
+];
+
+// Error handling middleware
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: errors.array()
+    });
+  }
+  next();
+};
 
 // Check if auto backup should be created
 router.get('/check-auto', async (req, res) => {
@@ -24,53 +64,24 @@ router.get('/check-auto', async (req, res) => {
       : settings.backupFrequencyHours + 1; // Force backup if never backed up
     
     if (hoursSinceLastBackup >= settings.backupFrequencyHours) {
-      // Create backup
-      const backupFileName = `myfinance_backup_${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.db.gz`;
-      const backupPath = path.join(process.cwd(), settings.backupLocation, backupFileName);
-      
-      // Ensure backup directory exists
-      const backupDir = path.dirname(backupPath);
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
-      }
-      
-      // Create backup (simplified - in production you'd want proper database backup)
-      const dbPath = path.join(process.cwd(), 'db.sqlite3');
-      if (fs.existsSync(dbPath)) {
-        // For now, just copy the database file
-        fs.copyFileSync(dbPath, backupPath.replace('.gz', ''));
-        
-        // Update last backup time
-        await settings.update({ lastBackup: now });
-        
-        // Clean up old backups if needed
-        const existingBackups = await DatabaseBackup.findAll({
-          order: [['created_at', 'DESC']]
+      try {
+        const result = await BackupService.createBackup({
+          type: 'auto',
+          notes: 'Automated backup',
+          compress: settings.compressionEnabled,
+          encrypt: settings.encryptionEnabled,
+          encryptionKey: settings.encryptionKey
         });
-        
-        if (existingBackups.length >= settings.maxBackups) {
-          const backupsToDelete = existingBackups.slice(settings.maxBackups - 1);
-          for (const backup of backupsToDelete) {
-            if (fs.existsSync(backup.filePath)) {
-              fs.unlinkSync(backup.filePath);
-            }
-            await backup.destroy();
-          }
-        }
-        
-        // Record the backup
-        await DatabaseBackup.create({
-          fileName: backupFileName,
-          filePath: backupPath.replace('.gz', ''),
-          fileSize: fs.statSync(backupPath.replace('.gz', '')).size,
-          backupType: 'auto',
-          isCompressed: false,
-          notes: 'Auto backup'
-        });
-        
+
         return res.json({ 
           backup_created: true, 
-          backup: { fileName: backupFileName, createdAt: now }
+          backup: result.backup
+        });
+      } catch (error) {
+        return res.status(500).json({ 
+          backup_created: false, 
+          error: 'Failed to create backup', 
+          details: error.message 
         });
       }
     }
@@ -93,7 +104,11 @@ router.get('/settings', async (req, res) => {
         maxBackups: 5,
         autoBackupEnabled: true,
         backupFrequencyHours: 24,
-        backupLocation: 'backups/'
+        backupLocation: 'backups/',
+        compressionEnabled: true,
+        encryptionEnabled: false,
+        retentionDays: 30,
+        maxBackupSize: 1024 * 1024 * 1024 // 1GB
       });
     }
 
@@ -103,7 +118,13 @@ router.get('/settings', async (req, res) => {
       autoBackupEnabled: settings.autoBackupEnabled,
       backupFrequencyHours: settings.backupFrequencyHours,
       lastBackup: settings.lastBackup,
-      backupLocation: settings.backupLocation
+      backupLocation: settings.backupLocation,
+      compressionEnabled: settings.compressionEnabled,
+      encryptionEnabled: settings.encryptionEnabled,
+      retentionDays: settings.retentionDays,
+      maxBackupSize: settings.maxBackupSize,
+      cloudStorageEnabled: settings.cloudStorageEnabled,
+      cloudProvider: settings.cloudProvider
     });
   } catch (error) {
     console.error('Error fetching backup settings:', error);
@@ -112,9 +133,22 @@ router.get('/settings', async (req, res) => {
 });
 
 // Update backup settings
-router.put('/settings', async (req, res) => {
+router.put('/settings', validateSettingsUpdate, handleValidationErrors, async (req, res) => {
   try {
-    const { maxBackups, autoBackupEnabled, backupFrequencyHours, backupLocation } = req.body;
+    const {
+      maxBackups,
+      autoBackupEnabled,
+      backupFrequencyHours,
+      backupLocation,
+      compressionEnabled,
+      encryptionEnabled,
+      encryptionKey,
+      retentionDays,
+      maxBackupSize,
+      cloudStorageEnabled,
+      cloudProvider,
+      cloudConfig
+    } = req.body;
 
     let settings = await BackupSettings.findOne();
     
@@ -123,15 +157,45 @@ router.put('/settings', async (req, res) => {
         maxBackups: maxBackups || 5,
         autoBackupEnabled: autoBackupEnabled !== undefined ? autoBackupEnabled : true,
         backupFrequencyHours: backupFrequencyHours || 24,
-        backupLocation: backupLocation || 'backups/'
+        backupLocation: backupLocation || 'backups/',
+        compressionEnabled: compressionEnabled !== undefined ? compressionEnabled : true,
+        encryptionEnabled: encryptionEnabled || false,
+        encryptionKey: encryptionKey || null,
+        retentionDays: retentionDays || 30,
+        maxBackupSize: maxBackupSize || 1024 * 1024 * 1024,
+        cloudStorageEnabled: cloudStorageEnabled || false,
+        cloudProvider: cloudProvider || null,
+        cloudConfig: cloudConfig || null
       });
     } else {
       if (maxBackups !== undefined) settings.maxBackups = maxBackups;
       if (autoBackupEnabled !== undefined) settings.autoBackupEnabled = autoBackupEnabled;
       if (backupFrequencyHours !== undefined) settings.backupFrequencyHours = backupFrequencyHours;
       if (backupLocation !== undefined) settings.backupLocation = backupLocation;
+      if (compressionEnabled !== undefined) settings.compressionEnabled = compressionEnabled;
+      if (encryptionEnabled !== undefined) settings.encryptionEnabled = encryptionEnabled;
+      if (encryptionKey !== undefined) settings.encryptionKey = encryptionKey;
+      if (retentionDays !== undefined) settings.retentionDays = retentionDays;
+      if (maxBackupSize !== undefined) settings.maxBackupSize = maxBackupSize;
+      if (cloudStorageEnabled !== undefined) settings.cloudStorageEnabled = cloudStorageEnabled;
+      if (cloudProvider !== undefined) settings.cloudProvider = cloudProvider;
+      if (cloudConfig !== undefined) settings.cloudConfig = cloudConfig;
       
       await settings.save();
+    }
+
+    // Update scheduler if auto backup settings changed
+    if (autoBackupEnabled !== undefined || backupFrequencyHours !== undefined) {
+      await BackupScheduler.updateSchedule(settings);
+    }
+
+    // Initialize cloud storage if enabled
+    if (cloudStorageEnabled && cloudProvider && cloudConfig) {
+      try {
+        await CloudStorageService.initialize({ [cloudProvider]: cloudConfig });
+      } catch (error) {
+        console.warn('Failed to initialize cloud storage:', error.message);
+      }
     }
 
     res.json({
@@ -140,7 +204,13 @@ router.put('/settings', async (req, res) => {
       autoBackupEnabled: settings.autoBackupEnabled,
       backupFrequencyHours: settings.backupFrequencyHours,
       lastBackup: settings.lastBackup,
-      backupLocation: settings.backupLocation
+      backupLocation: settings.backupLocation,
+      compressionEnabled: settings.compressionEnabled,
+      encryptionEnabled: settings.encryptionEnabled,
+      retentionDays: settings.retentionDays,
+      maxBackupSize: settings.maxBackupSize,
+      cloudStorageEnabled: settings.cloudStorageEnabled,
+      cloudProvider: settings.cloudProvider
     });
   } catch (error) {
     console.error('Error updating backup settings:', error);
@@ -151,53 +221,44 @@ router.put('/settings', async (req, res) => {
 // Get all backups
 router.get('/', async (req, res) => {
   try {
-    const { sequelize } = require('../config/database');
-    const [backups] = await sequelize.query(`
-      SELECT id, file_name, backup_type, file_path, file_size, is_compressed, notes, created_at, updated_at 
-      FROM backend_databasebackup 
-      ORDER BY created_at DESC
-    `);
-    
-    const backupsWithSize = backups.map(backup => ({
-      id: backup.id,
-      backupType: backup.backup_type,
-      filePath: backup.file_path,
-      fileSize: backup.file_size,
-      fileSizeMb: Math.round(backup.file_size / (1024 * 1024) * 100) / 100,
-      createdAt: backup.created_at,
-      isCompressed: backup.is_compressed === 1,
-      notes: backup.notes
-    }));
+    const { page = 1, limit = 50, type, status } = req.query;
+    const offset = (page - 1) * limit;
 
-    res.json(backupsWithSize);
-  } catch (error) {
-    console.error('Error fetching backups:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    const whereClause = {};
+    if (type) whereClause.backupType = type;
+    if (status) whereClause.status = status;
 
-// Get all backups (alias for /list)
-router.get('/list', async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const [backups] = await sequelize.query(`
-      SELECT id, file_name, backup_type, file_path, file_size, is_compressed, notes, created_at, updated_at 
-      FROM backend_databasebackup 
-      ORDER BY created_at DESC
-    `);
+    const { count, rows: backups } = await DatabaseBackup.findAndCountAll({
+      where: whereClause,
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
 
     const backupsWithSize = backups.map(backup => ({
       id: backup.id,
-      backupType: backup.backup_type,
-      filePath: backup.file_path,
-      fileSize: backup.file_size,
-      fileSizeMb: Math.round(backup.file_size / (1024 * 1024) * 100) / 100,
-      createdAt: backup.created_at,
-      isCompressed: backup.is_compressed === 1,
+      fileName: backup.fileName,
+      backupType: backup.backupType,
+      filePath: backup.filePath,
+      fileSize: backup.fileSize,
+      fileSizeMb: Math.round(backup.fileSize / (1024 * 1024) * 100) / 100,
+      isCompressed: backup.isCompressed,
+      isEncrypted: backup.isEncrypted,
+      checksum: backup.checksum,
+      status: backup.status,
+      createdAt: backup.createdAt,
       notes: backup.notes
     }));
 
-    res.json(backupsWithSize);
+    res.json({
+      backups: backupsWithSize,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching backups:', error);
     res.status(500).json({ error: error.message });
@@ -207,103 +268,72 @@ router.get('/list', async (req, res) => {
 // Get backup statistics
 router.get('/stats', async (req, res) => {
   try {
-    const totalBackups = await DatabaseBackup.count();
-    const totalSize = await DatabaseBackup.sum('fileSize') || 0;
-    const lastBackup = await DatabaseBackup.findOne({
-      order: [['created_at', 'DESC']],
-      attributes: ['created_at', 'fileSize']
-    });
-
-    res.json({
-      totalBackups,
-      totalSize,
-      totalSizeMb: Math.round(totalSize / (1024 * 1024) * 100) / 100,
-      lastBackup: lastBackup ? {
-        createdAt: lastBackup.created_at,
-        fileSize: lastBackup.fileSize,
-        fileSizeMb: Math.round(lastBackup.fileSize / (1024 * 1024) * 100) / 100
-      } : null
-    });
+    const stats = await BackupService.getBackupStats();
+    res.json(stats);
   } catch (error) {
     console.error('Error fetching backup stats:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Create manual backup
-router.post('/create', async (req, res) => {
+// Get monitoring dashboard data
+router.get('/monitoring', async (req, res) => {
   try {
-    const { notes } = req.body;
+    const dashboardData = await BackupMonitoringService.getDashboardData();
+    res.json(dashboardData);
+  } catch (error) {
+    console.error('Error fetching monitoring data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create manual backup
+router.post('/create', validateBackupCreation, handleValidationErrors, async (req, res) => {
+  try {
+    const { notes, compress, encrypt, encryptionKey } = req.body;
     
-    // Get backup settings
-    let settings = await BackupSettings.findOne();
-    if (!settings) {
-      settings = await BackupSettings.create({
-        maxBackups: 5,
-        autoBackupEnabled: true,
-        backupFrequencyHours: 24,
-        backupLocation: 'backups/'
-      });
-    }
+    const result = await BackupService.createBackup({
+      type: 'manual',
+      notes: notes || '',
+      compress: compress !== undefined ? compress : true,
+      encrypt: encrypt || false,
+      encryptionKey: encryptionKey || null
+    });
 
-    // Create backup directory if it doesn't exist
-    const backupDir = path.resolve(settings.backupLocation);
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-
-    // Generate backup filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `myfinance_backup_${timestamp}.db.gz`;
-    const filePath = path.join(backupDir, filename);
-
-    // Create backup using SQLite backup command
-    const dbPath = path.resolve('db.sqlite3');
-    
-    // For now, we'll just copy the database file
-    // In a production environment, you might want to use sqlite3 backup command
-    if (fs.existsSync(dbPath)) {
-      fs.copyFileSync(dbPath, filePath.replace('.gz', ''));
-      
-      // Get file size
-      const stats = fs.statSync(filePath.replace('.gz', ''));
-      const fileSize = stats.size;
-
-      // Create backup record
-      const backup = await DatabaseBackup.create({
-        fileName: filename,
-        backupType: 'manual',
-        filePath: filePath.replace('.gz', ''),
-        fileSize: fileSize,
-        isCompressed: false,
-        notes: notes || ''
-      });
-
-      // Update settings with last backup time
-      settings.lastBackup = new Date();
-      await settings.save();
-
-      // Clean up old backups
-      await cleanupOldBackups(settings);
-
-      res.status(201).json({
-        message: 'Backup created successfully',
-        backup: {
-          id: backup.id,
-          backupType: backup.backupType,
-          filePath: backup.filePath,
-          fileSize: backup.fileSize,
-          fileSizeMb: Math.round(backup.fileSize / (1024 * 1024) * 100) / 100,
-          createdAt: backup.createdAt,
-          isCompressed: backup.isCompressed,
-          notes: backup.notes
-        }
-      });
-    } else {
-      res.status(404).json({ error: 'Database file not found' });
-    }
+    res.status(201).json({
+      message: 'Backup created successfully',
+      backup: result.backup,
+      duration: result.duration
+    });
   } catch (error) {
     console.error('Error creating backup:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify backup integrity
+router.post('/:backupId/verify', async (req, res) => {
+  try {
+    const { backupId } = req.params;
+
+    const backup = await DatabaseBackup.findByPk(backupId);
+    if (!backup) {
+      return res.status(404).json({ error: 'Backup not found' });
+    }
+
+    if (!backup.checksum) {
+      return res.status(400).json({ error: 'No checksum available for this backup' });
+    }
+
+    const isValid = await BackupService.verifyBackupIntegrity(backup.filePath, backup.checksum);
+    
+    res.json({
+      valid: isValid,
+      checksum: backup.checksum,
+      message: isValid ? 'Backup integrity verified' : 'Backup integrity check failed'
+    });
+  } catch (error) {
+    console.error('Error verifying backup:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -337,6 +367,80 @@ router.delete('/:backupId', async (req, res) => {
 router.post('/:backupId/restore', async (req, res) => {
   try {
     const { backupId } = req.params;
+    const { encryptionKey } = req.body;
+
+    const result = await BackupService.restoreBackup(backupId, encryptionKey);
+    res.json(result);
+  } catch (error) {
+    console.error('Error restoring backup:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Schedule backup
+router.post('/schedule', async (req, res) => {
+  try {
+    const { type, scheduleTime, cronExpression, options = {} } = req.body;
+
+    let jobName;
+    if (type === 'one-time' && scheduleTime) {
+      const scheduleDate = new Date(scheduleTime);
+      jobName = await BackupScheduler.scheduleOneTimeBackup(scheduleDate, options);
+    } else if (type === 'recurring' && cronExpression) {
+      jobName = await BackupScheduler.scheduleCustomBackup(cronExpression, options);
+    } else {
+      return res.status(400).json({ error: 'Invalid schedule parameters' });
+    }
+
+    res.json({
+      message: 'Backup scheduled successfully',
+      jobName: jobName,
+      type: type
+    });
+  } catch (error) {
+    console.error('Error scheduling backup:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel scheduled backup
+router.delete('/schedule/:jobName', async (req, res) => {
+  try {
+    const { jobName } = req.params;
+    const cancelled = BackupScheduler.cancelJob(jobName);
+
+    if (cancelled) {
+      res.json({ message: 'Scheduled backup cancelled successfully' });
+    } else {
+      res.status(404).json({ error: 'Scheduled job not found' });
+    }
+  } catch (error) {
+    console.error('Error cancelling scheduled backup:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get scheduled jobs
+router.get('/schedule', async (req, res) => {
+  try {
+    const jobs = BackupScheduler.getScheduledJobs();
+    const status = BackupScheduler.getStatus();
+    
+    res.json({
+      jobs: jobs,
+      status: status
+    });
+  } catch (error) {
+    console.error('Error fetching scheduled jobs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload backup to cloud storage
+router.post('/:backupId/upload-cloud', async (req, res) => {
+  try {
+    const { backupId } = req.params;
+    const { provider } = req.body;
 
     const backup = await DatabaseBackup.findByPk(backupId);
     if (!backup) {
@@ -347,46 +451,84 @@ router.post('/:backupId/restore', async (req, res) => {
       return res.status(404).json({ error: 'Backup file not found' });
     }
 
-    // Close current database connection
-    await sequelize.close();
+    const result = await CloudStorageService.uploadBackup(
+      backup.filePath,
+      backup.fileName,
+      provider,
+      {
+        backupType: backup.backupType,
+        encryption: backup.isEncrypted
+      }
+    );
 
-    // Copy backup file to current database location
-    const dbPath = path.resolve('db.sqlite3');
-    fs.copyFileSync(backup.filePath, dbPath);
-
-    // Reconnect to database
-    await sequelize.authenticate();
-
-    res.json({ message: 'Database restored successfully from backup' });
+    res.json({
+      message: 'Backup uploaded to cloud storage successfully',
+      result: result
+    });
   } catch (error) {
-    console.error('Error restoring backup:', error);
+    console.error('Error uploading backup to cloud:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Helper function to clean up old backups
-async function cleanupOldBackups(settings) {
+// Download backup from cloud storage
+router.post('/:backupId/download-cloud', async (req, res) => {
   try {
-    const backups = await DatabaseBackup.findAll({
-      order: [['created_at', 'DESC']]
+    const { backupId } = req.params;
+    const { provider, localPath } = req.body;
+
+    const backup = await DatabaseBackup.findByPk(backupId);
+    if (!backup) {
+      return res.status(404).json({ error: 'Backup not found' });
+    }
+
+    const result = await CloudStorageService.downloadBackup(
+      backup.fileName,
+      provider,
+      localPath || path.join(process.cwd(), 'downloads', backup.fileName)
+    );
+
+    res.json({
+      message: 'Backup downloaded from cloud storage successfully',
+      result: result
+    });
+  } catch (error) {
+    console.error('Error downloading backup from cloud:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List cloud backups
+router.get('/cloud/:provider', async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const { prefix, maxResults } = req.query;
+
+    const backups = await CloudStorageService.listBackups(provider, {
+      prefix: prefix || 'myfinance_backup_',
+      maxResults: maxResults ? parseInt(maxResults) : 100
     });
 
-    if (backups.length > settings.maxBackups) {
-      const backupsToDelete = backups.slice(settings.maxBackups);
-      
-      for (const backup of backupsToDelete) {
-        // Delete the file if it exists
-        if (fs.existsSync(backup.filePath)) {
-          fs.unlinkSync(backup.filePath);
-        }
-        
-        // Delete the record
-        await backup.destroy();
-      }
-    }
+    res.json({
+      provider: provider,
+      backups: backups,
+      count: backups.length
+    });
   } catch (error) {
-    console.error('Error cleaning up old backups:', error);
+    console.error('Error listing cloud backups:', error);
+    res.status(500).json({ error: error.message });
   }
-}
+});
+
+// Health check endpoint
+router.get('/health', async (req, res) => {
+  try {
+    const healthCheck = await BackupMonitoringService.performHealthCheck();
+    res.json(healthCheck);
+  } catch (error) {
+    console.error('Error performing health check:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;
