@@ -379,4 +379,36 @@ ipcMain.on('check-for-updates', () => {
   console.log('Checking for updates...');
 });
 
+// IPC handlers for app information
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('get-app-path', () => {
+  return app.getAppPath();
+});
+
+ipcMain.handle('get-database-path', () => {
+  return path.join(app.getPath('userData'), 'db.sqlite3');
+});
+
+// Auto-updater IPC handlers (placeholder implementations)
+ipcMain.handle('check-for-updates', async () => {
+  console.log('Checking for updates...');
+  // TODO: Implement actual update checking
+  return { updateAvailable: false };
+});
+
+ipcMain.handle('download-update', async () => {
+  console.log('Downloading update...');
+  // TODO: Implement actual update downloading
+  return { success: true };
+});
+
+ipcMain.handle('install-update', async () => {
+  console.log('Installing update...');
+  // TODO: Implement actual update installation
+  return { success: true };
+});
+
 console.log('✅ Electron main process initialized');

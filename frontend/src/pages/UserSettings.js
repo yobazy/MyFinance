@@ -84,7 +84,13 @@ const UserSettings = () => {
     try {
       const response = await fetch('http://localhost:8000/api/backup/settings/');
       const data = await response.json();
-      setBackupSettings(data);
+      // Ensure all values are defined to prevent controlled/uncontrolled input issues
+      setBackupSettings({
+        max_backups: data.max_backups ?? 5,
+        auto_backup_enabled: data.auto_backup_enabled ?? true,
+        backup_frequency_hours: data.backup_frequency_hours ?? 24,
+        backup_location: data.backup_location ?? 'backups/'
+      });
     } catch (error) {
       showSnackbar('Failed to fetch backup settings', 'error');
     }
@@ -437,7 +443,7 @@ const UserSettings = () => {
                     <TextField
                       label="Maximum Backups to Keep"
                       type="number"
-                      value={backupSettings.max_backups}
+                      value={backupSettings.max_backups?.toString() || '5'}
                       onChange={(e) => setBackupSettings({...backupSettings, max_backups: parseInt(e.target.value) || 5})}
                       inputProps={{ min: 1, max: 50 }}
                       fullWidth
@@ -446,7 +452,7 @@ const UserSettings = () => {
                     <TextField
                       label="Backup Frequency (hours)"
                       type="number"
-                      value={backupSettings.backup_frequency_hours}
+                      value={backupSettings.backup_frequency_hours?.toString() || '24'}
                       onChange={(e) => setBackupSettings({...backupSettings, backup_frequency_hours: parseInt(e.target.value) || 24})}
                       inputProps={{ min: 1, max: 168 }}
                       fullWidth
@@ -455,7 +461,7 @@ const UserSettings = () => {
 
                     <TextField
                       label="Backup Location"
-                      value={backupSettings.backup_location}
+                      value={backupSettings.backup_location || 'backups/'}
                       onChange={(e) => setBackupSettings({...backupSettings, backup_location: e.target.value})}
                       fullWidth
                     />
