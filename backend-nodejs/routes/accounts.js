@@ -78,7 +78,12 @@ router.post('/create', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating account:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error details:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: error.errors ? error.errors.map(e => e.message).join(', ') : 'Unknown error',
+      type: error.name
+    });
   }
 });
 

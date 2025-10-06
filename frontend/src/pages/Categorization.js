@@ -522,7 +522,7 @@ const Categorization = () => {
       setCategories(categoriesResponse.data);
       setCategoryTree(categoryTreeResponse.data);
       
-      const allFetchedTransactions = transactionsResponse.data;
+      const allFetchedTransactions = transactionsResponse.data.transactions;
       
       // Store all transactions and set up pagination
       setAllTransactions(allFetchedTransactions);

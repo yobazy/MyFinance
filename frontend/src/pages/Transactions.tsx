@@ -122,8 +122,8 @@ const Transactions = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        // Ensure data is an array
-        setAllTransactions(Array.isArray(data) ? data : []);
+        // Extract transactions array from response object
+        setAllTransactions(Array.isArray(data.transactions) ? data.transactions : []);
       } catch (error) {
         console.error("Error fetching transactions:", error);
         // Set empty array on error to prevent map errors
