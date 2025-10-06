@@ -21,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(50),
       allowNull: false
     },
-    account_id: {
+    accountId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       field: 'account_id',
@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    category_id: {
+    categoryId: {
       type: DataTypes.INTEGER,
       allowNull: true,
       field: 'category_id',
@@ -39,17 +39,17 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    auto_categorized: {
+    autoCategorized: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       field: 'auto_categorized'
     },
-    confidence_score: {
+    confidenceScore: {
       type: DataTypes.FLOAT,
       allowNull: true,
       field: 'confidence_score'
     },
-    suggested_category_id: {
+    suggestedCategoryId: {
       type: DataTypes.INTEGER,
       allowNull: true,
       field: 'suggested_category_id',

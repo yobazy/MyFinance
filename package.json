@@ -35,7 +35,13 @@
     "release:build": "npm run build-backend && npm run build-frontend && npx electron-builder --publish=never && npm run release:notes",
     "release:notes": "node scripts/generate-release-notes.js",
     "release:clean": "rm -rf dist/ && rm -rf frontend/build/",
-    "release:prepare": "npm run release:clean && npm run test:quick && npm run release:build"
+    "release:prepare": "npm run release:clean && npm run test:quick && npm run release:build",
+    "test": "node test-suite.js",
+    "test:backend": "cd backend-nodejs && npm test",
+    "test:frontend": "cd frontend && npm test -- --watchAll=false",
+    "test:integration": "node test-nodejs-backend.js",
+    "test:quick": "npm run test:backend",
+    "test:coverage": "cd backend-nodejs && npm run test:coverage"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

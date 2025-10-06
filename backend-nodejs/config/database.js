@@ -22,6 +22,16 @@ const config = {
       underscored: true,
       freezeTableName: true
     }
+  },
+  test: {
+    dialect: 'sqlite',
+    storage: ':memory:',
+    logging: false,
+    define: {
+      timestamps: true,
+      underscored: true,
+      freezeTableName: true
+    }
   }
 };
 
@@ -29,7 +39,12 @@ const env = process.env.NODE_ENV || 'development';
 const dbConfig = config[env];
 
 // Create Sequelize instance
-const sequelize = new Sequelize(dbConfig);
+const sequelize = new Sequelize({
+  dialect: dbConfig.dialect,
+  storage: dbConfig.storage,
+  logging: dbConfig.logging,
+  define: dbConfig.define
+});
 
 // Test database connection
 const testConnection = async () => {

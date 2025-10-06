@@ -12,6 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     parentId: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      field: 'parent_id',
       references: {
         model: 'backend_category',
         key: 'id'
@@ -27,13 +28,14 @@ module.exports = (sequelize, DataTypes) => {
     },
     isActive: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'is_active'
     }
   }, {
     tableName: 'backend_category',
     timestamps: true,
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         unique: true,

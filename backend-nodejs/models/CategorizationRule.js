@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
-    rule_type: {
+    ruleType: {
       type: DataTypes.ENUM(
         'keyword', 'contains', 'exact', 'regex', 'amount_range',
         'amount_exact', 'amount_greater', 'amount_less', 'recurring',
@@ -26,7 +26,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: false
     },
-    category_id: {
+    categoryId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       field: 'category_id',
@@ -39,17 +39,17 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 1
     },
-    is_active: {
+    isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       field: 'is_active'
     },
-    case_sensitive: {
+    caseSensitive: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       field: 'case_sensitive'
     },
-    created_by: {
+    createdBy: {
       type: DataTypes.STRING(100),
       defaultValue: 'system',
       field: 'created_by'
@@ -58,12 +58,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.JSON,
       defaultValue: {}
     },
-    match_count: {
+    matchCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       field: 'match_count'
     },
-    last_matched: {
+    lastMatched: {
       type: DataTypes.DATE,
       allowNull: true,
       field: 'last_matched'

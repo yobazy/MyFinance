@@ -218,7 +218,7 @@ async function processTDData(filePath, account) {
       description: description,
       amount: amount,
       source: 'TD',
-      accountId: account.id
+      account_id: account.id
     });
 
     rowsProcessed++;
@@ -272,7 +272,7 @@ async function processAmexData(filePath, account) {
       description: description,
       amount: amount,
       source: 'Amex',
-      accountId: account.id
+      account_id: account.id
     });
 
     rowsProcessed++;
@@ -322,7 +322,7 @@ async function processScotiabankData(filePath, account) {
       description: description,
       amount: amount,
       source: 'Scotiabank',
-      accountId: account.id
+      account_id: account.id
     });
 
     rowsProcessed++;
