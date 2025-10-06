@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     // Filter by account if specified
     if (account_id && account_id !== 'all') {
       try {
-        whereClause.accountId = parseInt(account_id);
+        whereClause.account_id = parseInt(account_id);
       } catch (error) {
         return res.status(400).json({ error: 'Invalid account_id parameter' });
       }
@@ -43,7 +43,7 @@ router.get('/', async (req, res) => {
       }],
       order: [['date', 'DESC']],
       limit: 5,
-      attributes: ['date', 'description', 'amount', 'accountId']
+      attributes: ['date', 'description', 'amount', 'account_id']
     });
 
     const recentTransactionsWithNames = recentTransactions.map(transaction => ({
@@ -55,17 +55,14 @@ router.get('/', async (req, res) => {
     }));
 
     // Calculate monthly spending (filtered)
-    const currentMonth = moment().month() + 1; // moment months are 0-based
-    const currentYear = moment().year();
+    const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
+    const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
     
     const monthlySpendingResult = await Transaction.findOne({
       where: {
         ...whereClause,
         date: {
-          [Op.and]: [
-            fn('EXTRACT', 'MONTH', col('date')),
-            fn('EXTRACT', 'YEAR', col('date'))
-          ]
+          [Op.between]: [startOfMonth, endOfMonth]
         },
         amount: { [Op.lt]: 0 } // Only count expenses
       },

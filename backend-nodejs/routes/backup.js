@@ -6,6 +6,80 @@ const { sequelize } = require('../config/database');
 
 const router = express.Router();
 
+// Check if auto backup should be created
+router.get('/check-auto', async (req, res) => {
+  try {
+    const settings = await BackupSettings.findOne();
+    
+    if (!settings || !settings.autoBackupEnabled) {
+      return res.json({ backup_created: false, reason: 'Auto backup disabled' });
+    }
+    
+    const now = new Date();
+    const lastBackup = settings.lastBackup ? new Date(settings.lastBackup) : null;
+    
+    // Check if enough time has passed since last backup
+    const hoursSinceLastBackup = lastBackup 
+      ? (now - lastBackup) / (1000 * 60 * 60)
+      : settings.backupFrequencyHours + 1; // Force backup if never backed up
+    
+    if (hoursSinceLastBackup >= settings.backupFrequencyHours) {
+      // Create backup
+      const backupFileName = `myfinance_backup_${now.toISOString().replace(/[:.]/g, '-').slice(0, 19)}.db.gz`;
+      const backupPath = path.join(process.cwd(), settings.backupLocation, backupFileName);
+      
+      // Ensure backup directory exists
+      const backupDir = path.dirname(backupPath);
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+      
+      // Create backup (simplified - in production you'd want proper database backup)
+      const dbPath = path.join(process.cwd(), 'db.sqlite3');
+      if (fs.existsSync(dbPath)) {
+        // For now, just copy the database file
+        fs.copyFileSync(dbPath, backupPath.replace('.gz', ''));
+        
+        // Update last backup time
+        await settings.update({ lastBackup: now });
+        
+        // Clean up old backups if needed
+        const existingBackups = await DatabaseBackup.findAll({
+          order: [['createdAt', 'DESC']]
+        });
+        
+        if (existingBackups.length >= settings.maxBackups) {
+          const backupsToDelete = existingBackups.slice(settings.maxBackups - 1);
+          for (const backup of backupsToDelete) {
+            if (fs.existsSync(backup.filePath)) {
+              fs.unlinkSync(backup.filePath);
+            }
+            await backup.destroy();
+          }
+        }
+        
+        // Record the backup
+        await DatabaseBackup.create({
+          fileName: backupFileName,
+          filePath: backupPath.replace('.gz', ''),
+          fileSize: fs.statSync(backupPath.replace('.gz', '')).size,
+          backupType: 'auto'
+        });
+        
+        return res.json({ 
+          backup_created: true, 
+          backup: { fileName: backupFileName, createdAt: now }
+        });
+      }
+    }
+    
+    return res.json({ backup_created: false, reason: 'Not time for backup yet' });
+  } catch (error) {
+    console.error('Error checking auto backup:', error);
+    res.status(500).json({ error: 'Failed to check auto backup', details: error.message });
+  }
+});
+
 // Get backup settings
 router.get('/settings', async (req, res) => {
   try {

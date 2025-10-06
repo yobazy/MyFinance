@@ -99,17 +99,17 @@ const Transactions = () => {
 
   // Unique values for filter dropdowns
   const uniqueSources = useMemo(() => 
-    [...new Set(allTransactions.map(t => t.source).filter(Boolean))].sort(),
+    [...new Set((allTransactions || []).map(t => t.source).filter(Boolean))].sort(),
     [allTransactions]
   );
   
   const uniqueAccounts = useMemo(() => 
-    [...new Set(allTransactions.map(t => t.account_name).filter(Boolean))].sort(),
+    [...new Set((allTransactions || []).map(t => t.account_name).filter(Boolean))].sort(),
     [allTransactions]
   );
   
   const uniqueCategories = useMemo(() => 
-    [...new Set(allTransactions.map(t => t.category_name).filter((cat): cat is string => Boolean(cat)))].sort(),
+    [...new Set((allTransactions || []).map(t => t.category_name).filter((cat): cat is string => Boolean(cat)))].sort(),
     [allTransactions]
   );
 
@@ -118,10 +118,16 @@ const Transactions = () => {
     const fetchTransactions = async () => {
       try {
         const response = await fetch("http://127.0.0.1:8000/api/transactions/");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
-        setAllTransactions(data);
+        // Ensure data is an array
+        setAllTransactions(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching transactions:", error);
+        // Set empty array on error to prevent map errors
+        setAllTransactions([]);
       } finally {
         setLoading(false);
       }
@@ -132,7 +138,7 @@ const Transactions = () => {
 
   // Filter and sort transactions
   const filteredAndSortedTransactions = useMemo(() => {
-    let filtered = allTransactions.filter(transaction => {
+    let filtered = (allTransactions || []).filter(transaction => {
       // Search filter
       if (filters.search && !transaction.description.toLowerCase().includes(filters.search.toLowerCase())) {
         return false;
@@ -335,7 +341,7 @@ const Transactions = () => {
     );
   }
 
-  if (allTransactions.length === 0) {
+  if ((allTransactions || []).length === 0) {
     return (
       <Container sx={{ mt: 4 }}>
         <Typography variant="h4" gutterBottom>
@@ -655,8 +661,8 @@ const Transactions = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="body2" color="text.secondary">
           Showing {paginatedTransactions.length} of {filteredAndSortedTransactions.length} transactions
-          {filteredAndSortedTransactions.length !== allTransactions.length && 
-            ` (filtered from ${allTransactions.length} total)`
+          {filteredAndSortedTransactions.length !== (allTransactions || []).length && 
+            ` (filtered from ${(allTransactions || []).length} total)`
           }
         </Typography>
         {filteredAndSortedTransactions.length === 0 && Object.values(filters).some(f => f !== '') && (

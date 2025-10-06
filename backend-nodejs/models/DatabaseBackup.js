@@ -5,6 +5,10 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
+    fileName: {
+      type: DataTypes.STRING(255),
+      allowNull: false
+    },
     backupType: {
       type: DataTypes.ENUM('auto', 'manual', 'scheduled'),
       defaultValue: 'manual'

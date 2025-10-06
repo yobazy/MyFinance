@@ -13,21 +13,23 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
-    ruleType: {
+    rule_type: {
       type: DataTypes.ENUM(
         'keyword', 'contains', 'exact', 'regex', 'amount_range',
         'amount_exact', 'amount_greater', 'amount_less', 'recurring',
         'merchant', 'date_range', 'day_of_week', 'combined'
       ),
-      allowNull: false
+      allowNull: false,
+      field: 'rule_type'
     },
     pattern: {
       type: DataTypes.TEXT,
       allowNull: false
     },
-    categoryId: {
+    category_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'category_id',
       references: {
         model: 'backend_category',
         key: 'id'
@@ -37,53 +39,58 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 1
     },
-    isActive: {
+    is_active: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'is_active'
     },
-    caseSensitive: {
+    case_sensitive: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false
+      defaultValue: false,
+      field: 'case_sensitive'
     },
-    createdBy: {
+    created_by: {
       type: DataTypes.STRING(100),
-      defaultValue: 'system'
+      defaultValue: 'system',
+      field: 'created_by'
     },
     conditions: {
       type: DataTypes.JSON,
       defaultValue: {}
     },
-    matchCount: {
+    match_count: {
       type: DataTypes.INTEGER,
-      defaultValue: 0
+      defaultValue: 0,
+      field: 'match_count'
     },
-    lastMatched: {
+    last_matched: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true,
+      field: 'last_matched'
     }
   }, {
     tableName: 'backend_categorizationrule',
     timestamps: true,
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         fields: ['priority']
       },
       {
-        fields: ['isActive']
+        fields: ['is_active']
       }
     ]
   });
 
   CategorizationRule.associate = (models) => {
     CategorizationRule.belongsTo(models.Category, {
-      foreignKey: 'categoryId',
+      foreignKey: 'category_id',
       as: 'category'
     });
     
     CategorizationRule.hasMany(models.RuleUsage, {
-      foreignKey: 'ruleId',
+      foreignKey: 'rule_id',
       as: 'ruleUsages'
     });
   };

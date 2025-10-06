@@ -7,23 +7,28 @@ module.exports = (sequelize, DataTypes) => {
     },
     maxBackups: {
       type: DataTypes.INTEGER,
-      defaultValue: 5
+      defaultValue: 5,
+      field: 'maxBackups'
     },
     autoBackupEnabled: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'autoBackupEnabled'
     },
     backupFrequencyHours: {
       type: DataTypes.INTEGER,
-      defaultValue: 24
+      defaultValue: 24,
+      field: 'backupFrequencyHours'
     },
     lastBackup: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true,
+      field: 'lastBackup'
     },
     backupLocation: {
       type: DataTypes.STRING(500),
-      defaultValue: 'backups/'
+      defaultValue: 'backups/',
+      field: 'backupLocation'
     }
   }, {
     tableName: 'backend_backupsettings',

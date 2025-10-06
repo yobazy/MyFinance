@@ -50,13 +50,14 @@ function createWindow() {
   // Load the app
   if (isDev) {
     // In development, load from React dev server
-    mainWindow.loadURL('http://localhost:3001');
+    mainWindow.loadURL('http://localhost:3000');
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
   } else {
-    // In production, load from built files
-    const indexPath = path.join(__dirname, '../frontend/build/index.html');
-    mainWindow.loadFile(indexPath);
+    // For now, always use development server since we don't have a production build
+    // TODO: Build production version when needed
+    mainWindow.loadURL('http://localhost:3000');
+    console.log('⚠️  Using development server (no production build available)');
   }
 
   // Show window when ready to prevent visual flash

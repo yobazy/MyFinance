@@ -129,7 +129,7 @@ router.delete('/:accountId/delete', async (req, res) => {
 
     // Check if account has transactions
     const transactionCount = await Transaction.count({
-      where: { accountId: accountId }
+      where: { account_id: accountId }
     });
 
     if (transactionCount > 0) {

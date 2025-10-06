@@ -28,8 +28,8 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'backend_account',
     timestamps: true,
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         unique: true,
@@ -40,7 +40,7 @@ module.exports = (sequelize, DataTypes) => {
 
   Account.associate = (models) => {
     Account.hasMany(models.Transaction, {
-      foreignKey: 'accountId',
+      foreignKey: 'account_id',
       as: 'transactions'
     });
   };
@@ -48,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
   // Instance methods
   Account.prototype.calculateBalance = async function() {
     const result = await models.Transaction.sum('amount', {
-      where: { accountId: this.id }
+      where: { account_id: this.id }
     });
     return result || 0;
   };

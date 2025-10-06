@@ -21,33 +21,38 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(50),
       allowNull: false
     },
-    accountId: {
+    account_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'account_id',
       references: {
         model: 'backend_account',
         key: 'id'
       }
     },
-    categoryId: {
+    category_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      field: 'category_id',
       references: {
         model: 'backend_category',
         key: 'id'
       }
     },
-    autoCategorized: {
+    auto_categorized: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false
+      defaultValue: false,
+      field: 'auto_categorized'
     },
-    confidenceScore: {
+    confidence_score: {
       type: DataTypes.FLOAT,
-      allowNull: true
+      allowNull: true,
+      field: 'confidence_score'
     },
-    suggestedCategoryId: {
+    suggested_category_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      field: 'suggested_category_id',
       references: {
         model: 'backend_category',
         key: 'id'
@@ -56,17 +61,17 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'backend_transaction',
     timestamps: true,
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         fields: ['date']
       },
       {
-        fields: ['accountId']
+        fields: ['account_id']
       },
       {
-        fields: ['categoryId']
+        fields: ['category_id']
       },
       {
         fields: ['source']
@@ -76,22 +81,22 @@ module.exports = (sequelize, DataTypes) => {
 
   Transaction.associate = (models) => {
     Transaction.belongsTo(models.Account, {
-      foreignKey: 'accountId',
+      foreignKey: 'account_id',
       as: 'account'
     });
     
     Transaction.belongsTo(models.Category, {
-      foreignKey: 'categoryId',
+      foreignKey: 'category_id',
       as: 'category'
     });
     
     Transaction.belongsTo(models.Category, {
-      foreignKey: 'suggestedCategoryId',
+      foreignKey: 'suggested_category_id',
       as: 'suggestedCategory'
     });
     
     Transaction.hasMany(models.RuleUsage, {
-      foreignKey: 'transactionId',
+      foreignKey: 'transaction_id',
       as: 'ruleUsages'
     });
   };
