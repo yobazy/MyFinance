@@ -201,6 +201,105 @@ async function testBackupAPI() {
   }
 }
 
+async function testAccountsCreation() {
+  console.log('🔍 Testing accounts creation for each bank...');
+  try {
+    const banks = ['TD', 'Amex', 'Scotiabank'];
+    let allPassed = true;
+    const timestamp = Date.now();
+
+    for (const bank of banks) {
+      const accountData = {
+        bank: bank,
+        name: `Test ${bank} Account ${timestamp}`,
+        type: 'checking'
+      };
+
+      const response = await makeRequest('/api/accounts/create', 'POST', accountData);
+      if (response.status === 201) {
+        console.log(`✅ ${bank} account creation working`);
+      } else {
+        console.log(`❌ ${bank} account creation failed:`, response.status, response.body);
+        allPassed = false;
+      }
+    }
+
+    return allPassed;
+  } catch (error) {
+    console.log('❌ Accounts creation test failed:', error.message);
+    return false;
+  }
+}
+
+async function testAccountsDuplicatePrevention() {
+  console.log('🔍 Testing duplicate account name prevention...');
+  try {
+    const timestamp = Date.now();
+    const accountData = {
+      bank: 'TD',
+      name: `Duplicate Test Account ${timestamp}`,
+      type: 'checking'
+    };
+
+    // Create first account
+    const firstResponse = await makeRequest('/api/accounts/create', 'POST', accountData);
+    if (firstResponse.status !== 201) {
+      console.log('❌ First account creation failed:', firstResponse.status, firstResponse.body);
+      return false;
+    }
+    console.log('✅ First account created successfully');
+
+    // Try to create duplicate account
+    const duplicateResponse = await makeRequest('/api/accounts/create', 'POST', accountData);
+    if (duplicateResponse.status === 400 && duplicateResponse.body.error.includes('already exists')) {
+      console.log('✅ Duplicate account prevention working');
+      return true;
+    } else {
+      console.log('❌ Duplicate account prevention failed:', duplicateResponse.status, duplicateResponse.body);
+      return false;
+    }
+  } catch (error) {
+    console.log('❌ Duplicate prevention test failed:', error.message);
+    return false;
+  }
+}
+
+async function testAccountsValidation() {
+  console.log('🔍 Testing account validation...');
+  try {
+    // Test missing bank parameter
+    const missingBankResponse = await makeRequest('/api/accounts/create', 'POST', {
+      name: 'Test Account',
+      type: 'checking'
+    });
+    
+    if (missingBankResponse.status === 400 && missingBankResponse.body.error.includes('Bank and account name are required')) {
+      console.log('✅ Missing bank validation working');
+    } else {
+      console.log('❌ Missing bank validation failed:', missingBankResponse.status, missingBankResponse.body);
+      return false;
+    }
+
+    // Test missing name parameter
+    const missingNameResponse = await makeRequest('/api/accounts/create', 'POST', {
+      bank: 'TD',
+      type: 'checking'
+    });
+    
+    if (missingNameResponse.status === 400 && missingNameResponse.body.error.includes('Bank and account name are required')) {
+      console.log('✅ Missing name validation working');
+    } else {
+      console.log('❌ Missing name validation failed:', missingNameResponse.status, missingNameResponse.body);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.log('❌ Account validation test failed:', error.message);
+    return false;
+  }
+}
+
 // Main test function
 async function runTests() {
   console.log('🚀 Starting backend tests...\n');
@@ -208,6 +307,9 @@ async function runTests() {
   const tests = [
     { name: 'Health Check', fn: testHealthCheck },
     { name: 'Accounts API', fn: testAccountsAPI },
+    { name: 'Accounts Creation (All Banks)', fn: testAccountsCreation },
+    { name: 'Accounts Duplicate Prevention', fn: testAccountsDuplicatePrevention },
+    { name: 'Accounts Validation', fn: testAccountsValidation },
     { name: 'Categories API', fn: testCategoriesAPI },
     { name: 'Transactions API', fn: testTransactionsAPI },
     { name: 'Dashboard API', fn: testDashboardAPI },
