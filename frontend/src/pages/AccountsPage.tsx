@@ -42,6 +42,7 @@ interface Account {
   type: "checking" | "savings" | "credit";
   balance: number;
   lastUpdated: string;
+  transactionCount?: number;
 }
 
 type SortField = 'balance' | 'name' | 'bank' | 'type';
@@ -60,6 +61,8 @@ const AccountsPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -157,7 +160,22 @@ const AccountsPage = () => {
       await fetchAccounts();
       showMessage("Account deleted successfully!");
     } catch (error) {
-      showMessage("Failed to delete account", "error");
+      // Extract the specific error message from the backend response
+      const errorMessage = error.response?.data?.error || "Failed to delete account";
+      showMessage(errorMessage, "error");
+    }
+  };
+
+  const handleDeleteClick = (account: Account) => {
+    setAccountToDelete(account);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (accountToDelete) {
+      await handleDeleteAccount(accountToDelete.id);
+      setDeleteConfirmOpen(false);
+      setAccountToDelete(null);
     }
   };
 
@@ -351,7 +369,7 @@ const AccountsPage = () => {
                     <IconButton size="small" onClick={() => handleEditAccount(account)}>
                       <EditIcon />
                     </IconButton>
-                    <IconButton size="small" onClick={() => handleDeleteAccount(account.id)}>
+                    <IconButton size="small" onClick={() => handleDeleteClick(account)}>
                       <DeleteIcon />
                     </IconButton>
                   </Box>
@@ -378,6 +396,10 @@ const AccountsPage = () => {
                 
                 <Typography variant="body2" color="text.secondary">
                   Balance: ${account.balance?.toLocaleString() ?? '0'}
+                </Typography>
+                
+                <Typography variant="body2" color="text.secondary">
+                  Transactions: {account.transactionCount || 0}
                 </Typography>
                 
                 <Typography variant="caption" color="text.secondary" display="block" mt={1}>
@@ -463,6 +485,33 @@ const AccountsPage = () => {
             variant="contained"
           >
             {editingAccount ? "Save Changes" : "Add Account"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Delete Account</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete the account "{accountToDelete?.name}"?
+          </Typography>
+          {accountToDelete && accountToDelete.transactionCount && accountToDelete.transactionCount > 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This account has {accountToDelete.transactionCount} transactions. 
+              You must delete all transactions first before deleting the account.
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={confirmDelete} 
+            color="error" 
+            variant="contained"
+            disabled={Boolean(accountToDelete?.transactionCount && accountToDelete.transactionCount > 0)}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
