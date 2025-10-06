@@ -286,53 +286,70 @@ async function processAmexData(filePath, account) {
 }
 
 async function processScotiabankData(filePath, account) {
-  const workbook = XLSX.readFile(filePath);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet);
+  return new Promise((resolve, reject) => {
+    const results = [];
+    
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', async () => {
+        try {
+          let rowsProcessed = 0;
 
-  let rowsProcessed = 0;
+          for (const row of results) {
+            if (!row.Date || !row.Description) continue;
 
-  for (const row of data) {
-    if (!row.Date || !row.Description) continue;
+            // Convert date - handle both YYYY-MM-DD and other formats
+            let date;
+            if (row.Date.includes('-')) {
+              // Already in YYYY-MM-DD format
+              date = new Date(row.Date);
+            } else {
+              // Try other date formats
+              date = new Date(row.Date);
+            }
+            
+            if (isNaN(date.getTime())) continue;
 
-    // Convert date
-    const date = new Date(row.Date);
-    if (isNaN(date.getTime())) continue;
+            // Handle amount - Scotiabank uses negative for credits, positive for debits
+            const amountStr = String(row.Amount || 0).replace(/[$,\s]/g, '');
+            const amount = parseFloat(amountStr) || 0;
 
-    // Handle amount
-    const amountStr = String(row.Amount || 0).replace(/[$,\s]/g, '');
-    const amount = parseFloat(amountStr) || 0;
+            // Convert description to uppercase
+            const description = String(row.Description).toUpperCase();
 
-    // Convert description to uppercase
-    const description = String(row.Description).toUpperCase();
+            // Create ScotiabankTransaction record
+            await ScotiabankTransaction.create({
+              date: date.toISOString().split('T')[0],
+              description: description,
+              subDescription: row['Sub-description'] || '',
+              status: row.Status || '',
+              transactionType: row['Type of Transaction'] || '',
+              amount: amount
+            });
 
-    // Create ScotiabankTransaction record
-    await ScotiabankTransaction.create({
-      date: date.toISOString().split('T')[0],
-      description: description,
-      subDescription: row.Sub_description || '',
-      status: row.Status || '',
-      transactionType: row.Type_of_Transaction || '',
-      amount: amount
-    });
+            // Create Transaction record
+            await Transaction.create({
+              date: date.toISOString().split('T')[0],
+              description: description,
+              amount: amount,
+              source: 'Scotiabank',
+              accountId: account.id
+            });
 
-    // Create Transaction record
-    await Transaction.create({
-      date: date.toISOString().split('T')[0],
-      description: description,
-      amount: amount,
-      source: 'Scotiabank',
-      accountId: account.id
-    });
+            rowsProcessed++;
+          }
 
-    rowsProcessed++;
-  }
+          // Update account balance
+          await account.updateBalance();
 
-  // Update account balance
-  await account.updateBalance();
-
-  return rowsProcessed;
+          resolve(rowsProcessed);
+        } catch (error) {
+          reject(error);
+        }
+      })
+      .on('error', reject);
+  });
 }
 
 module.exports = router;

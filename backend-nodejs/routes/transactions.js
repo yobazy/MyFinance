@@ -7,7 +7,7 @@ const router = express.Router();
 // Get all transactions
 router.get('/', async (req, res) => {
   try {
-    const { uncategorized, account_id, limit = 100, offset = 0 } = req.query;
+    const { uncategorized, account_id, limit, offset = 0 } = req.query;
     
     let whereClause = {};
     
@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
         }
       ],
       order: [['date', 'DESC']],
-      limit: parseInt(limit),
+      ...(limit && { limit: parseInt(limit) }),
       offset: parseInt(offset)
     });
 
@@ -66,7 +66,7 @@ router.get('/', async (req, res) => {
     res.json({
       transactions: transactionsWithNames,
       total: transactions.count,
-      limit: parseInt(limit),
+      limit: limit ? parseInt(limit) : null,
       offset: parseInt(offset)
     });
   } catch (error) {

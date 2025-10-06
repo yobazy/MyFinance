@@ -125,7 +125,9 @@ const AccountsPage = () => {
       setOpenDialog(false);
       showMessage("Account created successfully!");
     } catch (error) {
-      showMessage("Failed to create account", "error");
+      // Extract the specific error message from the backend response
+      const errorMessage = error.response?.data?.error || "Failed to create account";
+      showMessage(errorMessage, "error");
     }
   };
 
@@ -150,7 +152,9 @@ const AccountsPage = () => {
       setOpenDialog(false);
       showMessage("Account updated successfully!");
     } catch (error) {
-      showMessage("Failed to update account", "error");
+      // Extract the specific error message from the backend response
+      const errorMessage = error.response?.data?.error || "Failed to update account";
+      showMessage(errorMessage, "error");
     }
   };
 

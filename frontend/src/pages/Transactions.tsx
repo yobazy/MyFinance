@@ -202,8 +202,8 @@ const Transactions = () => {
           bValue = b.description.toLowerCase();
           break;
         case 'category':
-          aValue = String(a.category_name ?? 'zzz_uncategorized').toLowerCase();
-          bValue = String(b.category_name ?? 'zzz_uncategorized').toLowerCase();
+          aValue = String(a.categoryName ?? 'zzz_uncategorized').toLowerCase();
+          bValue = String(b.categoryName ?? 'zzz_uncategorized').toLowerCase();
           break;
         default:
           return 0;
@@ -233,7 +233,7 @@ const Transactions = () => {
       .filter(t => parseFloat(t.amount) > 0)
       .reduce((sum, t) => sum + parseFloat(t.amount), 0);
     const netAmount = totalIncome - totalExpenses;
-    const uncategorized = filteredAndSortedTransactions.filter(t => !t.category_name).length;
+    const uncategorized = filteredAndSortedTransactions.filter(t => !t.categoryName).length;
     
     return {
       totalTransactions,
@@ -296,7 +296,7 @@ const Transactions = () => {
         `"${t.description.replace(/"/g, '""')}"`,
         t.amount,
         t.source,
-        t.account_name,
+        t.accountName,
         t.category_name || 'Uncategorized'
       ].join(','))
     ].join('\n');
@@ -760,14 +760,14 @@ const Transactions = () => {
                     <Box display="flex" alignItems="center" gap={1}>
                       <AccountIcon fontSize="small" color="action" />
                       <Typography variant="body2">
-                        {transaction.account_name}
+                        {transaction.accountName}
                       </Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
-                    {transaction.category_name ? (
+                    {transaction.categoryName ? (
                       <Chip 
-                        label={transaction.category_name} 
+                        label={transaction.categoryName} 
                         size="small" 
                         color="secondary"
                         variant="filled"

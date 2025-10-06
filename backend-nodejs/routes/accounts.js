@@ -49,13 +49,15 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Bank and account name are required' });
     }
 
-    // Check if account already exists
+    // Check if account already exists for the same bank
     const existingAccount = await Account.findOne({
       where: { bank: bank, name: name }
     });
 
     if (existingAccount) {
-      return res.status(400).json({ error: 'Account already exists for this bank.' });
+      return res.status(400).json({ 
+        error: `Account '${name}' already exists for ${bank}. Please choose a different name or bank.` 
+      });
     }
 
     const account = await Account.create({
