@@ -16,6 +16,8 @@ Issues:
 [] auto categorization stats are weird when nothing has been run
 [] multiple uploads needs work
 [x] When we apply to all similar transactions on the Uncategorized Transactions section, rather than refreshing the page, can we just update on page?
+[] Account type is spelled as "Checking" not "Chequing".
+[] Change Credit Card account type as default
 
 Checks:
 [x] Amex populates right

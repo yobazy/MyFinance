@@ -44,11 +44,10 @@
     "test:coverage": "cd backend-nodejs && npm run test:coverage"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0",
-    "electron": "^28.2.0",
+    "concurrently": "^9.2.1",
     "electron-builder": "^25.0.0",
     "playwright": "^1.40.0",
-    "wait-on": "^8.0.0"
+    "wait-on": "^8.0.5"
   },
   "build": {
     "appId": "com.myfinance.dashboard",
@@ -59,7 +58,7 @@
       "buildResources": "assets"
     },
     "dmg": {
-      "filesystem": "HFS+"
+      "title": "MyFinance Dashboard"
     },
     "files": [
       "electron/**/*",
@@ -162,9 +161,6 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "dmg": {
-      "title": "MyFinance Dashboard"
-    },
     "publish": {
       "provider": "github",
       "owner": "yobazy",
@@ -181,6 +177,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "electron": "^28.3.3",
     "electron-updater": "^6.6.2"
   }
 }

@@ -49,14 +49,14 @@ function createWindow() {
 
   // Load the app
   if (isDev) {
-    // In development, load from React dev server
-    mainWindow.loadURL('http://localhost:3000');
+    // In development, load from React dev server on port 3001
+    mainWindow.loadURL('http://localhost:3001');
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
   } else {
     // For now, always use development server since we don't have a production build
     // TODO: Build production version when needed
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL('http://localhost:3001');
     console.log('⚠️  Using development server (no production build available)');
   }
 
