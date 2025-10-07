@@ -11,13 +11,12 @@ Issues:
 [] bulk edit dialog popup only accounts for transactions on the page, rather than all transactions
 [] after accepting bulk edit, changes arent immediately reflected (only the selected one disappears, if theres other transactions of the same type)
 [] Uncat menu, category selection should be alphebatizes
-[x] old databases are removed when 
-[] set rule by specific account
+[] set rule for specific accounts
 [] auto categorization stats are weird when nothing has been run
 [] multiple uploads needs work
-[x] When we apply to all similar transactions on the Uncategorized Transactions section, rather than refreshing the page, can we just update on page?
 [] Account type is spelled as "Checking" not "Chequing".
 [] Change Credit Card account type as default
+[] dark mode is enabled by default, but the toggle in settings is disabled at start
 
 Checks:
 [x] Amex populates right
