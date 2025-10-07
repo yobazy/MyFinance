@@ -41,7 +41,11 @@
     "test:frontend": "cd frontend && npm test -- --watchAll=false",
     "test:integration": "node test-nodejs-backend.js",
     "test:quick": "npm run test:backend",
-    "test:coverage": "cd backend-nodejs && npm run test:coverage"
+    "test:coverage": "cd backend-nodejs && npm run test:coverage",
+    "process:status": "node backend-nodejs/utils/processUtility.js status",
+    "process:cleanup": "node backend-nodejs/utils/processUtility.js cleanup",
+    "process:test-ports": "node backend-nodejs/utils/processUtility.js test-ports",
+    "process:start": "node backend-nodejs/utils/processUtility.js start"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
@@ -52,7 +56,7 @@
   },
   "build": {
     "appId": "com.myfinance.dashboard",
-    "productName": "MyFinance Dashboard",
+    "productName": "MyFi Dashboard",
     "icon": "assets/icon.png",
     "directories": {
       "output": "dist",

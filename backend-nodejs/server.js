@@ -120,7 +120,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Start server
+// Start server with port conflict handling
 const startServer = async () => {
   try {
     // Test database connection
@@ -159,14 +159,27 @@ const startServer = async () => {
       console.log('   Server will continue without backup features');
     }
     
-    // Start server
-    app.listen(PORT, () => {
+    // Start server with error handling
+    const server = app.listen(PORT, () => {
       console.log(`🚀 MyFinance Backend Server running on port ${PORT}`);
       console.log(`📡 API available at: http://localhost:${PORT}/api`);
       console.log(`🏥 Health check at: http://localhost:${PORT}/health`);
       console.log(`💾 Backup API at: http://localhost:${PORT}/api/backup`);
       console.log(`📊 Backup monitoring at: http://localhost:${PORT}/api/backup/monitoring`);
     });
+    
+    // Handle server errors (like port conflicts)
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+        console.log('💡 This usually means another instance of the backend is running');
+        console.log('💡 Try closing other instances or the ProcessManager will handle this automatically');
+      } else {
+        console.error('❌ Server error:', error);
+      }
+      process.exit(1);
+    });
+    
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);

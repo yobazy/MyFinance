@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const ProcessManager = require('../backend-nodejs/utils/processManager');
 
 console.log('🚀 Starting MyFinance Dashboard with Node.js Backend...');
 console.log('Electron version:', process.versions.electron);
@@ -15,7 +16,7 @@ if (!app) {
 
 // Keep a global reference of the window object
 let mainWindow;
-let backendProcess;
+let processManager;
 
 // Check if we're running in development
 const isDev = process.env.NODE_ENV === 'development';
@@ -33,7 +34,7 @@ function createWindow() {
       enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, '../frontend/public/favicon.ico'),
+    icon: path.join(__dirname, '../frontend/public/logo512.png'),
     show: false, // Don't show until ready
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     frame: true,
@@ -77,111 +78,30 @@ function createWindow() {
   });
 }
 
-function startBackend() {
-  return new Promise((resolve, reject) => {
-    console.log('🚀 Starting Node.js backend...');
+async function startBackend() {
+  try {
+    console.log('🚀 Starting Node.js backend with ProcessManager...');
+    
+    // Initialize process manager
+    processManager = new ProcessManager();
     
     // Determine if we're in development or production
     const isPackaged = app.isPackaged;
     const projectRoot = path.join(__dirname, '..');
     
-    let backendPath;
-    let args;
+    // Start backend using process manager
+    const backendInfo = await processManager.startBackend(projectRoot, isPackaged);
     
-    if (isPackaged) {
-      // Production: Use the packaged Node.js backend
-      console.log('🔧 Production mode: Using packaged Node.js backend');
-      
-      // Try to find Node.js executable
-      const nodePaths = [
-        'node',
-        'nodejs',
-        '/usr/bin/node',
-        '/usr/local/bin/node',
-        '/opt/homebrew/bin/node'
-      ];
-      
-      let nodeExecutable = null;
-      for (const nodePath of nodePaths) {
-        try {
-          const result = require('child_process').execSync(`${nodePath} --version`, { timeout: 5000 });
-          if (result) {
-            nodeExecutable = nodePath;
-            console.log(`✅ Found Node.js: ${nodePath}`);
-            break;
-          }
-        } catch (error) {
-          // Continue to next path
-        }
-      }
-      
-      if (!nodeExecutable) {
-        console.error('❌ Node.js executable not found');
-        console.log('⚠️  Proceeding without backend - app will show connection error');
-        resolve();
-        return;
-      }
-      
-      backendPath = nodeExecutable;
-      args = [path.join(process.resourcesPath, 'backend-nodejs/server.js')];
-    } else {
-      // Development: Use system Node.js
-      console.log('🔧 Development mode: Using system Node.js');
-      backendPath = 'node';
-      args = [path.join(projectRoot, 'backend-nodejs/server.js')];
-    }
+    console.log('✅ Backend started successfully');
+    console.log(`📡 Backend running on port: ${backendInfo.port}`);
+    console.log(`🆔 Backend PID: ${backendInfo.pid}`);
     
-    console.log('Starting backend with:', backendPath, args);
-    console.log('Working directory:', projectRoot);
-    
-    // Start the backend process
-    backendProcess = spawn(backendPath, args, {
-      cwd: projectRoot,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: isDev ? 'development' : 'production' }
-    });
-
-    backendProcess.stdout.on('data', (data) => {
-      const output = data.toString();
-      console.log('Backend:', output);
-      
-      // Check if server is ready
-      if (output.includes('MyFinance Backend Server running') || 
-          output.includes('API available at')) {
-        console.log('✅ Backend server is ready');
-        resolve();
-      }
-    });
-
-    backendProcess.stderr.on('data', (data) => {
-      const error = data.toString();
-      console.error('Backend Error:', error);
-      
-      // Check for specific error patterns
-      if (error.includes('EADDRINUSE')) {
-        console.log('⚠️  Port 8000 is already in use, backend might already be running');
-        resolve(); // Don't reject, just continue
-      }
-    });
-
-    backendProcess.on('error', (error) => {
-      console.error('❌ Failed to start backend:', error);
-      reject(error);
-    });
-
-    backendProcess.on('exit', (code) => {
-      console.log(`Backend process exited with code ${code}`);
-      if (code !== 0 && code !== null) {
-        console.error('❌ Backend process exited with error');
-      }
-    });
-
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      console.log('⚠️  Backend startup timeout, proceeding anyway');
-      resolve();
-    }, 30000);
-  });
+    return backendInfo;
+  } catch (error) {
+    console.error('❌ Failed to start backend:', error);
+    console.log('⚠️  Proceeding without backend - app will show connection error');
+    throw error;
+  }
 }
 
 function createMenu() {
@@ -359,10 +279,10 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   console.log('🛑 App is quitting, shutting down backend...');
-  if (backendProcess) {
-    backendProcess.kill();
+  if (processManager) {
+    await processManager.stopBackend();
   }
 });
 
