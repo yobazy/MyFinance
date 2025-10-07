@@ -1,6 +1,6 @@
 {
   "name": "my-finance-dash",
-  "version": "0.3.0-alpha.3",
+  "version": "0.3.0-alpha.4",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "main": "electron/main-nodejs.js",
   "homepage": "./",
