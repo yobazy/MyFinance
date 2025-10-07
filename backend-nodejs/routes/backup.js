@@ -246,7 +246,7 @@ router.get('/', async (req, res) => {
       isEncrypted: backup.isEncrypted,
       checksum: backup.checksum,
       status: backup.status,
-      createdAt: backup.createdAt,
+      createdAt: backup.dataValues.created_at,
       notes: backup.notes
     }));
 

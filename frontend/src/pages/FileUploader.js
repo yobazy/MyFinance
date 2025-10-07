@@ -162,7 +162,7 @@ const FileUploader = () => {
         formData.append("bank", selectedAccount.bank);
         formData.append("account", selectedAccount.name);
 
-        const response = await axios.post("http://127.0.0.1:8000/api/upload-multiple/", formData);
+        const response = await axios.post("http://127.0.0.1:8000/api/upload/multiple", formData);
         setUploadResults(response.data.file_results);
         setMessage(response.data.message);
         setUploadProgress(100);
