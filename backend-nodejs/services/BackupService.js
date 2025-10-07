@@ -520,6 +520,23 @@ class BackupService {
   }
 
   /**
+   * Ensure directory exists, create if it doesn't
+   * @param {string} dirPath - Directory path
+   * @returns {Promise<void>}
+   */
+  async ensureDirectoryExists(dirPath) {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+        logger.info(`Created backup directory: ${dirPath}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to create backup directory: ${dirPath}`, { error: error.message });
+      throw new Error(`Failed to create backup directory: ${error.message}`);
+    }
+  }
+
+  /**
    * Get backup statistics
    * @returns {Promise<Object>} Backup statistics
    */
