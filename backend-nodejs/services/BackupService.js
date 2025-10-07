@@ -312,15 +312,48 @@ class BackupService {
           fs.copyFileSync(backup.filePath, tempRestorePath);
         }
 
-        // Close current database connection
-        await sequelize.close();
+        // Close current database connection gracefully
+        try {
+          await sequelize.close();
+        } catch (closeError) {
+          logger.warn('Error closing database connection:', closeError.message);
+        }
 
         // Replace current database with backup
         const dbPath = path.resolve('db.sqlite3');
         fs.copyFileSync(tempRestorePath, dbPath);
 
+        // Wait a moment for file system to sync
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Reconnect to database
-        await sequelize.authenticate();
+        try {
+          await sequelize.authenticate();
+        } catch (authError) {
+          // If authentication fails, try to recreate the connection
+          logger.warn('Authentication failed, recreating connection:', authError.message);
+          
+          // Import the database config and recreate the connection
+          const { Sequelize } = require('sequelize');
+          const path = require('path');
+          
+          const newSequelize = new Sequelize({
+            dialect: 'sqlite',
+            storage: dbPath,
+            logging: false,
+            define: {
+              timestamps: true,
+              underscored: true,
+              freezeTableName: true
+            }
+          });
+          
+          await newSequelize.authenticate();
+          
+          // Replace the global sequelize instance
+          Object.setPrototypeOf(sequelize, Object.getPrototypeOf(newSequelize));
+          Object.assign(sequelize, newSequelize);
+        }
 
         // Clean up temporary file
         fs.unlinkSync(tempRestorePath);
