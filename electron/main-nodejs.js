@@ -2,7 +2,43 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
-const ProcessManager = require('../backend-nodejs/utils/processManager');
+// Import ProcessManager with fallback for production builds
+let ProcessManager;
+try {
+  // Try development path first
+  ProcessManager = require('../backend-nodejs/utils/processManager');
+} catch (error) {
+  try {
+    // Try production path (packaged app)
+    ProcessManager = require(path.join(process.resourcesPath, 'backend-nodejs/utils/processManager'));
+  } catch (prodError) {
+    console.error('❌ Could not load ProcessManager:', error.message);
+    console.error('❌ Production path also failed:', prodError.message);
+    // Create a fallback ProcessManager
+    ProcessManager = class FallbackProcessManager {
+      async startBackend(projectRoot, isPackaged) {
+        console.log('⚠️  Using fallback process manager - limited functionality');
+        // Basic spawn without advanced features
+        const { spawn } = require('child_process');
+        const backendPath = isPackaged ? 
+          path.join(process.resourcesPath, 'backend-nodejs/server.js') :
+          path.join(projectRoot, 'backend-nodejs/server.js');
+        
+        const backendProcess = spawn('node', [backendPath], {
+          cwd: projectRoot,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, PORT: '8000' }
+        });
+        
+        return { process: backendProcess, port: 8000, pid: backendProcess.pid };
+      }
+      
+      async stopBackend() {
+        console.log('⚠️  Fallback process manager - basic cleanup');
+      }
+    };
+  }
+}
 
 console.log('🚀 Starting MyFinance Dashboard with Node.js Backend...');
 console.log('Electron version:', process.versions.electron);

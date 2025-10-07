@@ -69,6 +69,7 @@
       "electron/**/*",
       "frontend/build/**/*",
       "backend-nodejs/**/*",
+      "backend-nodejs/utils/**/*",
       "!backend-nodejs/node_modules/**/*",
       "!backend-nodejs/uploads/**/*",
       "!backend-nodejs/backups/**/*",
@@ -85,6 +86,7 @@
         "to": "backend-nodejs",
         "filter": [
           "**/*",
+          "utils/**/*",
           "!node_modules/**/*",
           "!uploads/**/*",
           "!backups/**/*",
