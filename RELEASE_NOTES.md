@@ -5,6 +5,9 @@
 
 ## Changes
 - fixes release manager beta updating
+- **Removed cloud storage dependencies** - Removed AWS SDK, Azure Storage Blob, and Google Cloud Storage SDKs to reduce build size by ~150MB
+- **Build size optimization** - App size reduced from ~500MB to ~350MB by removing unused cloud storage features
+- **Simplified backup system** - Backup functionality now focuses on local storage only
 
 ## Installation
 Download the appropriate installer for your platform from the `dist/` folder:

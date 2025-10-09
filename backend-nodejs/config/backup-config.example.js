@@ -40,60 +40,6 @@ module.exports = {
     }
   },
 
-  // Cloud storage configuration
-  cloudStorage: {
-    // Enable cloud storage
-    enabled: false,
-    
-    // Cloud provider: 'aws_s3', 'google_cloud', or 'azure'
-    provider: 'aws_s3',
-    
-    // Provider-specific configuration
-    config: {
-      // AWS S3 Configuration
-      aws_s3: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        region: process.env.AWS_REGION || 'us-east-1',
-        bucket: process.env.AWS_S3_BUCKET,
-        // Optional: S3 storage class for cost optimization
-        storageClass: 'STANDARD_IA', // STANDARD, STANDARD_IA, GLACIER, DEEP_ARCHIVE
-        // Optional: Server-side encryption
-        serverSideEncryption: 'AES256'
-      },
-      
-      // Google Cloud Storage Configuration
-      google_cloud: {
-        projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-        keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE,
-        // Alternative: use credentials object instead of keyFilename
-        // credentials: {
-        //   type: 'service_account',
-        //   project_id: 'your-project-id',
-        //   private_key_id: 'key-id',
-        //   private_key: '-----BEGIN PRIVATE KEY-----\n...',
-        //   client_email: 'service-account@project.iam.gserviceaccount.com',
-        //   client_id: 'client-id',
-        //   auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-        //   token_uri: 'https://oauth2.googleapis.com/token'
-        // },
-        bucket: process.env.GOOGLE_CLOUD_BUCKET,
-        // Optional: Storage class for cost optimization
-        storageClass: 'NEARLINE', // STANDARD, NEARLINE, COLDLINE, ARCHIVE
-        // Optional: Location for the bucket
-        location: 'US'
-      },
-      
-      // Azure Blob Storage Configuration
-      azure: {
-        connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING,
-        containerName: process.env.AZURE_CONTAINER_NAME,
-        // Optional: Access tier for cost optimization
-        accessTier: 'Hot' // Hot, Cool, Archive
-      }
-    }
-  },
-
   // Monitoring and alerting
   monitoring: {
     // Enable monitoring service

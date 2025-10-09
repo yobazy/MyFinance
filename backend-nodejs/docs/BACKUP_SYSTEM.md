@@ -89,48 +89,7 @@ await BackupScheduler.start();
   "encryptionEnabled": false,         // Enable encryption
   "encryptionKey": null,              // Encryption key (if enabled)
   "retentionDays": 30,                // Days to keep backups
-  "maxBackupSize": 1073741824,        // Maximum total backup size (1GB)
-  "cloudStorageEnabled": false,       // Enable cloud storage
-  "cloudProvider": null,              // Cloud provider (aws_s3, google_cloud, azure)
-  "cloudConfig": null                 // Cloud provider configuration
-}
-```
-
-### Cloud Storage Configuration
-
-#### AWS S3
-```javascript
-{
-  "cloudProvider": "aws_s3",
-  "cloudConfig": {
-    "accessKeyId": "your-access-key",
-    "secretAccessKey": "your-secret-key",
-    "region": "us-east-1",
-    "bucket": "your-backup-bucket"
-  }
-}
-```
-
-#### Google Cloud Storage
-```javascript
-{
-  "cloudProvider": "google_cloud",
-  "cloudConfig": {
-    "projectId": "your-project-id",
-    "keyFilename": "path/to/service-account.json",
-    "bucket": "your-backup-bucket"
-  }
-}
-```
-
-#### Azure Blob Storage
-```javascript
-{
-  "cloudProvider": "azure",
-  "cloudConfig": {
-    "connectionString": "your-connection-string",
-    "containerName": "your-container"
-  }
+  "maxBackupSize": 1073741824         // Maximum total backup size (1GB)
 }
 ```
 

@@ -6,7 +6,6 @@ const { sequelize, syncDatabase } = require('../models');
 const { DatabaseBackup, BackupSettings } = require('../models');
 const BackupService = require('../services/BackupService');
 const BackupScheduler = require('../services/BackupScheduler');
-const CloudStorageService = require('../services/CloudStorageService');
 const BackupMonitoringService = require('../services/BackupMonitoringService');
 
 // Mock the app
@@ -466,40 +465,6 @@ describe('Backup System Tests', () => {
         .expect(500);
 
       expect(response.body.error).toContain('Backup file not found');
-    });
-  });
-
-  describe('Cloud Storage Integration', () => {
-    test('should initialize cloud storage service', async () => {
-      const config = {
-        aws: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-          region: 'us-east-1',
-          bucket: 'test-bucket'
-        }
-      };
-
-      await expect(CloudStorageService.initialize(config)).resolves.not.toThrow();
-      expect(CloudStorageService.isProviderConfigured('aws_s3')).toBe(true);
-    });
-
-    test('should handle cloud storage errors gracefully', async () => {
-      const config = {
-        aws: {
-          accessKeyId: 'invalid-key',
-          secretAccessKey: 'invalid-secret',
-          region: 'us-east-1',
-          bucket: 'test-bucket'
-        }
-      };
-
-      // Initialize the service (this will succeed)
-      await CloudStorageService.initialize(config);
-      
-      // Test an actual operation that would fail with invalid credentials
-      await expect(CloudStorageService.uploadBackup('/nonexistent/file.db', 'test-file.db', 'aws_s3'))
-        .rejects.toThrow();
     });
   });
 

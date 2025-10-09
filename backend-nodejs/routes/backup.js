@@ -6,7 +6,6 @@ const { BackupSettings, DatabaseBackup } = require('../models');
 const { sequelize } = require('../config/database');
 const BackupService = require('../services/BackupService');
 const BackupScheduler = require('../services/BackupScheduler');
-const CloudStorageService = require('../services/CloudStorageService');
 const BackupMonitoringService = require('../services/BackupMonitoringService');
 
 const router = express.Router();
@@ -28,10 +27,7 @@ const validateSettingsUpdate = [
   body('encryptionEnabled').optional().isBoolean(),
   body('encryptionKey').optional().isString().isLength({ min: 8, max: 255 }),
   body('retentionDays').optional().isInt({ min: 1, max: 3650 }), // Max 10 years
-  body('maxBackupSize').optional().isInt({ min: 1024 * 1024, max: 1024 * 1024 * 1024 * 100 }), // 1MB to 100GB
-  body('cloudStorageEnabled').optional().isBoolean(),
-  body('cloudProvider').optional().isIn(['aws_s3', 'google_cloud', 'azure']),
-  body('cloudConfig').optional().isObject()
+  body('maxBackupSize').optional().isInt({ min: 1024 * 1024, max: 1024 * 1024 * 1024 * 100 }) // 1MB to 100GB
 ];
 
 // Error handling middleware
@@ -122,9 +118,7 @@ router.get('/settings', async (req, res) => {
       compressionEnabled: settings.compressionEnabled,
       encryptionEnabled: settings.encryptionEnabled,
       retentionDays: settings.retentionDays,
-      maxBackupSize: settings.maxBackupSize,
-      cloudStorageEnabled: settings.cloudStorageEnabled,
-      cloudProvider: settings.cloudProvider
+      maxBackupSize: settings.maxBackupSize
     });
   } catch (error) {
     console.error('Error fetching backup settings:', error);
@@ -144,10 +138,7 @@ router.put('/settings', validateSettingsUpdate, handleValidationErrors, async (r
       encryptionEnabled,
       encryptionKey,
       retentionDays,
-      maxBackupSize,
-      cloudStorageEnabled,
-      cloudProvider,
-      cloudConfig
+      maxBackupSize
     } = req.body;
 
     let settings = await BackupSettings.findOne();
@@ -162,10 +153,7 @@ router.put('/settings', validateSettingsUpdate, handleValidationErrors, async (r
         encryptionEnabled: encryptionEnabled || false,
         encryptionKey: encryptionKey || null,
         retentionDays: retentionDays || 30,
-        maxBackupSize: maxBackupSize || 1024 * 1024 * 1024,
-        cloudStorageEnabled: cloudStorageEnabled || false,
-        cloudProvider: cloudProvider || null,
-        cloudConfig: cloudConfig || null
+        maxBackupSize: maxBackupSize || 1024 * 1024 * 1024
       });
     } else {
       if (maxBackups !== undefined) settings.maxBackups = maxBackups;
@@ -177,9 +165,6 @@ router.put('/settings', validateSettingsUpdate, handleValidationErrors, async (r
       if (encryptionKey !== undefined) settings.encryptionKey = encryptionKey;
       if (retentionDays !== undefined) settings.retentionDays = retentionDays;
       if (maxBackupSize !== undefined) settings.maxBackupSize = maxBackupSize;
-      if (cloudStorageEnabled !== undefined) settings.cloudStorageEnabled = cloudStorageEnabled;
-      if (cloudProvider !== undefined) settings.cloudProvider = cloudProvider;
-      if (cloudConfig !== undefined) settings.cloudConfig = cloudConfig;
       
       await settings.save();
     }
@@ -187,15 +172,6 @@ router.put('/settings', validateSettingsUpdate, handleValidationErrors, async (r
     // Update scheduler if auto backup settings changed
     if (autoBackupEnabled !== undefined || backupFrequencyHours !== undefined) {
       await BackupScheduler.updateSchedule(settings);
-    }
-
-    // Initialize cloud storage if enabled
-    if (cloudStorageEnabled && cloudProvider && cloudConfig) {
-      try {
-        await CloudStorageService.initialize({ [cloudProvider]: cloudConfig });
-      } catch (error) {
-        console.warn('Failed to initialize cloud storage:', error.message);
-      }
     }
 
     res.json({
@@ -208,9 +184,7 @@ router.put('/settings', validateSettingsUpdate, handleValidationErrors, async (r
       compressionEnabled: settings.compressionEnabled,
       encryptionEnabled: settings.encryptionEnabled,
       retentionDays: settings.retentionDays,
-      maxBackupSize: settings.maxBackupSize,
-      cloudStorageEnabled: settings.cloudStorageEnabled,
-      cloudProvider: settings.cloudProvider
+      maxBackupSize: settings.maxBackupSize
     });
   } catch (error) {
     console.error('Error updating backup settings:', error);

@@ -17,6 +17,7 @@ Issues:
 [] Account type is spelled as "Checking" not "Chequing".
 [] Change Credit Card account type as default
 [] dark mode is enabled by default, but the toggle in settings is disabled at start
+[] T
 
 Checks:
 [x] Amex populates right

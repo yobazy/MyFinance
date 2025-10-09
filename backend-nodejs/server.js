@@ -22,7 +22,6 @@ const backupRoutes = require('./routes/backup');
 // Import backup services
 const BackupScheduler = require('./services/BackupScheduler');
 const BackupMonitoringService = require('./services/BackupMonitoringService');
-const CloudStorageService = require('./services/CloudStorageService');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -139,19 +138,6 @@ const startServer = async () => {
       // Start monitoring service
       await BackupMonitoringService.start();
       console.log('✅ Backup monitoring started');
-      
-      // Initialize cloud storage if configured
-      const { BackupSettings } = require('./models');
-      const settings = await BackupSettings.findOne();
-      if (settings && settings.cloudStorageEnabled && settings.cloudProvider) {
-        try {
-          const cloudConfig = settings.cloudConfig ? JSON.parse(settings.cloudConfig) : {};
-          await CloudStorageService.initialize({ [settings.cloudProvider]: cloudConfig });
-          console.log(`✅ Cloud storage initialized: ${settings.cloudProvider}`);
-        } catch (cloudError) {
-          console.warn('⚠️  Cloud storage initialization failed:', cloudError.message);
-        }
-      }
       
       console.log('✅ Backup system initialized successfully');
     } catch (backupError) {
