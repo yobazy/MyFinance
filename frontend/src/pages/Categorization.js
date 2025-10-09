@@ -1625,7 +1625,10 @@ const Categorization = () => {
               </Typography>
               <Typography 
                 variant="body2" 
-                color={transaction.amount >= 0 ? "error.main" : "success.main"}
+                color={transaction.source === 'TD' 
+                  ? (transaction.amount < 0 ? "error.main" : "success.main")
+                  : (transaction.amount >= 0 ? "error.main" : "success.main")
+                }
                 fontWeight="bold"
               >
                 ${Math.abs(transaction.amount).toFixed(2)}

@@ -720,7 +720,9 @@ const Transactions = () => {
           <TableBody>
             {paginatedTransactions.map((transaction) => {
               const amount = parseFloat(transaction.amount);
-              const isExpense = amount > 0;
+              // For TD transactions, positive amounts are credits (income), negative are debits (expenses)
+              // For other banks, positive amounts are expenses, negative are income
+              const isExpense = transaction.source === 'TD' ? amount < 0 : amount > 0;
               
               return (
                 <TableRow 

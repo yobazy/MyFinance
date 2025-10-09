@@ -295,9 +295,14 @@ const Dashboard = () => {
                       </Typography>
                     </Box>
                     <Typography variant="h6" fontWeight="600" sx={{ 
-                      color: transaction.amount > 0 ? 'error.main' : 'success.main' 
+                      color: transaction.source === 'TD' 
+                        ? (transaction.amount < 0 ? 'error.main' : 'success.main')
+                        : (transaction.amount > 0 ? 'error.main' : 'success.main')
                     }}>
-                      {transaction.amount > 0 ? '-' : ''}${Math.abs(transaction.amount).toLocaleString()}
+                      {transaction.source === 'TD' 
+                        ? (transaction.amount < 0 ? '-' : '') 
+                        : (transaction.amount > 0 ? '-' : '')
+                      }${Math.abs(transaction.amount).toLocaleString()}
                     </Typography>
                   </Box>
                   {index < Math.min(dashboardData.recentTransactions.length, 10) - 1 && <Divider />}
