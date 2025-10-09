@@ -187,7 +187,10 @@ class BackupService {
 
       // Add encryption if requested
       if (encrypt && encryptionKey) {
-        const cipher = crypto.createCipher('aes-256-cbc', encryptionKey);
+        // Use modern crypto API - create key from password
+        const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
         stream = stream.pipe(cipher);
       }
 
@@ -221,7 +224,10 @@ class BackupService {
       return new Promise((resolve, reject) => {
         const readStream = fs.createReadStream(sourcePath);
         const writeStream = fs.createWriteStream(targetPath);
-        const cipher = crypto.createCipher('aes-256-cbc', encryptionKey);
+        // Use modern crypto API - create key from password
+        const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
 
         readStream.pipe(cipher).pipe(writeStream);
 

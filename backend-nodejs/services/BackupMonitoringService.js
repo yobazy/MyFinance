@@ -162,7 +162,7 @@ class BackupMonitoringService {
         };
       }
 
-      const timeSinceLastBackup = Date.now() - new Date(lastBackup.createdAt).getTime();
+      const timeSinceLastBackup = Date.now() - new Date(lastBackup.created_at).getTime();
       const expectedInterval = settings.backupFrequencyHours * 60 * 60 * 1000;
 
       if (timeSinceLastBackup > expectedInterval * 1.5) { // 50% tolerance
@@ -176,7 +176,7 @@ class BackupMonitoringService {
       return {
         status: 'healthy',
         message: `Last backup was ${Math.round(timeSinceLastBackup / (60 * 60 * 1000))} hours ago`,
-        lastBackup: lastBackup.createdAt
+        lastBackup: lastBackup.created_at
       };
 
     } catch (error) {
@@ -366,7 +366,7 @@ class BackupMonitoringService {
           failedBackups: recentFailedBackups.map(backup => ({
             id: backup.id,
             fileName: backup.fileName,
-            createdAt: backup.createdAt,
+            createdAt: backup.created_at,
             notes: backup.notes
           }))
         };
@@ -398,7 +398,7 @@ class BackupMonitoringService {
         where: { status: 'completed' },
         order: [['created_at', 'DESC']],
         limit: 10,
-        attributes: ['file_size', 'createdAt']
+        attributes: ['file_size', 'created_at']
       });
 
       if (recentBackups.length < 3) {
@@ -499,7 +499,7 @@ class BackupMonitoringService {
         'isCompressed',
         'isEncrypted',
         'status',
-        'createdAt',
+        'created_at',
         'notes'
       ]
     });
@@ -531,7 +531,7 @@ class BackupMonitoringService {
       DatabaseBackup.findOne({
         where: { status: 'completed' },
         order: [['created_at', 'DESC']],
-        attributes: ['createdAt', 'file_size']
+        attributes: ['created_at', 'file_size']
       })
     ]);
 
@@ -546,7 +546,7 @@ class BackupMonitoringService {
       totalSizeMB: Math.round((totalSize || 0) / (1024 * 1024) * 100) / 100,
       avgSize: Math.round(avgSizeValue / (1024 * 1024) * 100) / 100,
       lastBackup: lastBackup ? {
-        createdAt: lastBackup.createdAt,
+        createdAt: lastBackup.created_at,
         fileSize: lastBackup.file_size,
         fileSizeMB: Math.round(lastBackup.file_size / (1024 * 1024) * 100) / 100
       } : null
