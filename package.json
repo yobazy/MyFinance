@@ -67,7 +67,6 @@
     },
     "files": [
       "electron/**/*",
-      "frontend/build/**/*",
       "backend-nodejs/**/*",
       "backend-nodejs/utils/**/*",
       "!backend-nodejs/node_modules/**/*",
@@ -82,12 +81,16 @@
     ],
     "extraResources": [
       {
+        "from": "frontend/build",
+        "to": "frontend/build"
+      },
+      {
         "from": "backend-nodejs",
         "to": "backend-nodejs",
         "filter": [
           "**/*",
           "utils/**/*",
-          "!node_modules/**/*",
+          "node_modules/**/*",
           "!uploads/**/*",
           "!backups/**/*",
           "!db.sqlite3"

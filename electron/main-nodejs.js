@@ -2,15 +2,35 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+
+console.log('🚀 Starting MyFinance Dashboard with Node.js Backend...');
+console.log('Electron version:', process.versions.electron);
+
+// Check if app is properly loaded
+if (!app) {
+  console.error('❌ Electron app object is undefined!');
+  console.error('This usually means Electron is not properly installed or there is a version mismatch.');
+  process.exit(1);
+}
+
 // Import ProcessManager with fallback for production builds
 let ProcessManager;
+console.log('🔄 Loading ProcessManager...');
+console.log('📁 App packaged:', app.isPackaged);
+console.log('📁 Resources path:', process.resourcesPath);
+
 try {
   // Try development path first
+  console.log('🔄 Trying development path...');
   ProcessManager = require('../backend-nodejs/utils/processManager');
+  console.log('✅ ProcessManager loaded from development path');
 } catch (error) {
+  console.log('❌ Development path failed:', error.message);
   try {
     // Try production path (packaged app)
+    console.log('🔄 Trying production path...');
     ProcessManager = require(path.join(process.resourcesPath, 'backend-nodejs/utils/processManager'));
+    console.log('✅ ProcessManager loaded from production path');
   } catch (prodError) {
     console.error('❌ Could not load ProcessManager:', error.message);
     console.error('❌ Production path also failed:', prodError.message);
@@ -23,6 +43,8 @@ try {
         const backendPath = isPackaged ? 
           path.join(process.resourcesPath, 'backend-nodejs/server.js') :
           path.join(projectRoot, 'backend-nodejs/server.js');
+        
+        console.log('📁 Backend path:', backendPath);
         
         const backendProcess = spawn('node', [backendPath], {
           cwd: projectRoot,
@@ -37,17 +59,8 @@ try {
         console.log('⚠️  Fallback process manager - basic cleanup');
       }
     };
+    console.log('⚠️  Using fallback ProcessManager');
   }
-}
-
-console.log('🚀 Starting MyFinance Dashboard with Node.js Backend...');
-console.log('Electron version:', process.versions.electron);
-
-// Check if app is properly loaded
-if (!app) {
-  console.error('❌ Electron app object is undefined!');
-  console.error('This usually means Electron is not properly installed or there is a version mismatch.');
-  process.exit(1);
 }
 
 // Keep a global reference of the window object
@@ -55,7 +68,7 @@ let mainWindow;
 let processManager;
 
 // Check if we're running in development
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
   // Create the browser window
@@ -91,10 +104,41 @@ function createWindow() {
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
   } else {
-    // For now, always use development server since we don't have a production build
-    // TODO: Build production version when needed
-    mainWindow.loadURL('http://localhost:3001');
-    console.log('⚠️  Using development server (no production build available)');
+    // In production, load the built React files
+    console.log('📁 Loading production build...');
+    console.log('📁 App packaged:', app.isPackaged);
+    console.log('📁 Resources path:', process.resourcesPath);
+    
+    // Try multiple paths for the frontend build
+    const possiblePaths = [
+      path.join(__dirname, '../frontend/build/index.html'),
+      path.join(process.resourcesPath, 'frontend/build/index.html'),
+      path.join(process.resourcesPath, 'app.asar.unpacked/frontend/build/index.html')
+    ];
+    
+    let frontendLoaded = false;
+    
+    for (const indexPath of possiblePaths) {
+      console.log('📁 Trying path:', indexPath);
+      if (fs.existsSync(indexPath)) {
+        try {
+          mainWindow.loadFile(indexPath);
+          console.log('✅ Production build loaded successfully from:', indexPath);
+          frontendLoaded = true;
+          break;
+        } catch (error) {
+          console.error('❌ Error loading from path:', indexPath, error.message);
+        }
+      } else {
+        console.log('📁 Path does not exist:', indexPath);
+      }
+    }
+    
+    if (!frontendLoaded) {
+      console.error('❌ Could not load frontend from any path');
+      console.log('⚠️  Loading error page');
+      mainWindow.loadURL('data:text/html,<h1>Frontend not found</h1><p>Please check the build configuration.</p>');
+    }
   }
 
   // Show window when ready to prevent visual flash
@@ -116,23 +160,50 @@ function createWindow() {
 
 async function startBackend() {
   try {
-    console.log('🚀 Starting Node.js backend with ProcessManager...');
-    
-    // Initialize process manager
-    processManager = new ProcessManager();
+    console.log('🚀 Starting Node.js backend...');
     
     // Determine if we're in development or production
     const isPackaged = app.isPackaged;
     const projectRoot = path.join(__dirname, '..');
     
-    // Start backend using process manager
-    const backendInfo = await processManager.startBackend(projectRoot, isPackaged);
+    // Always use fallback method for now to test
+    console.log('⚠️  Using fallback backend startup...');
+    // Basic backend startup without ProcessManager
+    const { spawn } = require('child_process');
+    const backendPath = isPackaged ? 
+      path.join(process.resourcesPath, 'backend-nodejs/server.js') :
+      path.join(projectRoot, 'backend-nodejs/server.js');
     
-    console.log('✅ Backend started successfully');
-    console.log(`📡 Backend running on port: ${backendInfo.port}`);
-    console.log(`🆔 Backend PID: ${backendInfo.pid}`);
+    console.log('📁 Backend path:', backendPath);
+    console.log('📁 Backend path exists:', fs.existsSync(backendPath));
     
-    return backendInfo;
+    const backendProcess = spawn('node', [backendPath], {
+      cwd: projectRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PORT: '8000' }
+    });
+    
+    // Add process event handlers
+    backendProcess.stdout.on('data', (data) => {
+      console.log('Backend stdout:', data.toString());
+    });
+    
+    backendProcess.stderr.on('data', (data) => {
+      console.log('Backend stderr:', data.toString());
+    });
+    
+    backendProcess.on('error', (error) => {
+      console.error('Backend process error:', error);
+    });
+    
+    backendProcess.on('exit', (code) => {
+      console.log(`Backend process exited with code ${code}`);
+    });
+    
+    console.log('✅ Backend started with fallback method');
+    console.log(`🆔 Backend PID: ${backendProcess.pid}`);
+    
+    return { process: backendProcess, port: 8000, pid: backendProcess.pid };
   } catch (error) {
     console.error('❌ Failed to start backend:', error);
     console.log('⚠️  Proceeding without backend - app will show connection error');
