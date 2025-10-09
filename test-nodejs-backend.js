@@ -204,14 +204,18 @@ async function testBackupAPI() {
 async function testAccountsCreation() {
   console.log('🔍 Testing accounts creation for each bank...');
   try {
-    const banks = ['TD', 'Amex', 'Scotiabank'];
-    let allPassed = true;
     const timestamp = Date.now();
+    const banks = [
+      `TD-Integration-${timestamp}`,
+      `Amex-Integration-${timestamp}`,
+      `Scotiabank-Integration-${timestamp}`
+    ];
+    let allPassed = true;
 
     for (const bank of banks) {
       const accountData = {
         bank: bank,
-        name: `Test ${bank} Account ${timestamp}`,
+        name: `Test ${bank} Account`,
         type: 'checking'
       };
 
@@ -236,7 +240,7 @@ async function testAccountsDuplicatePrevention() {
   try {
     const timestamp = Date.now();
     const accountData = {
-      bank: 'TD',
+      bank: `TD-Duplicate-Test-${timestamp}`,
       name: `Duplicate Test Account ${timestamp}`,
       type: 'checking'
     };
@@ -249,9 +253,11 @@ async function testAccountsDuplicatePrevention() {
     }
     console.log('✅ First account created successfully');
 
-    // Try to create duplicate account
+    // Try to create duplicate account (same bank and name)
     const duplicateResponse = await makeRequest('/api/accounts/create', 'POST', accountData);
-    if (duplicateResponse.status === 400 && duplicateResponse.body.error.includes('already exists')) {
+    if (duplicateResponse.status === 400 && 
+        (duplicateResponse.body.error.includes('already exists') || 
+         duplicateResponse.body.error.includes('must be unique'))) {
       console.log('✅ Duplicate account prevention working');
       return true;
     } else {
@@ -267,6 +273,8 @@ async function testAccountsDuplicatePrevention() {
 async function testAccountsValidation() {
   console.log('🔍 Testing account validation...');
   try {
+    const timestamp = Date.now();
+    
     // Test missing bank parameter
     const missingBankResponse = await makeRequest('/api/accounts/create', 'POST', {
       name: 'Test Account',
@@ -282,7 +290,7 @@ async function testAccountsValidation() {
 
     // Test missing name parameter
     const missingNameResponse = await makeRequest('/api/accounts/create', 'POST', {
-      bank: 'TD',
+      bank: `TD-Validation-Test-${timestamp}`,
       type: 'checking'
     });
     

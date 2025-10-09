@@ -196,6 +196,21 @@ async function runTest(test) {
 function parseJestOutput(output, errorOutput) {
   const combinedOutput = output + errorOutput;
   
+  // Look for Integration Test format (custom format from test-nodejs-backend.js)
+  const integrationMatch = combinedOutput.match(/✅ Passed:\s*(\d+)\s*\n.*❌ Failed:\s*(\d+)/);
+  if (integrationMatch) {
+    const passed = parseInt(integrationMatch[1]);
+    const failed = parseInt(integrationMatch[2]);
+    const total = passed + failed;
+    
+    return {
+      passed,
+      failed,
+      total,
+      suites: null
+    };
+  }
+  
   // Look for Jest test summary patterns (both formats)
   const testSummaryMatch = combinedOutput.match(/Tests:\s*(\d+)\s*failed,\s*(\d+)\s*passed,\s*(\d+)\s*total/);
   const testSuitesMatch = combinedOutput.match(/Test Suites:\s*(\d+)\s*failed,\s*(\d+)\s*passed,\s*(\d+)\s*total/);
