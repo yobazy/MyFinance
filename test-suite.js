@@ -196,7 +196,7 @@ async function runTest(test) {
 function parseJestOutput(output, errorOutput) {
   const combinedOutput = output + errorOutput;
   
-  // Look for Jest test summary patterns
+  // Look for Jest test summary patterns (both formats)
   const testSummaryMatch = combinedOutput.match(/Tests:\s*(\d+)\s*failed,\s*(\d+)\s*passed,\s*(\d+)\s*total/);
   const testSuitesMatch = combinedOutput.match(/Test Suites:\s*(\d+)\s*failed,\s*(\d+)\s*passed,\s*(\d+)\s*total/);
   
@@ -204,6 +204,25 @@ function parseJestOutput(output, errorOutput) {
     const failed = parseInt(testSummaryMatch[1]);
     const passed = parseInt(testSummaryMatch[2]);
     const total = parseInt(testSummaryMatch[3]);
+    
+    return {
+      passed,
+      failed,
+      total,
+      suites: testSuitesMatch ? {
+        failed: parseInt(testSuitesMatch[1]),
+        passed: parseInt(testSuitesMatch[2]),
+        total: parseInt(testSuitesMatch[3])
+      } : null
+    };
+  }
+  
+  // Look for React Scripts test format (no failed tests mentioned when all pass)
+  const reactScriptsMatch = combinedOutput.match(/Tests:\s*(\d+)\s*passed,\s*(\d+)\s*total/);
+  if (reactScriptsMatch) {
+    const passed = parseInt(reactScriptsMatch[1]);
+    const total = parseInt(reactScriptsMatch[2]);
+    const failed = total - passed;
     
     return {
       passed,
