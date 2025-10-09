@@ -50,7 +50,8 @@ function updateVersion(type) {
           return `-beta.${parseInt(num) + 1}`;
         });
       } else {
-        newVersion = `${currentVersion}-beta.1`;
+        // Remove any existing pre-release identifier and add beta
+        newVersion = currentVersion.replace(/-.*$/, '') + '-beta.1';
       }
       break;
     case 'rc':
@@ -59,7 +60,8 @@ function updateVersion(type) {
           return `-rc.${parseInt(num) + 1}`;
         });
       } else {
-        newVersion = `${currentVersion}-rc.1`;
+        // Remove any existing pre-release identifier and add rc
+        newVersion = currentVersion.replace(/-.*$/, '') + '-rc.1';
       }
       break;
     default:
@@ -142,8 +144,8 @@ Commands:
   minor     Create a minor release (0.1.0 -> 0.2.0)
   major     Create a major release (0.1.0 -> 1.0.0)
   alpha     Create an alpha release (0.1.0 -> 0.1.0-alpha.1)
-  beta      Create a beta release (0.1.0 -> 0.1.0-beta.1)
-  rc        Create a release candidate (0.1.0 -> 0.1.0-rc.1)
+  beta      Create a beta release (0.1.0-alpha.4 -> 0.1.0-beta.1)
+  rc        Create a release candidate (0.1.0-alpha.4 -> 0.1.0-rc.1)
   help      Show this help message
 
 Examples:
