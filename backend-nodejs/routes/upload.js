@@ -182,52 +182,79 @@ router.post('/multiple', upload.array('files', 10), async (req, res) => {
 
 // Helper functions for processing different file types
 async function processTDData(filePath, account) {
-  const workbook = XLSX.readFile(filePath);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet);
+  return new Promise((resolve, reject) => {
+    const results = [];
+    
+    fs.createReadStream(filePath)
+      .pipe(csv({
+        headers: ['Date', 'Description', 'Amount', 'Credit', 'Balance'],
+        skipEmptyLines: true
+      }))
+      .on('data', (data) => results.push(data))
+      .on('end', async () => {
+        try {
+          let rowsProcessed = 0;
 
-  let rowsProcessed = 0;
+          for (const row of results) {
+            if (!row.Date || !row.Description) continue;
 
-  for (const row of data) {
-    if (!row.Date || !row.Description) continue;
+            // Convert date - handle MM/DD/YYYY format
+            const date = new Date(row.Date);
+            if (isNaN(date.getTime())) continue;
 
-    // Convert date
-    const date = new Date(row.Date);
-    if (isNaN(date.getTime())) continue;
+            // Handle amount - TD CSV format has Amount, Credit columns
+            // If Credit column has value, it's a credit (positive amount), otherwise Amount is debit (negative)
+            let amount = 0;
+            if (row.Credit && row.Credit.trim() !== '') {
+              // This is a credit (positive amount - money coming in)
+              const creditStr = String(row.Credit).replace(/[$,\s]/g, '');
+              amount = parseFloat(creditStr) || 0;
+            } else if (row.Amount && row.Amount.trim() !== '') {
+              // This is a debit (negative amount - money going out)
+              const amountStr = String(row.Amount).replace(/[$,\s]/g, '');
+              amount = -(parseFloat(amountStr) || 0);
+            } else {
+              continue; // Skip if no amount data
+            }
 
-    // Handle amount
-    const amountStr = String(row.Amount || 0).replace(/[$,\s]/g, '');
-    const amount = parseFloat(amountStr) || 0;
+            // Convert description to uppercase
+            const description = String(row.Description).toUpperCase();
 
-    // Convert description to uppercase
-    const description = String(row.Description).toUpperCase();
+            // Create TDTransaction record
+            await TDTransaction.create({
+              date: date.toISOString().split('T')[0],
+              chargeName: description,
+              creditAmt: amount > 0 ? amount : null,
+              debitAmt: amount < 0 ? Math.abs(amount) : null,
+              balance: null
+            });
 
-    // Create TDTransaction record
-    await TDTransaction.create({
-      date: date.toISOString().split('T')[0],
-      chargeName: description,
-      creditAmt: amount > 0 ? amount : null,
-      debitAmt: amount < 0 ? Math.abs(amount) : null,
-      balance: null
-    });
+            // Create Transaction record
+            await Transaction.create({
+              date: date.toISOString().split('T')[0],
+              description: description,
+              amount: amount,
+              source: 'TD',
+              accountId: account.id
+            });
 
-    // Create Transaction record
-    await Transaction.create({
-      date: date.toISOString().split('T')[0],
-      description: description,
-      amount: amount,
-      source: 'TD',
-      accountId: account.id
-    });
+            rowsProcessed++;
+          }
 
-    rowsProcessed++;
-  }
+          // Update account balance - skip for now to test transaction creation
+          // const newBalance = await Transaction.sum('amount', {
+          //   where: { accountId: account.id }
+          // });
+          // account.balance = newBalance || 0;
+          // await account.save();
 
-  // Update account balance
-  await account.updateBalance();
-
-  return rowsProcessed;
+          resolve(rowsProcessed);
+        } catch (error) {
+          reject(error);
+        }
+      })
+      .on('error', reject);
+  });
 }
 
 async function processAmexData(filePath, account) {
