@@ -1,6 +1,6 @@
 import './globals.css';
 import type { ReactNode } from 'react';
-import { Roboto } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import Providers from './providers';
 
 export const metadata = {
@@ -8,15 +8,16 @@ export const metadata = {
   description: 'Multi-user MyFinance on Supabase',
 };
 
-const roboto = Roboto({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
 });
 
 export default function RootLayout(props: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={roboto.className}>
+      <body className={inter.className}>
         <Providers>{props.children}</Providers>
       </body>
     </html>

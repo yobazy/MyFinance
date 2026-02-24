@@ -7,7 +7,6 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Container,
   Divider,
   FormControl,
   Grid,
@@ -27,6 +26,8 @@ import {
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../lib/supabase';
 import type { Account } from '../lib/types';
+import { useAuth } from '../lib/auth/AuthContext';
+import PublicLanding from './components/PublicLanding';
 
 type RecentTx = {
   date: string;
@@ -46,6 +47,7 @@ type DashboardData = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { loading: authLoading, isAuthenticated } = useAuth();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -53,6 +55,7 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     (async () => {
       const { data, error } = await supabase
         .from('accounts')
@@ -60,9 +63,10 @@ export default function DashboardPage() {
         .order('updated_at', { ascending: false });
       if (!error) setAccounts((data ?? []) as Account[]);
     })();
-  }, [supabase]);
+  }, [isAuthenticated, supabase]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     (async () => {
       setLoading(true);
 
@@ -135,7 +139,7 @@ export default function DashboardPage() {
 
       setLoading(false);
     })();
-  }, [accounts, selectedAccountId, supabase]);
+  }, [accounts, isAuthenticated, selectedAccountId, supabase]);
 
   const handleAccountChange = (event: SelectChangeEvent) => {
     setSelectedAccountId(event.target.value);
@@ -169,6 +173,18 @@ export default function DashboardPage() {
       </CardContent>
     </Card>
   );
+
+  if (authLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <PublicLanding />;
+  }
 
   if (loading) {
     return (
@@ -206,7 +222,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <Container maxWidth="lg" sx={{ py: 2 }}>
+    <Box sx={{ py: 2 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
         <Typography variant="h3" component="h1">
           Financial Dashboard
@@ -321,7 +337,7 @@ export default function DashboardPage() {
           </Card>
         </>
       ) : null}
-    </Container>
+    </Box>
   );
 }
 

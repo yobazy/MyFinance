@@ -69,7 +69,7 @@ export default function AppShell(props: { children: React.ReactNode }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { mode } = useThemeMode();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAuthenticated, loading } = useAuth();
 
   const [mobileAnchorEl, setMobileAnchorEl] = useState<HTMLElement | null>(null);
   const [manageAnchorEl, setManageAnchorEl] = useState<HTMLElement | null>(null);
@@ -90,6 +90,9 @@ export default function AppShell(props: { children: React.ReactNode }) {
 
   const isLoginRoute = pathname === '/login';
   if (isLoginRoute) return <>{props.children}</>;
+
+  const isRootRoute = pathname === '/';
+  if (isRootRoute && (loading || !isAuthenticated)) return <>{props.children}</>;
 
   const handleLogout = async () => {
     await signOut();
