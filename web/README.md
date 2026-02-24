@@ -12,6 +12,7 @@ cp env.example .env.local
 2) Fill in:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side only; used by `/api/ingest/*`)
 
 ## Run
 
@@ -27,5 +28,5 @@ Open `http://localhost:3000`.
 
 - Create an account in `/accounts`
 - Upload an Amex `.xlsx` in `/upload`
-- Ensure the TS worker is running (`worker/`) to process the enqueued job
+- The file is processed immediately by a Next.js API route and then discarded
 

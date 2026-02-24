@@ -7,7 +7,18 @@
 --
 -- NOTE: Workers using the service_role key bypass RLS and can read any object.
 
--- Enable RLS on storage.objects (usually enabled, but safe to call)
+-- Preflight: `storage.objects` only exists once Supabase Storage is enabled/provisioned.
+-- If you see "relation storage.objects does not exist", go to the Supabase Dashboard:
+-- Storage → create any bucket (or enable Storage), then re-run this migration.
+do $$
+begin
+  if to_regclass('storage.objects') is null then
+    raise exception
+      'Supabase Storage is not provisioned (missing table storage.objects). Enable Storage / create a bucket in the dashboard, then re-run this migration.';
+  end if;
+end $$;
+
+-- Enable RLS on storage.objects (usually enabled already, but safe to call)
 alter table storage.objects enable row level security;
 
 -- Create policies (ignore duplicates if you re-run)

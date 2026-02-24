@@ -94,8 +94,7 @@ If you’re moving to a multi-user hosted version, the recommended direction is:
 - Run migrations:
   - `supabase/migrations/002_queue_rpc.sql`
   - `supabase/migrations/003_transactions_metadata_and_dedupe.sql`
-  - `supabase/migrations/004_storage_policies.sql`
-- Create a **private** Storage bucket named `uploads`
+- `supabase/migrations/004_storage_policies.sql` is only needed if you decide to store uploads in Supabase Storage.
 
 ### Run the worker
 See `worker/README.md`.

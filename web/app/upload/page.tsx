@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
-import type { Account, Upload } from '../../lib/types';
+import type { Account } from '../../lib/types';
 
 export default function UploadPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
@@ -14,7 +14,7 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpload, setLastUpload] = useState<Upload | null>(null);
+  const [result, setResult] = useState<{ rowsProcessed: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -41,51 +41,37 @@ export default function UploadPage() {
 
     setBusy(true);
     setError(null);
-    setLastUpload(null);
+    setResult(null);
 
     try {
-      // Fetch account to fill bank
-      const acct = accounts.find((a) => a.id === accountId);
-      if (!acct) throw new Error('Account not found in list');
+      const { data: sessionData, error: sessionErr } =
+        await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Missing session access token');
 
-      // Create an uploads row first (so we have upload_id for storage path)
-      const uploadId = crypto.randomUUID();
-      const storagePath = `${userId}/${uploadId}/${file.name}`;
+      if (fileType !== 'Amex') throw new Error('Only Amex is supported right now');
 
-      const { data: uploadInsert, error: uploadErr } = await supabase
-        .from('uploads')
-        .insert({
-          id: uploadId,
-          account_id: accountId,
-          bank: acct.bank,
-          file_type: fileType,
-          storage_path: storagePath,
-          original_filename: file.name,
-          status: 'uploaded',
-        })
-        .select('*')
-        .single();
+      const fd = new FormData();
+      fd.set('file', file);
+      fd.set('account_id', accountId);
 
-      if (uploadErr) throw uploadErr;
-
-      // Upload file bytes to Storage (private bucket, user-owned prefix)
-      const { error: storageErr } = await supabase.storage
-        .from('uploads')
-        .upload(storagePath, file, {
-          upsert: false,
-          contentType: file.type || 'application/octet-stream',
-        });
-
-      if (storageErr) throw storageErr;
-
-      // Enqueue processing job
-      const { error: jobErr } = await supabase.from('processing_jobs').insert({
-        type: 'ingest_upload',
-        payload: { upload_id: uploadId },
+      const resp = await fetch('/api/ingest/amex', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: fd,
       });
-      if (jobErr) throw jobErr;
 
-      setLastUpload(uploadInsert as Upload);
+      const body = (await resp.json()) as
+        | { ok: true; rowsProcessed: number }
+        | { error: string };
+
+      if (!resp.ok) {
+        throw new Error('error' in body ? body.error : `HTTP ${resp.status}`);
+      }
+
+      if (!('rowsProcessed' in body)) throw new Error('Invalid response');
+      setResult({ rowsProcessed: body.rowsProcessed });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -133,8 +119,8 @@ export default function UploadPage() {
 
       <p>
         <small className="muted">
-          This uploads to Supabase Storage, writes an <code>uploads</code> row, and
-          enqueues <code>processing_jobs</code> type <code>ingest_upload</code>.
+          This posts the file to a Next.js API route, parses immediately, writes
+          transactions to Postgres, then discards the file.
         </small>
       </p>
 
@@ -170,15 +156,10 @@ export default function UploadPage() {
 
       {error ? <p style={{ color: '#ff9aa2' }}>{error}</p> : null}
 
-      {lastUpload ? (
+      {result ? (
         <div style={{ marginTop: 12 }}>
-          <p style={{ marginBottom: 6 }}>
-            Uploaded: <b>{lastUpload.original_filename}</b>
-          </p>
-          <p style={{ marginTop: 0 }}>
-            <small className="muted">
-              upload_id={lastUpload.id} (watch worker logs for processing)
-            </small>
+          <p style={{ marginBottom: 0 }}>
+            Imported <b>{result.rowsProcessed}</b> rows.
           </p>
         </div>
       ) : null}
