@@ -225,7 +225,7 @@ export default function DashboardPage() {
     <Box sx={{ py: 2 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
         <Typography variant="h3" component="h1">
-          Financial Dashboard
+          Dashboard
         </Typography>
 
         <FormControl sx={{ minWidth: 240 }}>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
       )}
 
       <Typography variant="h5" gutterBottom mb={3}>
-        Quick Actions
+        Quick actions
       </Typography>
       <Grid container spacing={3} mb={4}>
         {quickActions.map((action) => (

@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Container,
   Dialog,
   DialogActions,
   DialogContent,
@@ -237,7 +236,7 @@ export default function AccountsPage() {
   };
 
   return (
-    <Container>
+    <Box>
       <Box mb={4}>
         <Typography variant="h4" gutterBottom>
           Manage Accounts
@@ -435,7 +434,7 @@ export default function AccountsPage() {
           {message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 }
 

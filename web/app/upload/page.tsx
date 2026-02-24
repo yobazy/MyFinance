@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Container,
   Divider,
   FormControl,
   FormControlLabel,
@@ -30,7 +29,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import type { Account } from '../../lib/types';
@@ -178,9 +177,9 @@ export default function UploadPage() {
 
   if (accounts.length === 0) {
     return (
-      <Container sx={{ mt: 4 }}>
+      <Box>
         <Typography variant="h4" gutterBottom>
-          Upload Statements 📄
+          Upload statements
         </Typography>
         <Card sx={{ p: 2 }}>
           <CardContent>
@@ -192,14 +191,14 @@ export default function UploadPage() {
             </Button>
           </CardContent>
         </Card>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container sx={{ mt: 2 }}>
+    <Box>
       <Typography variant="h4" gutterBottom>
-        Upload Statements 📄
+        Upload statements
       </Typography>
 
       <Card>
@@ -218,7 +217,7 @@ export default function UploadPage() {
                   }}
                 />
               }
-              label="Multiple File Upload"
+              label="Upload multiple files"
             />
 
             <FormControl fullWidth>
@@ -290,12 +289,13 @@ export default function UploadPage() {
 
             <Box
               sx={{
-                border: '2px dashed #2563eb',
-                borderRadius: 1,
+                border: `2px dashed ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.55 : 0.45)}`,
+                borderRadius: 3,
                 p: 3,
                 textAlign: 'center',
                 cursor: 'pointer',
-                '&:hover': { backgroundColor: 'rgba(37, 99, 235, 0.04)' },
+                backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.35 : 0.55),
+                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.10 : 0.07) },
               }}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
@@ -309,7 +309,7 @@ export default function UploadPage() {
                 style={{ display: 'none' }}
               />
               <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
-                <CloudUploadIcon sx={{ fontSize: 48, color: '#2563eb', mb: 1 }} />
+                <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
                 <Typography variant="body1" gutterBottom>
                   {isMultipleMode
                     ? files.length > 0
@@ -421,7 +421,7 @@ export default function UploadPage() {
           </Box>
         </CardContent>
       </Card>
-    </Container>
+    </Box>
   );
 }
 

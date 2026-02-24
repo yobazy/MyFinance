@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Box, Card, CardContent, Container, Typography } from '@mui/material';
+import { Box, Card, CardContent, Typography } from '@mui/material';
 
 export default function VisualizationsPage() {
   return (
-    <Container>
+    <Box>
       <Box mb={4}>
         <Typography variant="h4" gutterBottom>
           Analytics
@@ -25,7 +25,7 @@ export default function VisualizationsPage() {
           </Typography>
         </CardContent>
       </Card>
-    </Container>
+    </Box>
   );
 }
 

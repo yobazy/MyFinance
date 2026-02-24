@@ -6,7 +6,6 @@ import {
   Box,
   Card,
   CardContent,
-  Container,
   Grid,
   Typography,
 } from '@mui/material';
@@ -44,7 +43,7 @@ export default function RulesPage() {
   }, [supabase]);
 
   return (
-    <Container>
+    <Box>
       <Box mb={4}>
         <Typography variant="h4" gutterBottom>
           Rules
@@ -82,7 +81,7 @@ export default function RulesPage() {
           </Grid>
         ))}
       </Grid>
-    </Container>
+    </Box>
   );
 }
 

@@ -9,7 +9,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Container,
   IconButton,
   Menu,
   MenuItem,
@@ -17,7 +16,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -100,26 +99,45 @@ export default function AppShell(props: { children: React.ReactNode }) {
     router.push('/login');
   };
 
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname?.startsWith(href));
+
+  const navButtonSx = (active: boolean) => ({
+    borderRadius: 999,
+    px: 1.25,
+    py: 0.85,
+    color: active ? 'text.primary' : 'text.secondary',
+    backgroundColor: active ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.18 : 0.12) : 'transparent',
+    '&:hover': {
+      backgroundColor: alpha(
+        theme.palette.primary.main,
+        active ? (theme.palette.mode === 'dark' ? 0.22 : 0.16) : theme.palette.mode === 'dark' ? 0.10 : 0.08
+      ),
+      transform: 'translateY(-1px)',
+    },
+  });
+
   const appBar = (
     <>
-      <AppBar position="static">
-        <Toolbar sx={{ minHeight: '56px', py: 0, overflow: 'visible' }}>
-          <Box sx={{ flexGrow: isMobile ? 0 : 1, display: 'flex', alignItems: 'center' }}>
-            <img
+      <AppBar position="sticky">
+        <Toolbar sx={{ py: 0, overflow: 'visible' }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1.25 }}>
+            <Box
+              component="img"
               src={mode === 'dark' ? '/logo_dark.svg' : '/logo_light.svg'}
               alt="MyFinance"
-              style={{
-                height: '120px',
+              onClick={() => router.push('/')}
+              sx={{
+                height: 26,
                 width: 'auto',
                 cursor: 'pointer',
-                objectFit: 'cover',
-                objectPosition: 'center',
-                clipPath: 'inset(40% 0 40% 0)',
-                marginTop: '-30px',
-                marginBottom: '-30px',
+                userSelect: 'none',
               }}
-              onClick={() => router.push('/')}
             />
+            {!isMobile ? (
+              <Typography variant="body2" color="text.secondary">
+                Clear money, calm mind
+              </Typography>
+            ) : null}
           </Box>
 
           {isMobile ? (
@@ -136,6 +154,13 @@ export default function AppShell(props: { children: React.ReactNode }) {
                   color="inherit"
                   aria-label="menu"
                   onClick={(e) => setMobileAnchorEl(e.currentTarget)}
+                  sx={{
+                    border: `1px solid ${alpha(theme.palette.divider, theme.palette.mode === 'dark' ? 0.9 : 0.7)}`,
+                    backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.35 : 0.65),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.45 : 0.8),
+                    },
+                  }}
                 >
                   <MenuIcon />
                 </IconButton>
@@ -145,6 +170,17 @@ export default function AppShell(props: { children: React.ReactNode }) {
                 anchorEl={mobileAnchorEl}
                 open={Boolean(mobileAnchorEl)}
                 onClose={() => setMobileAnchorEl(null)}
+                PaperProps={{
+                  sx: {
+                    mt: 1,
+                    borderRadius: 3,
+                    minWidth: 220,
+                    boxShadow:
+                      theme.palette.mode === 'dark'
+                        ? '0 24px 70px rgba(0,0,0,0.55)'
+                        : '0 24px 70px rgba(15,23,42,0.14)',
+                  },
+                }}
               >
                 {navItems.slice(0, -1).map((item) => (
                   <MenuItem
@@ -190,7 +226,7 @@ export default function AppShell(props: { children: React.ReactNode }) {
                   component={NextLink}
                   href={item.href}
                   startIcon={item.icon}
-                  sx={{ ml: 1 }}
+                  sx={{ ...navButtonSx(isActive(item.href)), ml: 0.5 }}
                 >
                   {item.label}
                 </Button>
@@ -200,7 +236,7 @@ export default function AppShell(props: { children: React.ReactNode }) {
                 startIcon={<ManageAccountsIcon />}
                 endIcon={<ArrowDropDownIcon />}
                 onClick={(e) => setManageAnchorEl(e.currentTarget)}
-                sx={{ ml: 1 }}
+                sx={{ ...navButtonSx(Boolean(manageAnchorEl)), ml: 0.5 }}
               >
                 Manage
               </Button>
@@ -209,7 +245,7 @@ export default function AppShell(props: { children: React.ReactNode }) {
                 component={NextLink}
                 href={navItems[navItems.length - 1].href}
                 startIcon={navItems[navItems.length - 1].icon}
-                sx={{ ml: 1 }}
+                sx={{ ...navButtonSx(isActive(navItems[navItems.length - 1].href)), ml: 0.5 }}
               >
                 {navItems[navItems.length - 1].label}
               </Button>
@@ -250,9 +286,13 @@ export default function AppShell(props: { children: React.ReactNode }) {
         disableRestoreFocus
         sx={{
           '& .MuiPaper-root': {
-            marginTop: '0px',
+            marginTop: '8px',
+            borderRadius: 3,
+            minWidth: 220,
             boxShadow:
-              '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              theme.palette.mode === 'dark'
+                ? '0 24px 70px rgba(0,0,0,0.55)'
+                : '0 24px 70px rgba(15,23,42,0.14)',
           },
         }}
       >
@@ -281,7 +321,17 @@ export default function AppShell(props: { children: React.ReactNode }) {
   return (
     <RequireAuth>
       {appBar}
-      <Container sx={{ mt: 4 }}>{props.children}</Container>
+      <Box
+        component="main"
+        sx={{
+          px: { xs: 2, sm: 3 },
+          py: { xs: 3, md: 4 },
+          maxWidth: 1280,
+          mx: 'auto',
+        }}
+      >
+        {props.children}
+      </Box>
     </RequireAuth>
   );
 }

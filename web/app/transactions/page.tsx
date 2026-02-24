@@ -9,7 +9,6 @@ import {
   CardContent,
   Chip,
   Collapse,
-  Container,
   FormControl,
   Grid,
   InputLabel,
@@ -290,9 +289,9 @@ export default function TransactionsPage() {
 
   if (allTransactions.length === 0) {
     return (
-      <Container sx={{ mt: 2 }}>
+      <Box>
         <Typography variant="h4" gutterBottom>
-          Transactions 💳
+          Transactions
         </Typography>
         <Card
           sx={{
@@ -304,7 +303,7 @@ export default function TransactionsPage() {
             backgroundColor: theme.palette.background.paper,
             cursor: 'pointer',
             transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': { transform: 'translateY(-4px)', boxShadow: theme.shadows[4] },
+            '&:hover': { transform: 'translateY(-3px)', boxShadow: theme.shadows[3] },
           }}
           onClick={() => router.push('/upload')}
         >
@@ -321,14 +320,14 @@ export default function TransactionsPage() {
             </Button>
           </CardContent>
         </Card>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container sx={{ mt: 2 }} maxWidth="xl">
+    <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
-        <Typography variant="h4">Transactions 💳</Typography>
+        <Typography variant="h4">Transactions</Typography>
         <Box display="flex" gap={1} flexWrap="wrap">
           <Button
             variant="outlined"
@@ -515,8 +514,15 @@ export default function TransactionsPage() {
         ) : null}
       </Box>
 
-      <TableContainer component={Paper} sx={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <Table stickyHeader>
+      <TableContainer
+        component={Paper}
+        sx={{
+          boxShadow: 'none',
+          borderRadius: 3,
+          overflow: 'hidden',
+        }}
+      >
+        <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
               <TableCell>
@@ -594,7 +600,7 @@ export default function TransactionsPage() {
           />
         </Box>
       ) : null}
-    </Container>
+    </Box>
   );
 }
 

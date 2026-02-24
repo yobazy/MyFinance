@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   CardContent,
-  Container,
   Divider,
   FormControlLabel,
   Switch,
@@ -23,7 +22,7 @@ export default function UserSettingsPage() {
   const { mode, toggleMode } = useThemeMode();
 
   return (
-    <Container>
+    <Box>
       <Box mb={4}>
         <Typography variant="h4" gutterBottom>
           Settings
@@ -65,7 +64,7 @@ export default function UserSettingsPage() {
           </Button>
         </CardContent>
       </Card>
-    </Container>
+    </Box>
   );
 }
 

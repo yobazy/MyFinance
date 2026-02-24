@@ -7,7 +7,6 @@ import {
   Button,
   Card,
   CardContent,
-  Container,
   Grid,
   TextField,
   Typography,
@@ -73,7 +72,7 @@ export default function CategorizationPage() {
   };
 
   return (
-    <Container>
+    <Box>
       <Box mb={4}>
         <Typography variant="h4" gutterBottom>
           Categories
@@ -145,7 +144,7 @@ export default function CategorizationPage() {
           </Grid>
         ))}
       </Grid>
-    </Container>
+    </Box>
   );
 }
 
