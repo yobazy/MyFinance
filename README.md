@@ -96,6 +96,10 @@ If you’re moving to a multi-user hosted version, the recommended direction is:
   - `supabase/migrations/003_transactions_metadata_and_dedupe.sql`
 - `supabase/migrations/004_storage_policies.sql` is only needed if you decide to store uploads in Supabase Storage.
 
+### Supabase Auth setup
+- In Supabase Auth settings, enable **Email** if you want users to sign up/sign in with email/password (in addition to Google/GitHub OAuth).
+- For local development, set the Auth **Site URL** to `http://localhost:3000` (see `web/README.md`).
+
 ### Run the worker
 See `worker/README.md`.
 

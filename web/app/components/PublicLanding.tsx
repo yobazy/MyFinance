@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -12,6 +13,7 @@ import {
   IconButton,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
@@ -26,11 +28,19 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { useThemeMode } from '../../lib/themeMode';
 
 export default function PublicLanding(props: { redirectIfAuthenticated?: boolean }) {
-  const { signInWithOAuth, loading, isAuthenticated } = useAuth();
+  const { signInWithOAuth, signInWithPassword, signUpWithPassword, loading, isAuthenticated } = useAuth();
   const router = useRouter();
   const theme = useTheme();
   const { mode, toggleMode } = useThemeMode();
   const [loggingIn, setLoggingIn] = React.useState<'google' | 'github' | null>(null);
+  const [emailMode, setEmailMode] = React.useState<'signin' | 'signup'>('signin');
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [emailSubmitting, setEmailSubmitting] = React.useState(false);
+  const [message, setMessage] = React.useState<{ severity: 'error' | 'success' | 'info'; text: string } | null>(
+    null
+  );
 
   React.useEffect(() => {
     if (props.redirectIfAuthenticated && isAuthenticated) router.push('/');
@@ -45,6 +55,45 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
     } catch (e) {
       console.error(e);
       setLoggingIn(null);
+    }
+  };
+
+  const handleEmailAuth = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setMessage(null);
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setMessage({ severity: 'error', text: 'Please enter your email.' });
+      return;
+    }
+    if (password.length < 6) {
+      setMessage({ severity: 'error', text: 'Password must be at least 6 characters.' });
+      return;
+    }
+    if (emailMode === 'signup' && password !== confirmPassword) {
+      setMessage({ severity: 'error', text: "Passwords don't match." });
+      return;
+    }
+
+    try {
+      setEmailSubmitting(true);
+      if (emailMode === 'signin') {
+        await signInWithPassword(normalizedEmail, password);
+      } else {
+        const { needsEmailConfirmation } = await signUpWithPassword(normalizedEmail, password);
+        setMessage({
+          severity: 'success',
+          text: needsEmailConfirmation
+            ? 'Account created. Check your email to confirm your address, then sign in.'
+            : 'Account created. Signing you in…',
+        });
+      }
+    } catch (err) {
+      const text = err instanceof Error ? err.message : String(err);
+      setMessage({ severity: 'error', text });
+    } finally {
+      setEmailSubmitting(false);
     }
   };
 
@@ -206,7 +255,8 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                     Private by default
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
-                    Your data stays in your account. Sign in with OAuth and manage access with Supabase auth + RLS.
+                    Your data stays in your account. Sign in with OAuth or email/password and manage access with
+                    Supabase auth + RLS.
                   </Typography>
                 </Box>
               </Box>
@@ -316,10 +366,12 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
             }}
           >
             <Typography variant="h5" component="h2" sx={{ mb: 0.75 }}>
-              Sign in
+              {emailMode === 'signin' ? 'Sign in' : 'Create account'}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Continue with a provider to access your dashboard.
+              {emailMode === 'signin'
+                ? 'Continue with a provider or email/password to access your dashboard.'
+                : 'Create an account with email/password, or continue with a provider.'}
             </Typography>
 
             <Stack spacing={1.5}>
@@ -331,7 +383,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   loggingIn === 'google' ? <CircularProgress size={18} color="inherit" /> : <GoogleIcon />
                 }
                 onClick={() => handleLogin('google')}
-                disabled={!!loggingIn}
+                disabled={!!loggingIn || emailSubmitting}
                 sx={{
                   justifyContent: 'center',
                   py: 1.25,
@@ -348,7 +400,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   loggingIn === 'github' ? <CircularProgress size={18} color="inherit" /> : <GitHubIcon />
                 }
                 onClick={() => handleLogin('github')}
-                disabled={!!loggingIn}
+                disabled={!!loggingIn || emailSubmitting}
                 sx={{
                   py: 1.25,
                   borderColor: alpha(theme.palette.text.primary, mode === 'dark' ? 0.28 : 0.18),
@@ -364,7 +416,76 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
               </Button>
             </Stack>
 
-            <Divider sx={{ my: 3 }} />
+            <Divider sx={{ my: 3 }}>or</Divider>
+
+            <Box component="form" onSubmit={handleEmailAuth}>
+              <Stack spacing={1.5}>
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  fullWidth
+                  size="medium"
+                  disabled={emailSubmitting || !!loggingIn}
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={emailMode === 'signup' ? 'new-password' : 'current-password'}
+                  fullWidth
+                  size="medium"
+                  disabled={emailSubmitting || !!loggingIn}
+                />
+                {emailMode === 'signup' ? (
+                  <TextField
+                    label="Confirm password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    fullWidth
+                    size="medium"
+                    disabled={emailSubmitting || !!loggingIn}
+                  />
+                ) : null}
+
+                {message ? <Alert severity={message.severity}>{message.text}</Alert> : null}
+
+                <Button
+                  fullWidth
+                  size="large"
+                  variant="contained"
+                  type="submit"
+                  disabled={emailSubmitting || !!loggingIn}
+                  startIcon={emailSubmitting ? <CircularProgress size={18} color="inherit" /> : undefined}
+                  sx={{ py: 1.25 }}
+                >
+                  {emailSubmitting
+                    ? emailMode === 'signin'
+                      ? 'Signing in…'
+                      : 'Creating account…'
+                    : emailMode === 'signin'
+                      ? 'Sign in with email'
+                      : 'Create account'}
+                </Button>
+
+                <Button
+                  variant="text"
+                  onClick={() => {
+                    setMessage(null);
+                    setEmailMode((m) => (m === 'signin' ? 'signup' : 'signin'));
+                  }}
+                  disabled={emailSubmitting || !!loggingIn}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {emailMode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+                </Button>
+              </Stack>
+            </Box>
 
             <Typography variant="caption" color="text.secondary">
               By continuing, you agree to store your imported statements in your own workspace.
