@@ -80,6 +80,16 @@ celerybeat.pid
 # Node modules (if using frontend JS)
 node_modules/
 
+# Next.js
+.next/
+out/
+.vercel/
+.turbo/
+
+# Tooling caches
+.eslintcache
+*.tsbuildinfo
+
 # Webpack
 webpack-stats.json
 
