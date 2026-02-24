@@ -43,6 +43,37 @@ import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from 'react-plaid-link'
 type SortField = 'balance' | 'name' | 'bank' | 'type';
 type SortOrder = 'asc' | 'desc';
 
+function describeInvalidSupabaseAccessToken(token: string): string | null {
+  // Supabase user session access tokens are JWTs and should not contain whitespace.
+  if (!token) return 'Missing Supabase session access token. Please sign in again.';
+
+  if (token.trim() !== token) {
+    return 'Your Supabase session token has leading/trailing whitespace. Please sign out/in and ensure you did not paste keys with extra spaces in your env.';
+  }
+
+  if (/\s/.test(token)) {
+    return 'Your Supabase session token contains whitespace (space/newline), so the browser refuses to send it as an Authorization header. This usually means you pasted a Supabase key incorrectly (or used a key where a user JWT should be). Please sign out/in and double-check `NEXT_PUBLIC_SUPABASE_ANON_KEY` is an anon/publishable key, not a `sb_secret_...` service role key.';
+  }
+
+  if (token.startsWith('sb_secret_') || token.startsWith('sb_publishable_')) {
+    return 'The value being used as your Supabase session access token looks like a Supabase API key (`sb_*`), not a user JWT. Ensure you are logged in with Supabase Auth, and double-check your `web/.env.local`: `NEXT_PUBLIC_SUPABASE_ANON_KEY` must be an anon/publishable key (never `sb_secret_...`).';
+  }
+
+  if (!token.startsWith('eyJ')) {
+    return 'Your Supabase session access token does not look like a JWT. Please sign out/in and double-check `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` are correct.';
+  }
+
+  return null;
+}
+
+function formatClientSideFetchAuthHeaderError(e: unknown): string | null {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes('Headers.append') && msg.includes('invalid header value')) {
+    return 'Failed to send request: invalid Authorization header value. Your Supabase access token likely contains whitespace or is actually a Supabase API key (`sb_*`) instead of a user JWT. Check `web/.env.local` keys and re-login.';
+  }
+  return null;
+}
+
 export default function AccountsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -259,6 +290,11 @@ export default function AccountsPage() {
         showMessage('Failed to import: missing session access token.');
         return;
       }
+      const tokenIssue = describeInvalidSupabaseAccessToken(token);
+      if (tokenIssue) {
+        showMessage(tokenIssue);
+        return;
+      }
 
       const plaidAccountId =
         metadata.accounts.length === 1 ? metadata.accounts[0]?.id : undefined;
@@ -292,10 +328,9 @@ export default function AccountsPage() {
           } rows processed.`
         );
       } catch (e) {
+        const friendly = formatClientSideFetchAuthHeaderError(e);
         showMessage(
-          `Failed Plaid import: ${
-            e instanceof Error ? e.message : String(e)
-          }`
+          `Failed Plaid import: ${friendly ?? (e instanceof Error ? e.message : String(e))}`
         );
       } finally {
         setPlaidImporting(false);
@@ -331,6 +366,8 @@ export default function AccountsPage() {
 
         const token = sessionData.session?.access_token;
         if (!token) throw new Error('Missing session access token.');
+        const tokenIssue = describeInvalidSupabaseAccessToken(token);
+        if (tokenIssue) throw new Error(tokenIssue);
 
         const resp = await fetch('/api/plaid/link-token', {
           method: 'POST',
@@ -349,10 +386,9 @@ export default function AccountsPage() {
 
         setPlaidLinkToken(body.linkToken);
       } catch (e) {
+        const friendly = formatClientSideFetchAuthHeaderError(e);
         showMessage(
-          `Failed to start Plaid link: ${
-            e instanceof Error ? e.message : String(e)
-          }`
+          `Failed to start Plaid link: ${friendly ?? (e instanceof Error ? e.message : String(e))}`
         );
         setPlaidTargetAccount(null);
       } finally {
