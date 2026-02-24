@@ -576,7 +576,22 @@ export default function TransactionsPage() {
                   </TableCell>
                   <TableCell>
                     {t.category_name ? (
-                      <Chip label={t.category_name} size="small" color="secondary" variant="filled" />
+                      <Chip
+                        label={t.category_name}
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                        sx={(t) => ({
+                          backgroundColor:
+                            t.palette.mode === 'dark'
+                              ? 'rgba(236,231,220,0.04)'
+                              : 'rgba(11,18,32,0.03)',
+                          borderColor:
+                            t.palette.mode === 'dark'
+                              ? 'rgba(236,231,220,0.14)'
+                              : 'rgba(11,18,32,0.12)',
+                        })}
+                      />
                     ) : (
                       <Chip label="Uncategorized" size="small" color="warning" variant="outlined" />
                     )}

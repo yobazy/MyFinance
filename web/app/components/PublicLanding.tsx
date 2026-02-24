@@ -129,10 +129,10 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
           background:
             mode === 'dark'
               ? `radial-gradient(1200px 800px at 15% 10%, ${alpha(theme.palette.primary.main, 0.22)} 0%, transparent 60%),
-                 radial-gradient(900px 700px at 85% 30%, ${alpha(theme.palette.success.main, 0.16)} 0%, transparent 55%),
+                 radial-gradient(900px 700px at 85% 30%, ${alpha(theme.palette.warning.main, 0.12)} 0%, transparent 55%),
                  radial-gradient(1000px 800px at 50% 100%, ${alpha(theme.palette.secondary.main, 0.12)} 0%, transparent 60%)`
               : `radial-gradient(1200px 800px at 15% 10%, ${alpha(theme.palette.primary.main, 0.14)} 0%, transparent 60%),
-                 radial-gradient(900px 700px at 85% 30%, ${alpha(theme.palette.success.main, 0.12)} 0%, transparent 55%),
+                 radial-gradient(900px 700px at 85% 30%, ${alpha(theme.palette.warning.main, 0.10)} 0%, transparent 55%),
                  radial-gradient(1000px 800px at 50% 100%, ${alpha(theme.palette.secondary.main, 0.10)} 0%, transparent 60%)`,
         },
         '&:after': {
