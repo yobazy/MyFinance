@@ -88,7 +88,35 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 - Node.js 16+
 - npm or yarn
 
-### Backend Setup
+### Quick Start (Production Mode - Recommended)
+
+The easiest way to run the web app is using the provided startup script:
+
+```bash
+# Make scripts executable (first time only)
+chmod +x start.sh start-dev.sh
+
+# Run in production mode (single server, Django serves React build)
+./start.sh
+```
+
+The application will be available at `http://localhost:8000/`
+
+### Development Mode (Two Servers)
+
+For development with hot-reloading:
+
+```bash
+# Run development mode (Django on 8000, React on 3000)
+./start-dev.sh
+```
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000/api/`
+
+### Manual Setup
+
+#### Backend Setup
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
@@ -98,7 +126,7 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 2. **Set up Python environment**:
    ```bash
    # Create virtual environment
-   python -m venv venv
+   python3 -m venv venv
    
    # Activate virtual environment
    # On macOS/Linux:
@@ -117,13 +145,7 @@ MyFinance Dashboard is a comprehensive personal finance management application b
    python manage.py migrate
    ```
 
-5. **Start the Django backend server**:
-   ```bash
-   python manage.py runserver
-   ```
-   The API will be available at `http://127.0.0.1:8000/`
-
-### Frontend Setup
+#### Frontend Setup
 1. **Navigate to frontend directory**:
    ```bash
    cd frontend
@@ -134,19 +156,30 @@ MyFinance Dashboard is a comprehensive personal finance management application b
    npm install
    ```
 
-3. **Start the React development server**:
+3. **Build React app for production**:
    ```bash
-   npm start
+   npm run build
    ```
-   The application will be available at `http://localhost:3000/`
+
+4. **Return to root and collect static files**:
+   ```bash
+   cd ..
+   python manage.py collectstatic --noinput
+   ```
+
+5. **Start Django server** (serves both API and React app):
+   ```bash
+   python manage.py runserver
+   ```
+   The application will be available at `http://localhost:8000/`
 
 ---
 
 ## Usage
 
 ### Getting Started
-1. **Launch both servers** (backend and frontend)
-2. **Open your browser** to `http://localhost:3000`
+1. **Start the web application** using one of the methods above
+2. **Open your browser** to `http://localhost:8000` (production) or `http://localhost:3000` (development)
 3. **Create your first account** in the Accounts section
 4. **Upload bank statements** using the Upload page
 5. **Categorize transactions** as needed
@@ -179,15 +212,39 @@ The Django backend provides RESTful APIs for:
 # Frontend build
 cd frontend
 npm run build
+cd ..
 
-# Backend (if needed)
-python manage.py collectstatic
+# Collect static files
+python manage.py collectstatic --noinput
+
+# Start Django server (serves both API and React app)
+python manage.py runserver
+```
+
+### Environment Variables (Optional)
+You can configure the app using environment variables:
+
+```bash
+# Production settings
+export DEBUG=False
+export SECRET_KEY='your-secret-key-here'
+export ALLOWED_HOSTS='yourdomain.com,www.yourdomain.com'
+
+# Then run
+python manage.py runserver
 ```
 
 ### Database Management
 - Database is automatically initialized on first run
 - Local SQLite database: `myfinance.db`
 - Reset database: Use the reset option in the application
+
+### Web App Architecture
+- **Production Mode**: Django serves the built React app from a single server
+- **Development Mode**: React dev server (port 3000) communicates with Django API (port 8000)
+- **Static Files**: Served via WhiteNoise middleware in production
+- **API Routes**: All API endpoints are under `/api/`
+- **Frontend Routes**: All other routes are handled by React Router
 
 ---
 

@@ -2,6 +2,9 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.core.files.storage import default_storage
+from django.views.generic import TemplateView
+from django.conf import settings
+from django.conf.urls.static import static
 import pandas as pd
 import os
 import json
@@ -1010,3 +1013,29 @@ def get_dashboard_data(request):
         })
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+# View to serve React app
+def serve_react_app(request):
+    """Serve the React app's index.html for all non-API routes"""
+    try:
+        return render(request, 'index.html')
+    except:
+        # If React build doesn't exist, return a helpful message
+        from django.http import HttpResponse
+        return HttpResponse("""
+        <html>
+            <head><title>MyFinance - Setup Required</title></head>
+            <body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">
+                <h1>MyFinance Dashboard</h1>
+                <p>React build not found. Please build the frontend first:</p>
+                <pre style="background: #f5f5f5; padding: 20px; display: inline-block; border-radius: 5px;">
+cd frontend
+npm install
+npm run build
+cd ..
+python manage.py collectstatic --noinput
+                </pre>
+                <p>Or use the startup script: <code>./start.sh</code></p>
+            </body>
+        </html>
+        """, content_type='text/html')

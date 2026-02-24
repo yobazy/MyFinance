@@ -15,8 +15,9 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
-from .views import upload_file, upload_multiple_files, get_visualization_data, get_transactions, get_accounts, create_account, reset_database, update_account, delete_account, get_dashboard_data
+from django.urls import path, include, re_path
+from django.views.generic import TemplateView
+from .views import upload_file, upload_multiple_files, get_visualization_data, get_transactions, get_accounts, create_account, reset_database, update_account, delete_account, get_dashboard_data, serve_react_app
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -38,4 +39,7 @@ urlpatterns = [
 
     # EXTERNAL API ROUTES, SEE api_urls.py
     path('api/', include('backend.api.urls')),  # All API routes will be under /api/
+    
+    # Serve React app for all other routes (must be last)
+    re_path(r'^(?!api|admin|static).*$', serve_react_app, name='react_app'),
 ]
