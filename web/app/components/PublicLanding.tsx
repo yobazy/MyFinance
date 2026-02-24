@@ -25,6 +25,7 @@ import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { getSafeNextPath } from '../../lib/auth/redirect';
 import { useThemeMode } from '../../lib/themeMode';
 
 export default function PublicLanding(props: { redirectIfAuthenticated?: boolean }) {
@@ -43,13 +44,18 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
   );
 
   React.useEffect(() => {
-    if (props.redirectIfAuthenticated && isAuthenticated) router.push('/');
+    if (!props.redirectIfAuthenticated || !isAuthenticated) return;
+    const sp = new URLSearchParams(window.location.search);
+    const next = getSafeNextPath(sp.get('next'));
+    router.push(next);
   }, [isAuthenticated, props.redirectIfAuthenticated, router]);
 
   const handleLogin = async (provider: 'google' | 'github') => {
     try {
+      const sp = new URLSearchParams(window.location.search);
+      const next = getSafeNextPath(sp.get('next'));
       setLoggingIn(provider);
-      await signInWithOAuth(provider);
+      await signInWithOAuth(provider, next);
       // Supabase OAuth redirects; if it doesn't, clear spinner.
       setLoggingIn(null);
     } catch (e) {
@@ -78,10 +84,12 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
 
     try {
       setEmailSubmitting(true);
+      const sp = new URLSearchParams(window.location.search);
+      const next = getSafeNextPath(sp.get('next'));
       if (emailMode === 'signin') {
         await signInWithPassword(normalizedEmail, password);
       } else {
-        const { needsEmailConfirmation } = await signUpWithPassword(normalizedEmail, password);
+        const { needsEmailConfirmation } = await signUpWithPassword(normalizedEmail, password, next);
         setMessage({
           severity: 'success',
           text: needsEmailConfirmation

@@ -40,7 +40,9 @@ function RequireAuth(props: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) router.replace('/login');
+    if (loading || isAuthenticated) return;
+    const next = `${window.location.pathname}${window.location.search}`;
+    router.replace(`/login?next=${encodeURIComponent(next)}`);
   }, [isAuthenticated, loading, router]);
 
   if (loading) {
