@@ -41,7 +41,9 @@ type RecentTx = {
 type DashboardData = {
   totalBalance: number;
   monthlySpending: number;
-  lastTransactionDate: string | null;
+  lastMonthTransactionDate: string | null;
+  hasAnyTransactions: boolean;
+  hasMonthTransactions: boolean;
   recentTransactions: RecentTx[];
 };
 
@@ -108,13 +110,18 @@ export default function DashboardPage() {
         recentTxQuery,
       ]);
 
+      const monthTransactionCount = monthRows?.length ?? 0;
+      const hasMonthTransactions = monthTransactionCount > 0;
+      const hasAnyTransactions = (recentRows?.length ?? 0) > 0;
+
       const monthlySpending = (monthRows ?? []).reduce((sum, r) => {
         const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
         return amt > 0 ? sum + amt : sum;
       }, 0);
 
-      const lastTransactionDate =
-        (monthRows?.[0]?.date as string | undefined) ?? (recentRows?.[0]?.date as string | undefined) ?? null;
+      const lastMonthTransactionDate = hasMonthTransactions
+        ? ((monthRows?.[0]?.date as string | undefined) ?? null)
+        : null;
 
       const recentTransactions: RecentTx[] = (recentRows ?? []).map((r) => {
         const account = (r.accounts ?? null) as null | { name?: string; bank?: string };
@@ -133,7 +140,9 @@ export default function DashboardPage() {
       setDashboardData({
         totalBalance,
         monthlySpending,
-        lastTransactionDate,
+        lastMonthTransactionDate,
+        hasAnyTransactions,
+        hasMonthTransactions,
         recentTransactions,
       });
 
@@ -262,14 +271,21 @@ export default function DashboardPage() {
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Monthly spending as of:{' '}
-                  {dashboardData.lastTransactionDate
-                    ? new Date(dashboardData.lastTransactionDate).toLocaleDateString()
-                    : 'No transactions'}{' '}
-                  {selectedAccountId !== 'all' && '(Filtered)'}
+                <Typography variant="h6">
+                  Monthly spending (this month) {selectedAccountId !== 'all' && '(Filtered)'}
                 </Typography>
-                <Typography variant="h3">${dashboardData.monthlySpending.toLocaleString()}</Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {dashboardData.hasMonthTransactions && dashboardData.lastMonthTransactionDate
+                    ? `Updated ${new Date(dashboardData.lastMonthTransactionDate).toLocaleDateString()}`
+                    : dashboardData.hasAnyTransactions
+                      ? 'No transactions this month'
+                      : 'No transactions yet'}
+                </Typography>
+                <Typography variant="h3" color={dashboardData.hasAnyTransactions ? 'text.primary' : 'text.secondary'}>
+                  {dashboardData.hasAnyTransactions
+                    ? `$${dashboardData.monthlySpending.toLocaleString()}`
+                    : '—'}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
