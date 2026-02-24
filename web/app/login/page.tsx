@@ -1,87 +1,117 @@
 'use client';
 
-import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { createBrowserSupabaseClient } from '../../lib/supabase';
+import React from 'react';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Paper,
+  Typography,
+} from '@mui/material';
+import GoogleIcon from '@mui/icons-material/Google';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import { useAuth } from '../../lib/auth/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const { signInWithOAuth, loading, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [loggingIn, setLoggingIn] = React.useState<'google' | 'github' | null>(null);
 
-  async function signIn() {
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    const { error: e } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    setBusy(false);
-    if (e) setError(e.message);
-    else {
-      setMessage('Signed in.');
-      location.href = '/';
+  React.useEffect(() => {
+    if (isAuthenticated) router.push('/');
+  }, [isAuthenticated, router]);
+
+  const handleLogin = async (provider: 'google' | 'github') => {
+    try {
+      setLoggingIn(provider);
+      await signInWithOAuth(provider);
+      // Supabase OAuth redirects; if it doesn't, clear spinner.
+      setLoggingIn(null);
+    } catch (e) {
+      console.error(e);
+      setLoggingIn(null);
     }
-  }
+  };
 
-  async function signUp() {
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    const { error: e } = await supabase.auth.signUp({ email, password });
-    setBusy(false);
-    if (e) setError(e.message);
-    else setMessage('Signed up. If email confirmations are enabled, check email.');
+  if (loading) {
+    return (
+      <Container
+        maxWidth="sm"
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Container>
+    );
   }
 
   return (
-    <div className="card">
-      <h2>Login</h2>
-      <p>
-        <small className="muted">
-          Dev-friendly email/password. You can switch to OAuth in Supabase later.
-        </small>
-      </p>
+    <Container
+      maxWidth="sm"
+      sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+      }}
+    >
+      <Paper elevation={3} sx={{ p: 4, width: '100%', textAlign: 'center' }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          MyFinance Dashboard
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+          Sign in to manage your finances
+        </Typography>
 
-      <div className="row">
-        <input
-          placeholder="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-        />
-        <input
-          placeholder="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          type="password"
-          autoComplete="current-password"
-        />
-      </div>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={
+              loggingIn === 'google' ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <GoogleIcon />
+              )
+            }
+            onClick={() => handleLogin('google')}
+            disabled={!!loggingIn}
+            sx={{
+              backgroundColor: '#4285F4',
+              '&:hover': { backgroundColor: '#357AE8' },
+            }}
+          >
+            {loggingIn === 'google' ? 'Signing in...' : 'Sign in with Google'}
+          </Button>
 
-      <div className="row" style={{ marginTop: 12 }}>
-        <button onClick={signIn} disabled={busy || !email || !password}>
-          Sign in
-        </button>
-        <button
-          className="secondary"
-          onClick={signUp}
-          disabled={busy || !email || !password}
-        >
-          Sign up
-        </button>
-        <Link href="/">
-          <button className="secondary">Home</button>
-        </Link>
-      </div>
-
-      {error ? <p style={{ color: '#ff9aa2' }}>{error}</p> : null}
-      {message ? <p style={{ color: '#b6ffd3' }}>{message}</p> : null}
-    </div>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={
+              loggingIn === 'github' ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <GitHubIcon />
+              )
+            }
+            onClick={() => handleLogin('github')}
+            disabled={!!loggingIn}
+            sx={{
+              backgroundColor: '#24292e',
+              '&:hover': { backgroundColor: '#1a1e22' },
+            }}
+          >
+            {loggingIn === 'github' ? 'Signing in...' : 'Sign in with GitHub'}
+          </Button>
+        </Box>
+      </Paper>
+    </Container>
   );
 }
 

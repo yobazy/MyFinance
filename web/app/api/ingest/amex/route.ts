@@ -1,5 +1,5 @@
-import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
-import { parseAmexXlsx } from '@/lib/parsers/amex';
+import { createSupabaseAdminClient } from '../../../../lib/supabaseAdmin';
+import { parseAmexXlsx } from '../../../../lib/parsers/amex';
 
 export const runtime = 'nodejs';
 
