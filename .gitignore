@@ -12,6 +12,12 @@ eggs/
 .eggs/
 lib/
 lib64/
+!web/lib/
+web/lib/*
+!web/lib/plaid.ts
+!web/lib/parsers/
+web/lib/parsers/*
+!web/lib/parsers/plaid.ts
 parts/
 sdist/
 var/

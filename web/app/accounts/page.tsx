@@ -33,10 +33,12 @@ import {
   Refresh as RefreshIcon,
   Savings as SavingsIcon,
   Sort as SortIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import type { Account } from '../../lib/types';
+import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from 'react-plaid-link';
 
 type SortField = 'balance' | 'name' | 'bank' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -59,6 +61,10 @@ export default function AccountsPage() {
   const [busy, setBusy] = useState(false);
   const [sortBy, setSortBy] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [plaidTargetAccount, setPlaidTargetAccount] = useState<Account | null>(null);
+  const [plaidBusy, setPlaidBusy] = useState(false);
+  const [plaidImporting, setPlaidImporting] = useState(false);
 
   const showMessage = (msg: string) => {
     setMessage(msg);
@@ -235,6 +241,127 @@ export default function AccountsPage() {
     return sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
   };
 
+  const importPlaidTransactions = useCallback(
+    async (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => {
+      if (!plaidTargetAccount) {
+        showMessage('Failed to import: target account is missing.');
+        return;
+      }
+
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) {
+        showMessage(`Failed to import: ${sessionErr.message}`);
+        return;
+      }
+
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        showMessage('Failed to import: missing session access token.');
+        return;
+      }
+
+      const plaidAccountId =
+        metadata.accounts.length === 1 ? metadata.accounts[0]?.id : undefined;
+
+      setPlaidImporting(true);
+      try {
+        const resp = await fetch('/api/plaid/import', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            publicToken,
+            accountId: plaidTargetAccount.id,
+            plaidAccountId,
+          }),
+        });
+
+        const body = (await resp.json()) as {
+          ok?: boolean;
+          rowsProcessed?: number;
+          error?: string;
+        };
+
+        if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
+
+        showMessage(
+          `Plaid import complete for ${plaidTargetAccount.name}: ${
+            body.rowsProcessed ?? 0
+          } rows processed.`
+        );
+      } catch (e) {
+        showMessage(
+          `Failed Plaid import: ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        );
+      } finally {
+        setPlaidImporting(false);
+        setPlaidLinkToken(null);
+        setPlaidTargetAccount(null);
+      }
+    },
+    [plaidTargetAccount, supabase]
+  );
+
+  const { open: openPlaid, ready: plaidReady } = usePlaidLink({
+    token: plaidLinkToken,
+    onSuccess: importPlaidTransactions,
+    onExit: (err) => {
+      if (err?.error_message) showMessage(`Plaid closed: ${err.error_message}`);
+      setPlaidLinkToken(null);
+      setPlaidTargetAccount(null);
+    },
+  });
+
+  useEffect(() => {
+    if (plaidLinkToken && plaidReady) openPlaid();
+  }, [openPlaid, plaidLinkToken, plaidReady]);
+
+  const handleConnectPlaid = useCallback(
+    async (account: Account) => {
+      setPlaidBusy(true);
+      setPlaidTargetAccount(account);
+
+      try {
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) throw sessionErr;
+
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Missing session access token.');
+
+        const resp = await fetch('/api/plaid/link-token', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        });
+
+        const body = (await resp.json()) as {
+          ok?: boolean;
+          linkToken?: string;
+          error?: string;
+        };
+
+        if (!resp.ok || !body.linkToken) {
+          throw new Error(body.error ?? `HTTP ${resp.status}`);
+        }
+
+        setPlaidLinkToken(body.linkToken);
+      } catch (e) {
+        showMessage(
+          `Failed to start Plaid link: ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        );
+        setPlaidTargetAccount(null);
+      } finally {
+        setPlaidBusy(false);
+      }
+    },
+    [supabase]
+  );
+
   return (
     <Box>
       <Box mb={4}>
@@ -357,6 +484,17 @@ export default function AccountsPage() {
                 <Typography variant="body2" color="text.secondary">
                   Balance: ${Number(account.balance ?? 0).toLocaleString()}
                 </Typography>
+
+                <Button
+                  sx={{ mt: 2 }}
+                  size="small"
+                  variant="outlined"
+                  startIcon={<LinkIcon />}
+                  onClick={() => handleConnectPlaid(account)}
+                  disabled={busy || plaidBusy || plaidImporting}
+                >
+                  Connect with Plaid
+                </Button>
               </CardContent>
             </Card>
           </Grid>
