@@ -1,8 +1,10 @@
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 class Category(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categories')
     name = models.CharField(max_length=255)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subcategories')
     description = models.TextField(blank=True, help_text="Optional description for the category")
@@ -12,7 +14,7 @@ class Category(models.Model):
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     
     class Meta:
-        unique_together = ['name', 'parent']  # Allow same name under different parents
+        unique_together = ['user', 'name', 'parent']  # Allow same name under different parents, per user
         ordering = ['parent__name', 'name']  # Order by parent then name
         verbose_name_plural = "Categories"
     
@@ -54,7 +56,7 @@ class Category(models.Model):
         """Get the count of transactions in this category and all its subcategories"""
         from django.db.models import Count
         subcategory_ids = [self.id] + [sub.id for sub in self.get_all_subcategories()]
-        return Transaction.objects.filter(category__in=subcategory_ids).count()
+        return Transaction.objects.filter(user=self.user, category__in=subcategory_ids).count()
 
 class Account(models.Model):
     ACCOUNT_TYPES = [
@@ -63,6 +65,7 @@ class Account(models.Model):
         ('credit', 'Credit'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=100)
     bank = models.CharField(max_length=50)
     type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='checking')
@@ -70,7 +73,7 @@ class Account(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ['bank', 'name']
+        unique_together = ['user', 'bank', 'name']  # Unique per user
 
     def __str__(self):
         return f"{self.bank} - {self.name}"
@@ -90,6 +93,7 @@ class Account(models.Model):
         return self.balance
        
 class Transaction(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
     date = models.DateField()
     description = models.TextField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -122,6 +126,7 @@ class CategorizationRule(models.Model):
         ('combined', 'Combined Conditions'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categorization_rules')
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, help_text="Optional description of what this rule does")
     rule_type = models.CharField(max_length=20, choices=RULE_TYPES)
@@ -185,13 +190,15 @@ class CategorizationRule(models.Model):
 
 # Model for rule groups/categories
 class RuleGroup(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='rule_groups')
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default='#2196F3', help_text="Hex color code for UI display")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
+        unique_together = ['user', 'name']  # Unique per user
         ordering = ['name']
         verbose_name = "Rule Group"
         verbose_name_plural = "Rule Groups"
@@ -252,6 +259,7 @@ class ScotiabankTransaction(models.Model):
 # Database Management Models
 class BackupSettings(models.Model):
     """Settings for database backup management"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='backup_settings')
     max_backups = models.PositiveIntegerField(default=5, help_text="Maximum number of auto-backups to keep")
     auto_backup_enabled = models.BooleanField(default=True, help_text="Enable automatic backups")
     backup_frequency_hours = models.PositiveIntegerField(default=24, help_text="Hours between automatic backups")
@@ -273,6 +281,7 @@ class DatabaseBackup(models.Model):
         ('scheduled', 'Scheduled'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='database_backups')
     backup_type = models.CharField(max_length=20, choices=BACKUP_TYPES, default='manual')
     file_path = models.CharField(max_length=500, help_text="Path to backup file")
     file_size = models.BigIntegerField(help_text="Size of backup file in bytes")

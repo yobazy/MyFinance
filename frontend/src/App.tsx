@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
 import { 
   AppBar, 
   Toolbar, 
@@ -9,7 +9,9 @@ import {
   Menu,
   MenuItem,
   useMediaQuery,
-  Box
+  Box,
+  Typography,
+  Avatar
 } from "@mui/material";
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -23,6 +25,7 @@ import RuleIcon from '@mui/icons-material/Rule';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpIcon from '@mui/icons-material/Help';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import LogoutIcon from '@mui/icons-material/Logout';
 import Dashboard from "./pages/Dashboard.tsx";
 import AccountsPage from "./pages/AccountsPage.tsx";
 import FileUploader from "./pages/FileUploader";
@@ -32,6 +35,9 @@ import Visualizations from "./pages/Visualizations";
 import Transactions from "./pages/Transactions.tsx";
 import UserSettings from "./pages/UserSettings";
 import HelpPage from "./pages/HelpPage.tsx";
+import LoginPage from "./components/LoginPage";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "@mui/material/styles";
 import { getTheme } from "./theme";
 import { CssBaseline } from "@mui/material";
@@ -39,7 +45,12 @@ import { CssBaseline } from "@mui/material";
 // Backup check function
 const checkAndCreateAutoBackup = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/backup/check-auto/');
+    const token = localStorage.getItem('access_token');
+    const response = await fetch('http://localhost:8000/api/backup/check-auto/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
     if (response.ok) {
       const data = await response.json();
       if (data.backup_created) {
@@ -51,9 +62,12 @@ const checkAndCreateAutoBackup = async () => {
   }
 };
 
-const App = () => {
+const AppContent = () => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [manageAnchorEl, setManageAnchorEl] = React.useState(null);
+  const [userMenuAnchor, setUserMenuAnchor] = React.useState(null);
   const [mode, setMode] = React.useState(localStorage.getItem('theme') || 'dark');
   const theme = React.useMemo(() => getTheme(mode), [mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -65,13 +79,21 @@ const App = () => {
 
     window.addEventListener('themeChange', handleThemeChange);
     
-    // Check for auto backup when app loads
-    checkAndCreateAutoBackup();
+    // Check for auto backup when app loads (only if authenticated)
+    if (isAuthenticated) {
+      checkAndCreateAutoBackup();
+    }
     
     return () => {
       window.removeEventListener('themeChange', handleThemeChange);
     };
-  }, []);
+  }, [isAuthenticated]);
+  
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+    setUserMenuAnchor(null);
+  };
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -114,7 +136,6 @@ const navItems = [
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
         <AppBar position="static">
           <Toolbar sx={{ minHeight: '56px', py: 0, overflow: 'visible' }}>
             <Box sx={{ flexGrow: isMobile ? 0 : 1, display: 'flex', alignItems: 'center' }}>
@@ -138,16 +159,22 @@ const navItems = [
 
             {isMobile ? (
               <>
-                <IconButton
-                  size="large"
-                  edge="end"
-                  color="inherit"
-                  aria-label="menu"
-                  onClick={handleMenu}
-                  sx={{ ml: 'auto' }}
-                >
-                  <MenuIcon />
-                </IconButton>
+                <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {user && (
+                    <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                      {user.first_name || user.email}
+                    </Typography>
+                  )}
+                  <IconButton
+                    size="large"
+                    edge="end"
+                    color="inherit"
+                    aria-label="menu"
+                    onClick={handleMenu}
+                  >
+                    <MenuIcon />
+                  </IconButton>
+                </Box>
                 <Menu
                   anchorEl={anchorEl}
                   open={Boolean(anchorEl)}
@@ -209,7 +236,7 @@ const navItems = [
                 </Menu>
               </>
             ) : (
-              <Box sx={{ display: 'flex' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {navItems.slice(0, -1).map((item) => (
                   <NavButton
                     key={item.to}
@@ -232,6 +259,33 @@ const navItems = [
                   icon={navItems[navItems.length - 1].icon}
                   label={navItems[navItems.length - 1].label}
                 />
+                {user && (
+                  <>
+                    <IconButton
+                      onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+                      sx={{ ml: 1 }}
+                    >
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+                        {(user.first_name?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                      </Avatar>
+                    </IconButton>
+                    <Menu
+                      anchorEl={userMenuAnchor}
+                      open={Boolean(userMenuAnchor)}
+                      onClose={() => setUserMenuAnchor(null)}
+                    >
+                      <MenuItem disabled>
+                        <Typography variant="body2">
+                          {user.email}
+                        </Typography>
+                      </MenuItem>
+                      <MenuItem onClick={handleLogout}>
+                        <LogoutIcon sx={{ mr: 1 }} />
+                        Logout
+                      </MenuItem>
+                    </Menu>
+                  </>
+                )}
               </Box>
             )}
           </Toolbar>
@@ -281,19 +335,95 @@ const navItems = [
 
         <Container sx={{ mt: 4 }}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/upload" element={<FileUploader />} />
-            <Route path="/accounts" element={<AccountsPage />} />
-            <Route path="/categorization" element={<Categorization />} />
-            <Route path="/rules" element={<RuleManagement />} />
-            <Route path="/visualizations" element={<Visualizations />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="/user-settings" element={<UserSettings />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/upload"
+              element={
+                <ProtectedRoute>
+                  <FileUploader />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounts"
+              element={
+                <ProtectedRoute>
+                  <AccountsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/categorization"
+              element={
+                <ProtectedRoute>
+                  <Categorization />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rules"
+              element={
+                <ProtectedRoute>
+                  <RuleManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/visualizations"
+              element={
+                <ProtectedRoute>
+                  <Visualizations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/transactions"
+              element={
+                <ProtectedRoute>
+                  <Transactions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/help"
+              element={
+                <ProtectedRoute>
+                  <HelpPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-settings"
+              element={
+                <ProtectedRoute>
+                  <UserSettings />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </Container>
-      </Router>
     </ThemeProvider>
+  );
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <ThemeProvider theme={getTheme(localStorage.getItem('theme') || 'dark')}>
+        <CssBaseline />
+        <Router>
+          <AppContent />
+        </Router>
+      </ThemeProvider>
+    </AuthProvider>
   );
 };
 

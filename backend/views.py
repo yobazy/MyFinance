@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from django.core.files.storage import default_storage
 from django.views.generic import TemplateView
 from django.conf import settings
@@ -18,6 +19,7 @@ from backend.serializers import TransactionSerializer, CategorySerializer  # ✅
 UPLOAD_DIR = "uploads/"
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def upload_file(request):
     """Handles CSV/XLS file upload and inserts data into the database."""
     print(f"DEBUG: Request method: {request.method}")
@@ -40,9 +42,9 @@ def upload_file(request):
     if not bank or not account_name:
         return Response({"error": "Bank and account are required"}, status=400)
 
-    # Get or create the account
+    # Get or create the account (filter by user)
     try:
-        account = Account.objects.get(bank=bank, name=account_name)
+        account = Account.objects.get(user=request.user, bank=bank, name=account_name)
     except Account.DoesNotExist:
         return Response({"error": f"Account '{account_name}' not found for bank '{bank}'"}, status=400)
 
@@ -91,15 +93,15 @@ def upload_file(request):
                     except UnicodeDecodeError:
                         df = pd.read_csv(file_path, skiprows=11, encoding='iso-8859-1')
             
-            df.columns = df.columns.str.lower().str.replace(' ', '_')
-            df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
-            process_amex_data(df, account)
-        elif file_type == "Scotiabank":
-            # Read Scotiabank CSV
-            df = pd.read_csv(file_path)
-            # Clean column names
-            df.columns = df.columns.str.strip()
-            process_scotiabank_data(df, account)
+                df.columns = df.columns.str.lower().str.replace(' ', '_')
+                df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
+                process_amex_data(df, account, request.user)
+            elif file_type == "Scotiabank":
+                # Read Scotiabank CSV
+                df = pd.read_csv(file_path)
+                # Clean column names
+                df.columns = df.columns.str.strip()
+                process_scotiabank_data(df, account, request.user)
         else:
             return Response({"error": "Unsupported file type"}, status=400)
 
@@ -115,6 +117,7 @@ def upload_file(request):
     return Response({"error": "Failed to process file"}, status=500)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def upload_multiple_files(request):
     """Handles multiple CSV/XLS file uploads and inserts data into the database."""
     print(f"DEBUG: Request method: {request.method}")
@@ -139,7 +142,7 @@ def upload_multiple_files(request):
 
     # Get or create the account
     try:
-        account = Account.objects.get(bank=bank, name=account_name)
+        account = Account.objects.get(user=request.user, bank=bank, name=account_name)
     except Account.DoesNotExist:
         return Response({"error": f"Account '{account_name}' not found for bank '{bank}'"}, status=400)
 
@@ -178,10 +181,10 @@ def upload_multiple_files(request):
                 if is_headerless:
                     # This is a headerless file, assign proper column names
                     df.columns = ['DATE', 'DESCRIPTION', 'CREDIT', 'DEBIT', 'BALANCE']
-                    process_td_data_headerless(df, account)
+                    process_td_data_headerless(df, account, request.user)
                 else:
                     # This is the standard format with headers
-                    process_td_data(df, account)
+                    process_td_data(df, account, request.user)
             elif file_type == "Amex":
                 # Try different encodings for Amex files
                 try:
@@ -198,13 +201,13 @@ def upload_multiple_files(request):
                 
                 df.columns = df.columns.str.lower().str.replace(' ', '_')
                 df.rename(columns={'exchange_rate': 'exc_rate'}, inplace=True)
-                process_amex_data(df, account)
+                process_amex_data(df, account, request.user)
             elif file_type == "Scotiabank":
                 # Read Scotiabank CSV
                 df = pd.read_csv(file_path)
                 # Clean column names
                 df.columns = df.columns.str.strip()
-                process_scotiabank_data(df, account)
+                process_scotiabank_data(df, account, request.user)
             else:
                 file_result["error"] = "Unsupported file type"
                 results.append(file_result)
@@ -238,7 +241,7 @@ def upload_multiple_files(request):
         "file_results": results
     })
 
-def process_td_data(df, account):
+def process_td_data(df, account, user):
     """Process and insert TD data into the database."""
     from datetime import datetime
     
@@ -275,8 +278,9 @@ def process_td_data(df, account):
             balance=None  # Not available in this format
         )
         
-        # Create Transaction record
+        # Create Transaction record with user
         Transaction.objects.create(
+            user=user,
             date=row.Date,
             description=description_upper,
             amount=amount,
@@ -287,7 +291,7 @@ def process_td_data(df, account):
     # Update account balance after processing all transactions
     account.update_balance()
 
-def process_td_data_headerless(df, account):
+def process_td_data_headerless(df, account, user):
     """Process and insert TD data from headerless CSV format (DATE, DESCRIPTION, CREDIT, DEBIT, BALANCE)."""
     from datetime import datetime
     
@@ -339,8 +343,9 @@ def process_td_data_headerless(df, account):
             balance=None  # Balance column is ignored as requested
         )
         
-        # Create Transaction record
+        # Create Transaction record with user
         Transaction.objects.create(
+            user=user,
             date=row.DATE,
             description=description_upper,
             amount=net_amount,
@@ -351,7 +356,7 @@ def process_td_data_headerless(df, account):
     # Update account balance after processing all transactions
     account.update_balance()
 
-def process_amex_data(df, account):
+def process_amex_data(df, account, user):
     """Process and insert Amex data into the database, ensuring correct formats."""
     from datetime import datetime
 
@@ -403,8 +408,9 @@ def process_amex_data(df, account):
             merchant=row.merchant
         )
 
-        # Insert into the combined transactions table
+        # Insert into the combined transactions table with user
         Transaction.objects.create(
+            user=user,
             date=row.date,
             description=description_upper,
             amount=row.amount,
@@ -415,7 +421,7 @@ def process_amex_data(df, account):
     # Update account balance after processing all transactions
     account.update_balance()
 
-def process_scotiabank_data(df, account):
+def process_scotiabank_data(df, account, user):
     """Process and insert Scotiabank data into the database."""
     from datetime import datetime
     
@@ -498,13 +504,15 @@ def manage_accounts(request):
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def transactions_missing_categories(request):
     """Fetches transactions that are missing categories."""
-    transactions = Transaction.objects.filter(category__isnull=True)
+    transactions = Transaction.objects.filter(user=request.user, category__isnull=True)
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_categories(request):
     """Fetches all categories with optional tree structure."""
     tree_view = request.GET.get('tree', 'false').lower() == 'true'
@@ -513,20 +521,21 @@ def get_categories(request):
     if tree_view:
         # Return hierarchical tree structure
         from .serializers import CategoryTreeSerializer
-        categories = Category.objects.filter(parent__isnull=True, is_active=True)
+        categories = Category.objects.filter(user=request.user, parent__isnull=True, is_active=True)
         serializer = CategoryTreeSerializer(categories, many=True)
     elif root_only:
         # Return only root categories
-        categories = Category.objects.filter(parent__isnull=True, is_active=True)
+        categories = Category.objects.filter(user=request.user, parent__isnull=True, is_active=True)
         serializer = CategorySerializer(categories, many=True)
     else:
         # Return flat list of all categories
-        categories = Category.objects.filter(is_active=True)
+        categories = Category.objects.filter(user=request.user, is_active=True)
         serializer = CategorySerializer(categories, many=True)
     
     return Response(serializer.data, content_type="application/json")
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_account(request):
     if request.method == "POST":
         try:
@@ -539,6 +548,7 @@ def create_account(request):
                 return JsonResponse({"error": "Bank and account name are required"}, status=400)
 
             account = Account.objects.create(
+                user=request.user,
                 bank=bank,
                 name=name,
                 type=account_type,
@@ -560,11 +570,12 @@ def create_account(request):
             return JsonResponse({"error": str(e)}, status=500)
     else:
         return JsonResponse({"error": "Method not allowed. Use POST to create accounts."}, status=405)
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_accounts(request):
     try:
         bank = request.GET.get("bank")
-        accounts = Account.objects.all()
+        accounts = Account.objects.filter(user=request.user)
         if bank:
             accounts = accounts.filter(bank=bank)
 
@@ -582,9 +593,10 @@ def get_accounts(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_transactions(request):
     """Fetch all transactions."""
-    transactions = Transaction.objects.select_related('account').all().order_by("-date")  # Order by latest
+    transactions = Transaction.objects.filter(user=request.user).select_related('account').all().order_by("-date")  # Order by latest
     
     # Filter for uncategorized transactions if requested
     uncategorized = request.GET.get('uncategorized', 'false').lower() == 'true'
@@ -595,6 +607,7 @@ def get_transactions(request):
     return Response(serializer.data)
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def reset_database(request):
     """Deletes all data from the database, then runs migrations. Preserves backup records and settings."""
     try:
@@ -625,11 +638,13 @@ import numpy as np
 from django.db.models.functions import Abs, TruncMonth
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_visualization_data(request):
     """API to get transaction data for visualizations"""
 
     # Determine sensible defaults: from earliest transaction date (if any) to today
-    first_txn = Transaction.objects.order_by('date').values_list('date', flat=True).first()
+    first_txn = Transaction.objects.filter(user=request.user).order_by('date').values_list('date', flat=True).first()
     default_start = first_txn.strftime("%Y-%m-%d") if first_txn else f"{datetime.now().year}-01-01"
     default_end = datetime.now().strftime("%Y-%m-%d")
 
@@ -638,8 +653,8 @@ def get_visualization_data(request):
     end_date = request.GET.get("end_date", default_end)
     account_id = request.GET.get("account_id", None)
 
-    # Get all transactions within the date range
-    transactions = Transaction.objects.filter(date__range=[start_date, end_date])
+    # Get all transactions within the date range (filter by user)
+    transactions = Transaction.objects.filter(user=request.user, date__range=[start_date, end_date])
     
     # Filter by account if specified
     if account_id and account_id != 'all':
@@ -780,6 +795,7 @@ def get_visualization_data(request):
     return JsonResponse(response_data, safe=False)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_most_recent_transaction_date(request, table_name):
     """Fetch the most recent transaction date for a given table."""
     model_mapping = {
@@ -796,19 +812,23 @@ def get_most_recent_transaction_date(request, table_name):
     return Response({"error": "No transactions found"}, status=404)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_category(request):
     """Creates a new category."""
-    serializer = CategorySerializer(data=request.data)
+    data = request.data.copy()
+    data['user'] = request.user.id
+    serializer = CategorySerializer(data=data)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=201)
     return Response(serializer.errors, status=400)
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated])
 def update_category(request, category_id):
     """Updates an existing category."""
     try:
-        category = Category.objects.get(id=category_id)
+        category = Category.objects.get(user=request.user, id=category_id)
         serializer = CategorySerializer(category, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -818,10 +838,11 @@ def update_category(request, category_id):
         return Response({'error': 'Category not found'}, status=404)
 
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_category(request, category_id):
     """Deletes a category."""
     try:
-        category = Category.objects.get(id=category_id)
+        category = Category.objects.get(user=request.user, id=category_id)
         # Check if category has subcategories
         if category.subcategories.exists():
             return Response({
@@ -833,13 +854,15 @@ def delete_category(request, category_id):
         return Response({'error': 'Category not found'}, status=404)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_subcategory(request, parent_id):
     """Creates a subcategory under a parent category."""
     try:
-        parent_category = Category.objects.get(id=parent_id)
-        # Include parent in the data
+        parent_category = Category.objects.get(user=request.user, id=parent_id)
+        # Include parent and user in the data
         data = request.data.copy()
         data['parent'] = parent_id
+        data['user'] = request.user.id
         serializer = CategorySerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -849,39 +872,43 @@ def create_subcategory(request, parent_id):
         return Response({'error': 'Parent category not found'}, status=404)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_category_subcategories(request, category_id):
     """Gets all subcategories of a specific category."""
     try:
-        category = Category.objects.get(id=category_id)
-        subcategories = category.subcategories.filter(is_active=True)
+        category = Category.objects.get(user=request.user, id=category_id)
+        subcategories = category.subcategories.filter(user=request.user, is_active=True)
         serializer = CategorySerializer(subcategories, many=True)
         return Response(serializer.data)
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=404)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_category_tree(request):
     """Gets the complete category tree structure."""
     from .serializers import CategoryTreeSerializer
-    categories = Category.objects.filter(parent__isnull=True, is_active=True)
+    categories = Category.objects.filter(user=request.user, parent__isnull=True, is_active=True)
     serializer = CategoryTreeSerializer(categories, many=True)
     return Response(serializer.data)
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated])
 def update_transaction_category(request, transaction_id):
     """Updates a transaction's category and all other transactions with the same description."""
     try:
-        transaction = Transaction.objects.get(id=transaction_id)
+        transaction = Transaction.objects.get(user=request.user, id=transaction_id)
         category_id = request.data.get('category')
-        category = Category.objects.get(id=category_id)
+        category = Category.objects.get(user=request.user, id=category_id)
         
         # Update the original transaction
         transaction.category = category
         transaction.save()
         
-        # Find and update all other transactions with the same description
+        # Find and update all other transactions with the same description (same user)
         description = transaction.description
         other_transactions = Transaction.objects.filter(
+            user=request.user,
             description=description
         ).exclude(id=transaction_id)
         
@@ -900,12 +927,12 @@ def update_transaction_category(request, transaction_id):
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=400)
 
-@csrf_exempt
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
 def update_account(request, account_id):
-    if request.method == "PUT":
-        try:
-            data = json.loads(request.body)
-            account = Account.objects.get(id=account_id)
+    try:
+        data = request.data
+        account = Account.objects.get(user=request.user, id=account_id)
             
             account.name = data.get("name", account.name)
             account.bank = data.get("bank", account.bank)
@@ -928,11 +955,11 @@ def update_account(request, account_id):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 
-@csrf_exempt
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_account(request, account_id):
-    if request.method == "DELETE":
-        try:
-            account = Account.objects.get(id=account_id)
+    try:
+        account = Account.objects.get(user=request.user, id=account_id)
             account.delete()
             return JsonResponse({"message": "Account deleted successfully"})
         except Account.DoesNotExist:
@@ -941,10 +968,11 @@ def delete_account(request, account_id):
             return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def refresh_account_balances(request):
     """Refresh all account balances by recalculating from transactions."""
     try:
-        accounts = Account.objects.all()
+        accounts = Account.objects.filter(user=request.user)
         updated_accounts = []
         
         for account in accounts:
@@ -966,13 +994,14 @@ def refresh_account_balances(request):
         return Response({'error': str(e)}, status=500)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_dashboard_data(request):
     try:
         # Get account_id from query parameters (optional)
         account_id = request.GET.get('account_id')
         
-        # Build base queryset
-        transactions_queryset = Transaction.objects.all()
+        # Build base queryset (filter by user)
+        transactions_queryset = Transaction.objects.filter(user=request.user)
         
         # Filter by account if specified
         if account_id and account_id != 'all':

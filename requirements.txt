@@ -4,3 +4,6 @@ django-cors-headers
 pandas
 xlrd
 whitenoise
+django-allauth
+djangorestframework-simplejwt
+requests

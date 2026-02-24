@@ -5,7 +5,8 @@ Backup management API views
 import os
 from django.http import JsonResponse, HttpResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils.decorators import method_decorator
@@ -18,6 +19,7 @@ from ...backup_service import DatabaseBackupService
 
 
 @api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
 def backup_settings_view(request):
     """Get or update backup settings"""
     service = DatabaseBackupService()
@@ -35,6 +37,7 @@ def backup_settings_view(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_backup_view(request):
     """Create a new backup"""
     try:
@@ -57,14 +60,16 @@ def create_backup_view(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_backups_view(request):
     """List all backups"""
-    backups = DatabaseBackup.objects.all().order_by('-created_at')
+    backups = DatabaseBackup.objects.filter(user=request.user).order_by('-created_at')
     serializer = DatabaseBackupSerializer(backups, many=True)
     return Response(serializer.data)
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def restore_backup_view(request, backup_id):
     """Restore from a backup"""
     try:
@@ -94,10 +99,11 @@ def restore_backup_view(request, backup_id):
 
 
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_backup_view(request, backup_id):
     """Delete a backup"""
     try:
-        backup = DatabaseBackup.objects.get(id=backup_id)
+        backup = DatabaseBackup.objects.get(user=request.user, id=backup_id)
         
         # Delete the file if it exists
         if os.path.exists(backup.file_path):
@@ -122,6 +128,7 @@ def delete_backup_view(request, backup_id):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def backup_stats_view(request):
     """Get backup statistics"""
     try:
@@ -136,10 +143,11 @@ def backup_stats_view(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def download_backup_view(request, backup_id):
     """Download a backup file"""
     try:
-        backup = DatabaseBackup.objects.get(id=backup_id)
+        backup = DatabaseBackup.objects.get(user=request.user, id=backup_id)
         
         if not os.path.exists(backup.file_path):
             return Response({
@@ -170,6 +178,7 @@ def download_backup_view(request, backup_id):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def check_auto_backup_view(request):
     """Check if auto backup should be created and create it if needed"""
     try:

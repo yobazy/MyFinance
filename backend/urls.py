@@ -21,6 +21,10 @@ from .views import upload_file, upload_multiple_files, get_visualization_data, g
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Django Allauth URLs (for OAuth)
+    path('accounts/', include('allauth.urls')),
+    
+    # Legacy API routes (will be migrated to use authentication)
     path("api/upload/", upload_file, name="upload_file"),
     path("api/upload-multiple/", upload_multiple_files, name="upload_multiple_files"),
     # VISUALIZATIONS
@@ -41,5 +45,5 @@ urlpatterns = [
     path('api/', include('backend.api.urls')),  # All API routes will be under /api/
     
     # Serve React app for all other routes (must be last)
-    re_path(r'^(?!api|admin|static).*$', serve_react_app, name='react_app'),
+    re_path(r'^(?!api|admin|static|accounts).*$', serve_react_app, name='react_app'),
 ]

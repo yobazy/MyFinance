@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
@@ -13,6 +14,7 @@ from ...serializers import CategorizationRuleSerializer, RuleGroupSerializer, Ru
 from ...categorization_service import AutoCategorizationService
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_rules(request):
     """Get all categorization rules with optional filtering."""
     try:
@@ -22,8 +24,8 @@ def get_rules(request):
         category_id = request.GET.get('category_id')
         search = request.GET.get('search')
         
-        # Build query
-        rules = CategorizationRule.objects.select_related('category').all()
+        # Build query (filter by user)
+        rules = CategorizationRule.objects.filter(user=request.user).select_related('category').all()
         
         if is_active is not None:
             rules = rules.filter(is_active=is_active.lower() == 'true')
@@ -53,10 +55,11 @@ def get_rules(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_rule(request, rule_id):
     """Get a specific categorization rule."""
     try:
-        rule = CategorizationRule.objects.select_related('category').get(id=rule_id)
+        rule = CategorizationRule.objects.filter(user=request.user).select_related('category').get(id=rule_id)
         serializer = CategorizationRuleSerializer(rule)
         return Response(serializer.data)
         
@@ -70,6 +73,7 @@ def get_rule(request, rule_id):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_rule(request):
     """Create a new categorization rule."""
     try:
@@ -83,9 +87,9 @@ def create_rule(request):
                     'error': f'Missing required field: {field}'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate category exists
+        # Validate category exists (filter by user)
         try:
-            category = Category.objects.get(id=data['category'])
+            category = Category.objects.get(user=request.user, id=data['category'])
         except Category.DoesNotExist:
             return Response({
                 'error': 'Category not found'
@@ -98,8 +102,9 @@ def create_rule(request):
                 'error': validation_error
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create rule
+        # Create rule (with user)
         rule = CategorizationRule.objects.create(
+            user=request.user,
             name=data['name'],
             description=data.get('description', ''),
             rule_type=data['rule_type'],

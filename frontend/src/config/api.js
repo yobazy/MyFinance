@@ -22,7 +22,14 @@ export const apiUrl = (endpoint) => {
   return `${API_BASE_URL}/${cleanEndpoint}`;
 };
 
+// Helper to get auth headers
+export const getAuthHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export default {
   API_BASE_URL,
   apiUrl,
+  getAuthHeaders,
 };
