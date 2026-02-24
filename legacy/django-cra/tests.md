@@ -1,7 +1,8 @@
-# MyFinance Dashboard - Test Coverage Outline
+# MyFinance Dashboard - Test Coverage Outline (Legacy)
 
 ## Overview
-This document outlines comprehensive test coverage for the MyFinance dashboard application, covering both backend Django API and frontend React components.
+This document was written for the **legacy Django + CRA** stack (`backend/` + `frontend/`).  
+If you’re migrating to **Supabase + Next.js** (`web/` + `worker/`), treat this as historical reference and rewrite tests around the new architecture.
 
 ## Backend Testing (Django)
 

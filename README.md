@@ -2,6 +2,8 @@
 
 MyFinance Dashboard is a comprehensive personal finance management application built with **React** frontend and **Django** backend. This modern web application allows users to upload bank statements, categorize transactions, and generate detailed financial insights and visualizations.
 
+> Note: this repo is currently **mid-migration**. The legacy stack (Django + CRA) is still present, but the recommended multi-user path is **Supabase + Next.js + TS worker**.
+
 ## Architecture
 
 - **Frontend**: React with Material-UI components
@@ -49,35 +51,9 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 
 ---
 
-## 📸 Screenshots
+## 📸 Screenshots (legacy UI)
 
-### Home Dashboard
-![Home Dashboard](screenshots/home-dashboard.png)
-*Main dashboard with financial overview and quick action buttons*
-
-### File Upload
-![File Upload](screenshots/file-upload.png)
-*Drag-and-drop interface for uploading bank statements (CSV/XLSX)*
-
-### Transactions List
-![Transactions List](screenshots/transactions-list.png)
-*Comprehensive transaction management with search and filtering capabilities*
-
-### Categories Management
-![Categories Management](screenshots/categories-management.png)
-*Transaction categorization interface with bulk operations and custom categories*
-
-### Analytics & Visualizations
-![Analytics & Visualizations](screenshots/analytics-visualizations.png)
-*Interactive charts showing spending patterns, trends, and financial insights*
-
-### Accounts Management
-![Accounts Management](screenshots/accounts-management.png)
-*Bank account management with support for multiple institutions*
-
-### Settings Page
-![Settings Page](screenshots/settings-page.png)
-*User preferences including theme customization and database management*
+Legacy CRA UI screenshots are archived under `legacy/django-cra/screenshots/`.
 
 ---
 
@@ -88,27 +64,57 @@ MyFinance Dashboard is a comprehensive personal finance management application b
 - Node.js 16+
 - npm or yarn
 
-### Quick Start (Production Mode - Recommended)
+### Legacy Quick Start (Production Mode)
 
 The easiest way to run the web app is using the provided startup script:
 
 ```bash
 # Make scripts executable (first time only)
-chmod +x start.sh start-dev.sh
+chmod +x legacy/django-cra/start.sh legacy/django-cra/start-dev.sh
 
 # Run in production mode (single server, Django serves React build)
-./start.sh
+./legacy/django-cra/start.sh
 ```
 
 The application will be available at `http://localhost:8000/`
 
-### Development Mode (Two Servers)
+---
+
+## Supabase + Next.js (New path)
+
+If you’re moving to a multi-user hosted version, the recommended direction is:
+- **Supabase** for Auth + Postgres + Storage
+- **TypeScript worker** for async statement ingestion (Excel parsing)
+
+### What’s already in this repo
+- Supabase migrations in `supabase/migrations/`
+- A TS worker in `worker/` that can process `processing_jobs` of type `ingest_upload` (Amex `.xlsx` first)
+
+### Supabase setup (minimum)
+- Run migrations:
+  - `supabase/migrations/002_queue_rpc.sql`
+  - `supabase/migrations/003_transactions_metadata_and_dedupe.sql`
+  - `supabase/migrations/004_storage_policies.sql`
+- Create a **private** Storage bucket named `uploads`
+
+### Run the worker
+See `worker/README.md`.
+
+### Run the Next.js app
+See `web/README.md`.
+
+### Repo structure (high-level)
+- **New**: `web/`, `worker/`, `supabase/`
+- **Legacy**: `legacy/django-cra/`
+- Details: `docs/repo-audit.md`
+
+### Legacy Development Mode (Two Servers)
 
 For development with hot-reloading:
 
 ```bash
 # Run development mode (Django on 8000, React on 3000)
-./start-dev.sh
+./legacy/django-cra/start-dev.sh
 ```
 
 - Frontend: `http://localhost:3000`
@@ -137,18 +143,18 @@ For development with hot-reloading:
 
 3. **Install Python dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip install -r legacy/django-cra/requirements.txt
    ```
 
 4. **Run Django migrations**:
    ```bash
-   python manage.py migrate
+   python legacy/django-cra/manage.py migrate
    ```
 
 #### Frontend Setup
 1. **Navigate to frontend directory**:
    ```bash
-   cd frontend
+   cd legacy/django-cra/frontend
    ```
 
 2. **Install Node.js dependencies**:
@@ -163,13 +169,13 @@ For development with hot-reloading:
 
 4. **Return to root and collect static files**:
    ```bash
-   cd ..
-   python manage.py collectstatic --noinput
+   cd ../../
+   python legacy/django-cra/manage.py collectstatic --noinput
    ```
 
 5. **Start Django server** (serves both API and React app):
    ```bash
-   python manage.py runserver
+   python legacy/django-cra/manage.py runserver
    ```
    The application will be available at `http://localhost:8000/`
 
@@ -210,15 +216,15 @@ The Django backend provides RESTful APIs for:
 ### Building for Production
 ```bash
 # Frontend build
-cd frontend
+cd legacy/django-cra/frontend
 npm run build
-cd ..
+cd ../../
 
 # Collect static files
-python manage.py collectstatic --noinput
+python legacy/django-cra/manage.py collectstatic --noinput
 
 # Start Django server (serves both API and React app)
-python manage.py runserver
+python legacy/django-cra/manage.py runserver
 ```
 
 ### Environment Variables (Optional)
@@ -231,7 +237,7 @@ export SECRET_KEY='your-secret-key-here'
 export ALLOWED_HOSTS='yourdomain.com,www.yourdomain.com'
 
 # Then run
-python manage.py runserver
+python legacy/django-cra/manage.py runserver
 ```
 
 ### Database Management

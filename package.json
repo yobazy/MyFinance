@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "MyFinance Dashboard - Automated Screenshot Tool",
   "scripts": {
-    "screenshots": "node scripts/screenshot-automation.js",
-    "screenshots:update": "node scripts/screenshot-automation.js --update",
-    "screenshots:all": "node scripts/screenshot-automation.js --all",
-    "screenshots:help": "echo 'Available commands: npm run screenshots, npm run screenshots:update, npm run screenshots:all'"
+    "web:dev": "npm --prefix web run dev",
+    "worker:dev": "npm --prefix worker run dev",
+    "legacy:dev": "bash legacy/django-cra/start-dev.sh",
+    "legacy:prod": "bash legacy/django-cra/start.sh",
+    "legacy:screenshots": "node legacy/django-cra/scripts/screenshot-automation.js",
+    "legacy:screenshots:update": "node legacy/django-cra/scripts/screenshot-automation.js --update",
+    "legacy:screenshots:all": "node legacy/django-cra/scripts/screenshot-automation.js --all",
+    "legacy:screenshots:help": "echo 'Available commands: npm run legacy:screenshots, npm run legacy:screenshots:update, npm run legacy:screenshots:all'"
   },
   "devDependencies": {
     "playwright": "^1.40.0"
