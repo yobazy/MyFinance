@@ -42,6 +42,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
+import { formatUnknownError } from '../../lib/errors';
 
 type Transaction = {
   id: string;
@@ -74,6 +75,7 @@ export default function TransactionsPage() {
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -96,9 +98,14 @@ export default function TransactionsPage() {
   useEffect(() => {
     (async () => {
       try {
+        setLoadError(null);
         const { data, error } = await supabase
           .from('transactions')
-          .select('id,date,description,amount,source,accounts(name),categories(name)')
+          // `transactions` has two FKs to `categories` (category_id + suggested_category_id),
+          // so we must disambiguate which relationship to embed.
+          .select(
+            'id,date,description,amount,source,accounts(name),categories:categories!transactions_category_id_fkey(name)'
+          )
           .order('date', { ascending: false })
           .limit(2000);
         if (error) throw error;
@@ -118,7 +125,9 @@ export default function TransactionsPage() {
         });
         setAllTransactions(mapped);
       } catch (e) {
+        const msg = formatUnknownError(e);
         console.error('Error fetching transactions:', e);
+        setLoadError(msg);
         setAllTransactions([]);
       } finally {
         setLoading(false);
@@ -283,6 +292,22 @@ export default function TransactionsPage() {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
         <Typography color="text.secondary">Loading…</Typography>
+      </Box>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Box>
+        <Typography variant="h4" gutterBottom>
+          Transactions
+        </Typography>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load transactions: {loadError}
+        </Alert>
+        <Button variant="outlined" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
       </Box>
     );
   }

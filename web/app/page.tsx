@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -25,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../lib/supabase';
+import { formatUnknownError } from '../lib/errors';
 import type { Account } from '../lib/types';
 import { useAuth } from '../lib/auth/AuthContext';
 import PublicLanding from './components/PublicLanding';
@@ -52,6 +54,7 @@ export default function DashboardPage() {
   const { loading: authLoading, isAuthenticated } = useAuth();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -63,7 +66,13 @@ export default function DashboardPage() {
         .from('accounts')
         .select('*')
         .order('updated_at', { ascending: false });
-      if (!error) setAccounts((data ?? []) as Account[]);
+      if (error) {
+        setErrorMessage(`Failed to load accounts: ${error.message}`);
+        setAccounts([]);
+        return;
+      }
+      setErrorMessage(null);
+      setAccounts((data ?? []) as Account[]);
     })();
   }, [isAuthenticated, supabase]);
 
@@ -71,82 +80,93 @@ export default function DashboardPage() {
     if (!isAuthenticated) return;
     (async () => {
       setLoading(true);
+      setErrorMessage(null);
+      try {
+        const filteredAccount =
+          selectedAccountId === 'all'
+            ? null
+            : accounts.find((a) => a.id === selectedAccountId) ?? null;
 
-      const filteredAccount =
-        selectedAccountId === 'all'
-          ? null
-          : accounts.find((a) => a.id === selectedAccountId) ?? null;
+        const totalBalance =
+          selectedAccountId === 'all'
+            ? accounts.reduce((sum, a) => sum + Number(a.balance ?? 0), 0)
+            : Number(filteredAccount?.balance ?? 0);
 
-      const totalBalance =
-        selectedAccountId === 'all'
-          ? accounts.reduce((sum, a) => sum + Number(a.balance ?? 0), 0)
-          : Number(filteredAccount?.balance ?? 0);
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startISO = startOfMonth.toISOString().slice(0, 10);
+        const endISO = now.toISOString().slice(0, 10);
 
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const startISO = startOfMonth.toISOString().slice(0, 10);
-      const endISO = now.toISOString().slice(0, 10);
+        let txForMonth = supabase
+          .from('transactions')
+          .select('amount,date')
+          .gte('date', startISO)
+          .lte('date', endISO)
+          .order('date', { ascending: false });
 
-      let txForMonth = supabase
-        .from('transactions')
-        .select('amount,date')
-        .gte('date', startISO)
-        .lte('date', endISO)
-        .order('date', { ascending: false });
+        let recentTxQuery = supabase
+          .from('transactions')
+          .select(
+            'date,description,amount,accounts(name,bank),categories:categories!transactions_category_id_fkey(name)'
+          )
+          .order('date', { ascending: false })
+          .limit(8);
 
-      let recentTxQuery = supabase
-        .from('transactions')
-        .select('date,description,amount,accounts(name,bank),categories(name)')
-        .order('date', { ascending: false })
-        .limit(8);
+        if (selectedAccountId !== 'all') {
+          txForMonth = txForMonth.eq('account_id', selectedAccountId);
+          recentTxQuery = recentTxQuery.eq('account_id', selectedAccountId);
+        }
 
-      if (selectedAccountId !== 'all') {
-        txForMonth = txForMonth.eq('account_id', selectedAccountId);
-        recentTxQuery = recentTxQuery.eq('account_id', selectedAccountId);
+        const [monthRes, recentRes] = await Promise.all([txForMonth, recentTxQuery]);
+        if (monthRes.error) throw monthRes.error;
+        if (recentRes.error) throw recentRes.error;
+
+        const monthRows = monthRes.data;
+        const recentRows = recentRes.data;
+
+        const monthTransactionCount = monthRows?.length ?? 0;
+        const hasMonthTransactions = monthTransactionCount > 0;
+        const hasAnyTransactions = (recentRows?.length ?? 0) > 0;
+
+        const monthlySpending = (monthRows ?? []).reduce((sum, r) => {
+          const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
+          return amt > 0 ? sum + amt : sum;
+        }, 0);
+
+        const lastMonthTransactionDate = hasMonthTransactions
+          ? ((monthRows?.[0]?.date as string | undefined) ?? null)
+          : null;
+
+        const recentTransactions: RecentTx[] = (recentRows ?? []).map((r) => {
+          const account = (r.accounts ?? null) as null | { name?: string; bank?: string };
+          const category = (r.categories ?? null) as null | { name?: string };
+          const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
+          return {
+            date: String(r.date),
+            description: String(r.description ?? ''),
+            amount: amt,
+            category_name: category?.name ?? null,
+            account_name: account?.name ?? null,
+            account_bank: account?.bank ?? null,
+          };
+        });
+
+        setDashboardData({
+          totalBalance,
+          monthlySpending,
+          lastMonthTransactionDate,
+          hasAnyTransactions,
+          hasMonthTransactions,
+          recentTransactions,
+        });
+      } catch (e) {
+        const msg = formatUnknownError(e);
+        console.error('Error loading dashboard:', e);
+        setErrorMessage(`Failed to load dashboard: ${msg}`);
+        setDashboardData(null);
+      } finally {
+        setLoading(false);
       }
-
-      const [{ data: monthRows }, { data: recentRows }] = await Promise.all([
-        txForMonth,
-        recentTxQuery,
-      ]);
-
-      const monthTransactionCount = monthRows?.length ?? 0;
-      const hasMonthTransactions = monthTransactionCount > 0;
-      const hasAnyTransactions = (recentRows?.length ?? 0) > 0;
-
-      const monthlySpending = (monthRows ?? []).reduce((sum, r) => {
-        const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
-        return amt > 0 ? sum + amt : sum;
-      }, 0);
-
-      const lastMonthTransactionDate = hasMonthTransactions
-        ? ((monthRows?.[0]?.date as string | undefined) ?? null)
-        : null;
-
-      const recentTransactions: RecentTx[] = (recentRows ?? []).map((r) => {
-        const account = (r.accounts ?? null) as null | { name?: string; bank?: string };
-        const category = (r.categories ?? null) as null | { name?: string };
-        const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
-        return {
-          date: String(r.date),
-          description: String(r.description ?? ''),
-          amount: amt,
-          category_name: category?.name ?? null,
-          account_name: account?.name ?? null,
-          account_bank: account?.bank ?? null,
-        };
-      });
-
-      setDashboardData({
-        totalBalance,
-        monthlySpending,
-        lastMonthTransactionDate,
-        hasAnyTransactions,
-        hasMonthTransactions,
-        recentTransactions,
-      });
-
-      setLoading(false);
     })();
   }, [accounts, isAuthenticated, selectedAccountId, supabase]);
 
@@ -232,6 +252,11 @@ export default function DashboardPage() {
 
   return (
     <Box sx={{ py: 2 }}>
+      {errorMessage ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {errorMessage}
+        </Alert>
+      ) : null}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
         <Typography variant="h3" component="h1">
           Dashboard
