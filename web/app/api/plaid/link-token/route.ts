@@ -11,13 +11,28 @@ function json(status: number, body: unknown) {
   });
 }
 
+function validateBearerUserJwt(token: string): string | null {
+  if (!token) return 'Missing Bearer token';
+  if (/\s/.test(token)) {
+    return 'Invalid Bearer token: contains whitespace/newlines. Send a Supabase user access token (JWT) from the browser session, not an API key.';
+  }
+  if (token.startsWith('sb_secret_') || token.startsWith('sb_publishable_')) {
+    return 'Invalid Bearer token: looks like a Supabase API key (sb_*), not a user access token (JWT). In the browser, you must send `session.access_token` from Supabase Auth.';
+  }
+  if (!token.startsWith('eyJ')) {
+    return 'Invalid Bearer token: expected a JWT (starts with "eyJ"). Ensure you are logged in via Supabase Auth and you are sending the user session access token.';
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   const authz = req.headers.get('authorization') ?? '';
   const token = authz.toLowerCase().startsWith('bearer ')
     ? authz.slice('bearer '.length).trim()
     : '';
 
-  if (!token) return json(401, { error: 'Missing Bearer token' });
+  const tokenErr = validateBearerUserJwt(token);
+  if (tokenErr) return json(401, { error: tokenErr });
 
   const supabase = createSupabaseAdminClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser(token);
