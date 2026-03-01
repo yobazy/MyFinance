@@ -92,7 +92,7 @@ export default function UploadPage() {
   };
 
   const accept =
-    selectedAccount?.bank?.toUpperCase().includes('AMEX') ? '.xlsx' : '.csv,.xlsx';
+    selectedAccount?.bank?.toUpperCase().includes('AMEX') ? '.xls,.xlsx' : '.csv,.xlsx';
 
   const handleFileChange = (picked: FileList | null) => {
     if (!picked || picked.length === 0) return;

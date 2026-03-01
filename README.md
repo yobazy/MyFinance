@@ -92,8 +92,10 @@ If you’re moving to a multi-user hosted version, the recommended direction is:
 
 ### Supabase setup (minimum)
 - Run migrations:
+  - `supabase/migrations/001_init.sql`
   - `supabase/migrations/002_queue_rpc.sql`
   - `supabase/migrations/003_transactions_metadata_and_dedupe.sql`
+  - `supabase/migrations/005_transactions_dedupe_on_conflict.sql` (required for statement upload upserts)
 - `supabase/migrations/004_storage_policies.sql` is only needed if you decide to store uploads in Supabase Storage.
 
 ### Supabase Auth setup

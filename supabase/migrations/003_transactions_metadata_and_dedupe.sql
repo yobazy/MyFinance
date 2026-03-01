@@ -7,7 +7,8 @@ alter table public.transactions
   add column if not exists fingerprint text null;
 
 -- Idempotency: allow worker to upsert by (user_id, account_id, fingerprint).
--- Partial unique index so existing/manual rows without fingerprint are allowed.
+-- NOTE: This migration originally used a partial unique index, but Supabase upsert
+-- requires a non-partial unique index. See 005_transactions_dedupe_on_conflict.sql.
 create unique index if not exists transactions_user_account_fingerprint_unique
   on public.transactions(user_id, account_id, fingerprint)
   where fingerprint is not null;

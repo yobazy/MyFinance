@@ -42,7 +42,7 @@ Open `http://localhost:3000`.
 ## Flow
 
 - Create an account in `/accounts`
-- Upload an Amex `.xlsx` in `/upload`
+- Upload an Amex `.xls` or `.xlsx` in `/upload`
 - The file is processed immediately by a Next.js API route and then discarded
 
 ## Plaid MVP Flow

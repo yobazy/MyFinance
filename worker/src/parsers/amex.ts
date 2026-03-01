@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { fingerprintTransaction } from '../fingerprint.js';
 import type { NormalizedTransaction } from './types.js';
 
@@ -46,6 +46,29 @@ function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
+function findHeaderRowIdx(rows: unknown[][]): number | null {
+  const hasRequired = (row: unknown[]) => {
+    const keys = new Set(
+      row
+        .map((v) => normalizeHeader(String(v ?? '')))
+        .filter((s) => s.length > 0),
+    );
+    return keys.has('date') && keys.has('description') && keys.has('amount');
+  };
+
+  // Prefer the historical "row 12" convention if it matches, otherwise scan.
+  const preferredIdx = 11; // row 12, 0-indexed
+  if (rows[preferredIdx] && hasRequired(rows[preferredIdx])) return preferredIdx;
+
+  for (let i = 0; i < Math.min(rows.length, 50); i += 1) {
+    const row = rows[i] ?? [];
+    if (row.length === 0) continue;
+    if (hasRequired(row)) return i;
+  }
+
+  return null;
+}
+
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return value;
@@ -66,39 +89,48 @@ export async function parseAmexXlsx(params: {
   accountId: string;
   source?: string;
 }): Promise<NormalizedTransaction[]> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(params.buffer);
-
-  const sheet = workbook.worksheets[0];
+  const workbook = XLSX.read(params.buffer, { type: 'buffer', cellDates: true });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
+  const sheet = workbook.Sheets[firstSheetName];
   if (!sheet) return [];
 
-  const headerRowNumber = 12; // 1-indexed
-  const headerRow = sheet.getRow(headerRowNumber);
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    raw: true,
+    defval: null,
+    blankrows: true,
+  }) as unknown[][];
 
-  // Build column index -> key mapping
+  const headerRowIdx = findHeaderRowIdx(rows);
+  if (headerRowIdx === null) return [];
+  const headerRow = rows[headerRowIdx] ?? [];
+
+  // Build column index (0-indexed) -> key mapping
   const colKeys = new Map<number, string>();
-  headerRow.eachCell((cell, colNumber) => {
-    const raw = String(cell.value ?? '').trim();
+  headerRow.forEach((cellValue, colIdx) => {
+    const raw = String(cellValue ?? '').trim();
     if (!raw) return;
     let key = normalizeHeader(raw);
     if (key === 'exchange_rate') key = 'exc_rate';
-    colKeys.set(colNumber, key);
+    colKeys.set(colIdx, key);
   });
 
   const out: NormalizedTransaction[] = [];
 
-  for (let r = headerRowNumber + 1; r <= sheet.rowCount; r += 1) {
-    const row = sheet.getRow(r);
-
-    // Stop if the row is completely empty
-    if (!row || row.cellCount === 0) continue;
+  for (let r = headerRowIdx + 1; r < rows.length; r += 1) {
+    const row = rows[r] ?? [];
+    if (
+      row.length === 0 ||
+      row.every((v) => v === null || v === undefined || String(v).trim() === '')
+    ) {
+      continue;
+    }
 
     const rawObj: Record<string, unknown> = {};
-    row.eachCell((cell, colNumber) => {
-      const key = colKeys.get(colNumber);
-      if (!key) return;
-      rawObj[key] = cell.value ?? null;
-    });
+    for (const [colIdx, key] of colKeys.entries()) {
+      rawObj[key] = row[colIdx] ?? null;
+    }
 
     const date = toIsoDate(rawObj['date']);
     const description = String(rawObj['description'] ?? '').trim();
@@ -118,6 +150,9 @@ export async function parseAmexXlsx(params: {
       date,
       amount: String(amount),
       description: descriptionUpper,
+      // Include the raw row to reduce collisions for "same day/same amount/same description"
+      // cases. This must stay deterministic across imports.
+      salt: JSON.stringify(rawObj),
     });
 
     out.push({

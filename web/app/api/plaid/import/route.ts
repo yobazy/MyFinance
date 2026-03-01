@@ -132,17 +132,23 @@ export async function POST(req: Request) {
       transactions: allTransactions,
     });
 
-    if (transactions.length > 0) {
+    // Defensive: Postgres upsert will error if the same conflict target appears
+    // multiple times in a single statement ("cannot affect row a second time").
+    const uniqueTransactions = Array.from(
+      new Map(transactions.map((t) => [t.fingerprint, t])).values(),
+    );
+
+    if (uniqueTransactions.length > 0) {
       const { error: upsertErr } = await supabase
         .from('transactions')
-        .upsert(transactions, { onConflict: 'user_id,account_id,fingerprint' });
+        .upsert(uniqueTransactions, { onConflict: 'user_id,account_id,fingerprint' });
 
       if (upsertErr) return json(500, { error: upsertErr.message });
     }
 
     return json(200, {
       ok: true,
-      rowsProcessed: transactions.length,
+      rowsProcessed: uniqueTransactions.length,
       account: acct,
       plaidAccountId: selectedPlaidAccountId,
     });

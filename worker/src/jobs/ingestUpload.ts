@@ -77,12 +77,20 @@ export async function handleIngestUploadJob(params: {
   }
 
   if (transactions.length > 0) {
-    // Upsert for idempotency using partial unique index on (user_id, account_id, fingerprint)
+    // Defensive: Postgres upsert will error if the same conflict target appears
+    // multiple times in a single statement ("cannot affect row a second time").
+    const uniqueTransactions = Array.from(
+      new Map(transactions.map((t) => [t.fingerprint, t])).values(),
+    );
+
+    // Upsert for idempotency using unique index on (user_id, account_id, fingerprint)
     const { error: upsertErr } = await params.supabase
       .from('transactions')
-      .upsert(transactions, { onConflict: 'user_id,account_id,fingerprint' });
+      .upsert(uniqueTransactions, { onConflict: 'user_id,account_id,fingerprint' });
 
     if (upsertErr) throw upsertErr;
+
+    transactions = uniqueTransactions;
   }
 
   await params.supabase
