@@ -56,33 +56,109 @@ export async function POST(req: Request) {
 
   if (acctErr) return json(403, { error: 'Account not found for user' });
 
-  const buf = Buffer.from(await file.arrayBuffer());
+  const uploadId = crypto.randomUUID();
+  const safeFilename = file.name.replace(/[\\/]/g, '_');
+  const storagePath = `${userId}/${uploadId}/${safeFilename}`;
 
-  const transactions = await parseAmexXlsx({
-    buffer: buf,
-    userId,
-    accountId,
-    source: 'Amex',
+  const { error: uploadInsertErr } = await supabase.from('uploads').insert({
+    id: uploadId,
+    user_id: userId,
+    account_id: accountId,
+    bank: String(acct.bank ?? 'Unknown'),
+    file_type: 'Amex',
+    storage_path: storagePath,
+    original_filename: file.name,
+    status: 'uploaded',
+    error: null,
+    rows_processed: 0,
   });
 
-  // Defensive: Postgres upsert will error if the same conflict target appears
-  // multiple times in a single statement ("cannot affect row a second time").
-  const uniqueTransactions = Array.from(
-    new Map(transactions.map((t) => [t.fingerprint, t])).values(),
-  );
+  if (uploadInsertErr) return json(500, { error: uploadInsertErr.message });
 
-  if (uniqueTransactions.length > 0) {
-    const { error: upsertErr } = await supabase
-      .from('transactions')
-      .upsert(uniqueTransactions, { onConflict: 'user_id,account_id,fingerprint' });
+  const markFailed = async (message: string) => {
+    await supabase
+      .from('uploads')
+      .update({ status: 'failed', error: message })
+      .eq('id', uploadId)
+      .eq('user_id', userId);
+  };
 
-    if (upsertErr) return json(500, { error: upsertErr.message });
+  try {
+    const { error: storageErr } = await supabase.storage
+      .from('uploads')
+      .upload(storagePath, file, { upsert: false, contentType: file.type || undefined });
+
+    if (storageErr) {
+      await markFailed(storageErr.message);
+      return json(500, { error: storageErr.message });
+    }
+
+    await supabase
+      .from('uploads')
+      .update({ status: 'processing', error: null })
+      .eq('id', uploadId)
+      .eq('user_id', userId);
+
+    const buf = Buffer.from(await file.arrayBuffer());
+    const transactions = await parseAmexXlsx({
+      buffer: buf,
+      userId,
+      accountId,
+      source: 'Amex',
+    });
+
+    // Defensive: Postgres insert will error if the same conflict target appears
+    // multiple times in a single statement.
+    const uniqueTransactions = Array.from(
+      new Map(transactions.map((t) => [t.fingerprint, t])).values(),
+    );
+
+    let insertedRows = 0;
+    if (uniqueTransactions.length > 0) {
+      const fingerprints = uniqueTransactions.map((t) => t.fingerprint);
+      const { data: existingRows, error: existingErr } = await supabase
+        .from('transactions')
+        .select('fingerprint')
+        .eq('user_id', userId)
+        .eq('account_id', accountId)
+        .in('fingerprint', fingerprints);
+
+      if (existingErr) {
+        await markFailed(existingErr.message);
+        return json(500, { error: existingErr.message });
+      }
+
+      const existingSet = new Set((existingRows ?? []).map((r) => String(r.fingerprint)));
+      const toInsert = uniqueTransactions
+        .filter((t) => !existingSet.has(t.fingerprint))
+        .map((t) => ({ ...t, upload_id: uploadId }));
+
+      if (toInsert.length > 0) {
+        const { error: insertErr } = await supabase.from('transactions').insert(toInsert);
+        if (insertErr) {
+          await markFailed(insertErr.message);
+          return json(500, { error: insertErr.message });
+        }
+      }
+      insertedRows = toInsert.length;
+    }
+
+    await supabase
+      .from('uploads')
+      .update({ status: 'succeeded', error: null, rows_processed: insertedRows })
+      .eq('id', uploadId)
+      .eq('user_id', userId);
+
+    return json(200, {
+      ok: true,
+      rowsProcessed: insertedRows,
+      uploadId,
+      account: acct,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await markFailed(msg);
+    return json(500, { error: msg });
   }
-
-  return json(200, {
-    ok: true,
-    rowsProcessed: uniqueTransactions.length,
-    account: acct,
-  });
 }
 

@@ -29,12 +29,20 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import UndoIcon from '@mui/icons-material/Undo';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import type { Account } from '../../lib/types';
 
-type UploadResult = { filename: string; success: boolean; rowsProcessed?: number; error?: string };
+type UploadResult = {
+  filename: string;
+  success: boolean;
+  rowsProcessed?: number;
+  error?: string;
+  uploadId?: string;
+  undone?: boolean;
+};
 
 export default function UploadPage() {
   const theme = useTheme();
@@ -141,11 +149,50 @@ export default function UploadPage() {
         body: fd,
       });
 
-      const body = (await resp.json()) as { ok?: true; rowsProcessed?: number; error?: string };
+      const body = (await resp.json()) as {
+        ok?: true;
+        rowsProcessed?: number;
+        uploadId?: string;
+        error?: string;
+      };
       if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
-      return { filename: f.name, success: true, rowsProcessed: body.rowsProcessed ?? 0 };
+      return {
+        filename: f.name,
+        success: true,
+        rowsProcessed: body.rowsProcessed ?? 0,
+        uploadId: body.uploadId,
+      };
     } catch (e) {
       return { filename: f.name, success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+
+  const handleUndoResult = async (resultIndex: number) => {
+    const current = uploadResults[resultIndex];
+    if (!current?.success || !current.uploadId || current.undone) return;
+    if (!window.confirm(`Undo upload "${current.filename}"? This cannot be undone.`)) return;
+
+    try {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Missing session access token.');
+
+      const resp = await fetch(`/api/uploads/${encodeURIComponent(current.uploadId)}/undo`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = (await resp.json()) as { error?: string; rowsReversed?: number };
+      if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
+
+      setUploadResults((prev) =>
+        prev.map((r, i) => (i === resultIndex ? { ...r, undone: true } : r))
+      );
+      setMessage(
+        `Upload "${current.filename}" undone. ${body.rowsReversed ?? 0} transaction(s) removed.`
+      );
+    } catch (e) {
+      setMessage(`Undo failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -368,9 +415,20 @@ export default function UploadPage() {
 
             {uploadResults.length > 0 ? (
               <Paper sx={{ p: 2, mt: 1 }}>
-                <Typography variant="h6" gutterBottom>
-                  Upload Results
-                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                    gap: 1,
+                  }}
+                >
+                  <Typography variant="h6">Upload Results</Typography>
+                  <Button size="small" variant="outlined" onClick={() => router.push('/uploads')}>
+                    Manage uploads
+                  </Button>
+                </Box>
                 <List dense>
                   {uploadResults.map((r, idx) => (
                     <ListItem key={`${r.filename}-${idx}`} sx={{ px: 0 }}>
@@ -381,7 +439,9 @@ export default function UploadPage() {
                         primary={r.filename}
                         secondary={
                           r.success
-                            ? `${r.rowsProcessed ?? 0} rows processed`
+                            ? r.undone
+                              ? 'Upload undone'
+                              : `${r.rowsProcessed ?? 0} rows processed`
                             : r.error ?? 'Unknown error'
                         }
                       />
@@ -390,6 +450,18 @@ export default function UploadPage() {
                       ) : (
                         <Chip label="Failed" color="error" size="small" />
                       )}
+                      {r.success && r.uploadId && !r.undone ? (
+                        <Button
+                          size="small"
+                          sx={{ ml: 1 }}
+                          variant="outlined"
+                          color="warning"
+                          startIcon={<UndoIcon />}
+                          onClick={() => void handleUndoResult(idx)}
+                        >
+                          Undo
+                        </Button>
+                      ) : null}
                     </ListItem>
                   ))}
                 </List>

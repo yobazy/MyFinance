@@ -316,6 +316,15 @@ export default function AppShell(props: { children: React.ReactNode }) {
           <RuleIcon />
           Rules
         </MenuItem>
+        <MenuItem
+          component={NextLink}
+          href="/uploads"
+          onClick={() => setManageAnchorEl(null)}
+          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+        >
+          <UploadFileIcon />
+          Uploads
+        </MenuItem>
       </Menu>
     </>
   );
