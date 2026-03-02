@@ -7,7 +7,13 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
+  FormControl,
+  FormControlLabel,
   Grid,
+  InputLabel,
+  MenuItem,
+  Select,
   TextField,
   Typography,
 } from '@mui/material';
@@ -22,9 +28,19 @@ type Category = {
   is_active: boolean;
 };
 
+type CategoryPreset = {
+  key: string;
+  name: string;
+  description: string;
+  version: number;
+};
+
 export default function CategorizationPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [presets, setPresets] = useState<CategoryPreset[]>([]);
+  const [selectedPresetKey, setSelectedPresetKey] = useState<string>('');
+  const [overwritePreset, setOverwritePreset] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState('#2196F3');
   const [message, setMessage] = useState<string>('');
@@ -43,8 +59,31 @@ export default function CategorizationPage() {
     setCategories((data ?? []) as Category[]);
   };
 
+  const loadPresets = async () => {
+    const { data, error } = await supabase
+      .from('category_presets')
+      .select('key,name,description,version,is_active')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (error) {
+      if (!message) {
+        setMessage(`Failed to load presets: ${error.message}`);
+      }
+      setPresets([]);
+      return;
+    }
+    const rows = (data ?? []) as (CategoryPreset & { is_active: boolean })[];
+    setPresets(rows);
+    if (!selectedPresetKey && rows.length > 0) {
+      setSelectedPresetKey(rows[0].key);
+    }
+  };
+
   useEffect(() => {
-    refresh();
+    (async () => {
+      await refresh();
+      await loadPresets();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -71,6 +110,26 @@ export default function CategorizationPage() {
     }
   };
 
+  const applyPreset = async () => {
+    if (!selectedPresetKey) {
+      setMessage('Please select a preset to apply.');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    const { error } = await supabase.rpc('apply_category_preset', {
+      p_preset_key: selectedPresetKey,
+      p_overwrite: overwritePreset,
+    });
+    setBusy(false);
+    if (error) {
+      setMessage(`Failed to apply preset: ${error.message}`);
+      return;
+    }
+    await refresh();
+    setMessage('Preset categories applied.');
+  };
+
   return (
     <Box>
       <Box mb={4}>
@@ -81,6 +140,64 @@ export default function CategorizationPage() {
           Create and manage categories used for transaction classification.
         </Typography>
       </Box>
+
+      {presets.length > 0 ? (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Category presets
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Quickly load a recommended category set instead of creating everything manually.
+            </Typography>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="preset-select-label">Preset</InputLabel>
+                  <Select
+                    labelId="preset-select-label"
+                    label="Preset"
+                    value={selectedPresetKey}
+                    onChange={(e) => setSelectedPresetKey(e.target.value)}
+                  >
+                    {presets.map((p) => (
+                      <MenuItem key={p.key} value={p.key}>
+                        <Box display="flex" flexDirection="column">
+                          <Typography variant="body1">{p.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            v{p.version} • {p.description}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={overwritePreset}
+                      onChange={(e) => setOverwritePreset(e.target.checked)}
+                    />
+                  }
+                  label="Overwrite existing preset categories"
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="contained"
+                  onClick={applyPreset}
+                  disabled={busy || !selectedPresetKey}
+                  fullWidth
+                >
+                  Apply preset
+                </Button>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
