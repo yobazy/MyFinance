@@ -15,6 +15,7 @@ import {
   FormControl,
   FormControlLabel,
   Grid,
+  IconButton,
   InputLabel,
   List,
   ListItem,
@@ -22,8 +23,10 @@ import {
   MenuItem,
   Select,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { DeleteOutline as DeleteIcon } from '@mui/icons-material';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 
 type Category = {
@@ -143,6 +146,23 @@ export default function CategorizationPage() {
     }
     await refresh();
     setMessage('Preset categories applied.');
+  };
+
+  const deleteCategory = async (id: string, name: string) => {
+    const confirmed = window.confirm(
+      `Delete category "${name}"?\n\nAny transactions using it will become Uncategorized.`,
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setMessage('');
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    setBusy(false);
+    if (error) {
+      setMessage(`Failed to delete category: ${error.message}`);
+      return;
+    }
+    await refresh();
+    setMessage('Category deleted.');
   };
 
   const ensurePresetCategoriesLoaded = async (presetKey: string) => {
@@ -298,17 +318,31 @@ export default function CategorizationPage() {
           <Grid key={c.id} item xs={12} sm={6} md={4}>
             <Card>
               <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" gap={2}>
-                  <Typography variant="h6">{c.name}</Typography>
-                  <Box
-                    sx={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      background: c.color,
-                      border: '1px solid rgba(0,0,0,0.2)',
-                    }}
-                  />
+                <Box display="flex" justifyContent="space-between" alignItems="center" gap={1}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Typography variant="h6">{c.name}</Typography>
+                    <Box
+                      sx={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: c.color,
+                        border: '1px solid rgba(0,0,0,0.2)',
+                      }}
+                    />
+                  </Box>
+                  <Tooltip title="Delete category">
+                    <span>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        disabled={busy}
+                        onClick={() => deleteCategory(c.id, c.name)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </Box>
                 <Typography variant="body2" color="text.secondary">
                   {c.is_active ? 'Active' : 'Inactive'}
