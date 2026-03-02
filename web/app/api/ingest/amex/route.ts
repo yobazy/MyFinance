@@ -2,6 +2,8 @@ import { createSupabaseAdminClient } from '../../../../lib/supabaseAdmin';
 import { parseAmexXlsx } from '../../../../lib/parsers/amex';
 
 export const runtime = 'nodejs';
+// Allow up to 60 seconds for processing large files
+export const maxDuration = 60;
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -57,8 +59,6 @@ export async function POST(req: Request) {
   if (acctErr) return json(403, { error: 'Account not found for user' });
 
   const uploadId = crypto.randomUUID();
-  const safeFilename = file.name.replace(/[\\/]/g, '_');
-  const storagePath = `${userId}/${uploadId}/${safeFilename}`;
 
   const { error: uploadInsertErr } = await supabase.from('uploads').insert({
     id: uploadId,
@@ -66,9 +66,9 @@ export async function POST(req: Request) {
     account_id: accountId,
     bank: String(acct.bank ?? 'Unknown'),
     file_type: 'Amex',
-    storage_path: storagePath,
+    storage_path: null, // No storage - process file directly
     original_filename: file.name,
-    status: 'uploaded',
+    status: 'processing',
     error: null,
     rows_processed: 0,
   });
@@ -84,63 +84,49 @@ export async function POST(req: Request) {
   };
 
   try {
-    const { error: storageErr } = await supabase.storage
-      .from('uploads')
-      .upload(storagePath, file, { upsert: false, contentType: file.type || undefined });
-
-    if (storageErr) {
-      await markFailed(storageErr.message);
-      return json(500, { error: storageErr.message });
+    // Process file directly from request - no storage needed
+    const buf = Buffer.from(await file.arrayBuffer());
+    
+    let transactions;
+    try {
+      transactions = await parseAmexXlsx({
+        buffer: buf,
+        userId,
+        accountId,
+        source: 'Amex',
+      });
+    } catch (parseErr) {
+      const parseMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      await markFailed(`Failed to parse file: ${parseMsg}`);
+      return json(500, { error: `Failed to parse file: ${parseMsg}` });
     }
 
-    await supabase
-      .from('uploads')
-      .update({ status: 'processing', error: null })
-      .eq('id', uploadId)
-      .eq('user_id', userId);
-
-    const buf = Buffer.from(await file.arrayBuffer());
-    const transactions = await parseAmexXlsx({
-      buffer: buf,
-      userId,
-      accountId,
-      source: 'Amex',
-    });
+    if (!transactions || transactions.length === 0) {
+      await markFailed('No transactions found in file');
+      return json(400, { error: 'No transactions found in file' });
+    }
 
     // Defensive: Postgres insert will error if the same conflict target appears
-    // multiple times in a single statement.
+    // multiple times in a single statement. De-duplicate in-memory first and
+    // then rely on a UNIQUE index with upsert (see migration 005).
     const uniqueTransactions = Array.from(
       new Map(transactions.map((t) => [t.fingerprint, t])).values(),
     );
 
     let insertedRows = 0;
     if (uniqueTransactions.length > 0) {
-      const fingerprints = uniqueTransactions.map((t) => t.fingerprint);
-      const { data: existingRows, error: existingErr } = await supabase
+      const toUpsert = uniqueTransactions.map((t) => ({ ...t, upload_id: uploadId }));
+
+      const { error: upsertErr } = await supabase
         .from('transactions')
-        .select('fingerprint')
-        .eq('user_id', userId)
-        .eq('account_id', accountId)
-        .in('fingerprint', fingerprints);
+        .upsert(toUpsert, { onConflict: 'user_id,account_id,fingerprint' });
 
-      if (existingErr) {
-        await markFailed(existingErr.message);
-        return json(500, { error: existingErr.message });
+      if (upsertErr) {
+        await markFailed(upsertErr.message);
+        return json(500, { error: `Failed to upsert transactions: ${upsertErr.message}` });
       }
 
-      const existingSet = new Set((existingRows ?? []).map((r) => String(r.fingerprint)));
-      const toInsert = uniqueTransactions
-        .filter((t) => !existingSet.has(t.fingerprint))
-        .map((t) => ({ ...t, upload_id: uploadId }));
-
-      if (toInsert.length > 0) {
-        const { error: insertErr } = await supabase.from('transactions').insert(toInsert);
-        if (insertErr) {
-          await markFailed(insertErr.message);
-          return json(500, { error: insertErr.message });
-        }
-      }
-      insertedRows = toInsert.length;
+      insertedRows = toUpsert.length;
     }
 
     await supabase

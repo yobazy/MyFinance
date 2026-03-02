@@ -100,7 +100,7 @@ export default function UploadPage() {
   };
 
   const accept =
-    selectedAccount?.bank?.toUpperCase().includes('AMEX') ? '.xls,.xlsx' : '.csv,.xlsx';
+    selectedAccount?.bank?.toUpperCase().includes('AMEX') ? '.csv,.xls,.xlsx' : '.csv,.xlsx';
 
   const handleFileChange = (picked: FileList | null) => {
     if (!picked || picked.length === 0) return;
@@ -149,12 +149,25 @@ export default function UploadPage() {
         body: fd,
       });
 
-      const body = (await resp.json()) as {
+      // Check if response is HTML (error page) instead of JSON
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await resp.text();
+        throw new Error(`Server returned non-JSON response (${resp.status}). This may indicate a timeout or server error.`);
+      }
+
+      let body: {
         ok?: true;
         rowsProcessed?: number;
         uploadId?: string;
         error?: string;
       };
+      try {
+        body = (await resp.json()) as typeof body;
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse server response: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
+      }
+      
       if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
       return {
         filename: f.name,
@@ -308,7 +321,7 @@ export default function UploadPage() {
                     String(selectedAccount.type ?? '').slice(1)}
                 </Typography>
                 <Box mt={1} display="flex" gap={1} flexWrap="wrap">
-                  <Chip size="small" label={`File type: ${fileType}`} />
+                  <Chip size="small" label={`Allowed file types: ${accept}`} />
                   {fileType !== 'Amex' ? (
                     <Chip size="small" color="warning" label="Ingest not wired yet" />
                   ) : (
@@ -329,7 +342,9 @@ export default function UploadPage() {
                   color: theme.palette.text.secondary as any,
                 }}
               >
-                <li>Amex: XLS/XLSX (current supported path)</li>
+                <li>Amex: CSV, XLS, or XLSX files</li>
+                <li>CSV format: YearEndSummary format with Category, Date, Transaction, Charges $, Credits $ columns</li>
+                <li>Excel format: Standard Amex export with optional 11-row preamble</li>
                 <li>Must contain transaction date, description, and amount</li>
               </ul>
             </Box>

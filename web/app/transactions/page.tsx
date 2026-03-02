@@ -353,7 +353,17 @@ export default function TransactionsPage() {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
         <Typography variant="h4">Transactions</Typography>
-        <Box display="flex" gap={1} flexWrap="wrap">
+        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+          <TextField
+            size="small"
+            placeholder="Search description…"
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+            }}
+            sx={{ minWidth: { xs: '100%', sm: 220 } }}
+          />
           <Button
             variant="outlined"
             startIcon={<FilterIcon />}

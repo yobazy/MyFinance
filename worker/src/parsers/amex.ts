@@ -79,9 +79,140 @@ function toNumber(value: unknown): number | null {
 }
 
 /**
- * Matches your previous Django ingestion assumption:
- * - the Amex export has 11 lines of preamble
- * - row 12 contains headers
+ * Parse Amex CSV files in YearEndSummary format.
+ * Format: Category,Card Member,Account Number,Sub-Category,Date,Month-Billed,Transaction,Charges $,Credits $
+ * Date format: DD/MM/YYYY
+ */
+function parseAmexCsv(params: {
+  buffer: Buffer;
+  userId: string;
+  accountId: string;
+  source?: string;
+}): NormalizedTransaction[] {
+  const text = params.buffer.toString('utf-8');
+  const lines = text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+  if (lines.length === 0) return [];
+
+  // Parse header row
+  const headerLine = lines[0];
+  const headers = headerLine.split(',').map((h) => h.trim());
+  
+  // Find column indices
+  const dateIdx = headers.findIndex((h) => normalizeHeader(h) === 'date');
+  const transactionIdx = headers.findIndex((h) => normalizeHeader(h) === 'transaction');
+  const chargesIdx = headers.findIndex((h) => normalizeHeader(h).includes('charges'));
+  const creditsIdx = headers.findIndex((h) => normalizeHeader(h).includes('credits'));
+
+  if (dateIdx === -1 || transactionIdx === -1 || (chargesIdx === -1 && creditsIdx === -1)) {
+    return [];
+  }
+
+  const out: NormalizedTransaction[] = [];
+
+  // Process data rows
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line || line.trim().length === 0) continue;
+
+    // Parse CSV line (handling quoted fields)
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let j = 0; j < line.length; j += 1) {
+      const char = line[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        fields.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    fields.push(current.trim()); // Add last field
+
+    if (fields.length <= Math.max(dateIdx, transactionIdx, chargesIdx, creditsIdx)) continue;
+
+    // Parse date (DD/MM/YYYY format)
+    const dateStr = fields[dateIdx]?.trim();
+    if (!dateStr) continue;
+    
+    // Try to parse DD/MM/YYYY
+    const dateMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    let date: string | null = null;
+    if (dateMatch) {
+      const [, dd, mm, yyyy] = dateMatch;
+      date = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    } else {
+      // Fallback to Date.parse
+      const parsed = Date.parse(dateStr);
+      if (!Number.isNaN(parsed)) {
+        const d = new Date(parsed);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        date = `${yyyy}-${mm}-${dd}`;
+      }
+    }
+    if (!date) continue;
+
+    // Get transaction description
+    const description = fields[transactionIdx]?.trim();
+    if (!description) continue;
+
+    // Calculate amount to match Plaid / app semantics:
+    // - Charges are spending (positive outflow)
+    // - Credits are refunds/payments (negative inflow)
+    const chargesStr = chargesIdx >= 0 ? fields[chargesIdx]?.trim() : '';
+    const creditsStr = creditsIdx >= 0 ? fields[creditsIdx]?.trim() : '';
+    const charges = toNumber(chargesStr) ?? 0;
+    const credits = toNumber(creditsStr) ?? 0;
+    const amount = charges - credits; // Positive = charge, negative = credit/refund
+
+    if (amount === 0) continue; // Skip zero-amount transactions
+
+    const descriptionUpper = description.toUpperCase();
+    const source = params.source ?? 'Amex';
+
+    // Build raw object for fingerprint salt
+    const rawObj: Record<string, unknown> = {};
+    headers.forEach((h, idx) => {
+      if (fields[idx]) {
+        rawObj[normalizeHeader(h)] = fields[idx];
+      }
+    });
+
+    const fingerprint = fingerprintTransaction({
+      userId: params.userId,
+      accountId: params.accountId,
+      source,
+      date,
+      amount: String(amount),
+      description: descriptionUpper,
+      salt: JSON.stringify(rawObj),
+    });
+
+    out.push({
+      user_id: params.userId,
+      account_id: params.accountId,
+      date,
+      description: descriptionUpper,
+      amount,
+      source,
+      merchant: null,
+      raw: rawObj,
+      fingerprint,
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Detect if buffer is CSV or Excel and parse accordingly.
+ * Supports:
+ * - Excel files (.xls, .xlsx) - with optional 11-row preamble
+ * - CSV files (YearEndSummary format) - header row starts immediately
  */
 export async function parseAmexXlsx(params: {
   buffer: Buffer;
@@ -89,6 +220,25 @@ export async function parseAmexXlsx(params: {
   accountId: string;
   source?: string;
 }): Promise<NormalizedTransaction[]> {
+  // Try to detect if it's CSV by checking if it starts with text that looks like CSV headers
+  const firstBytes = params.buffer.slice(0, Math.min(100, params.buffer.length));
+  const textStart = firstBytes.toString('utf-8', 0, Math.min(100, firstBytes.length));
+  
+  // Check if it looks like CSV (starts with text headers, not Excel binary signature)
+  // Excel files start with specific byte sequences (PK for .xlsx, D0 CF for .xls)
+  const isLikelyCsv = 
+    textStart.includes('Category') && 
+    textStart.includes('Card Member') && 
+    textStart.includes('Date') &&
+    textStart.includes('Transaction') &&
+    !textStart.startsWith('PK') && // .xlsx signature
+    !textStart.startsWith('\xD0\xCF'); // .xls signature
+
+  if (isLikelyCsv) {
+    return parseAmexCsv(params);
+  }
+
+  // Otherwise, try to parse as Excel
   const workbook = XLSX.read(params.buffer, { type: 'buffer', cellDates: true });
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) return [];

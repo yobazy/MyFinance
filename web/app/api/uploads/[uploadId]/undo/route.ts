@@ -27,7 +27,7 @@ type UploadUndoRow = {
   id: string;
   user_id: string;
   status: string;
-  storage_path: string;
+  storage_path: string | null;
   rows_reversed: number;
 };
 
