@@ -80,6 +80,9 @@ export default function AccountsPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [balanceRollupByAccountId, setBalanceRollupByAccountId] = useState<
+    Record<string, { txSum: number; txCount: number; lastTxDate: string | null }>
+  >({});
   const [bank, setBank] = useState<string>('');
   const [accountName, setAccountName] = useState<string>('');
   const [accountType, setAccountType] = useState<'checking' | 'savings' | 'credit'>(
@@ -115,9 +118,31 @@ export default function AccountsPage() {
     setAccounts((data ?? []) as Account[]);
   }, [supabase]);
 
+  const fetchBalanceRollup = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_account_balance_rollup');
+    if (error) {
+      showMessage(`Failed to fetch balance rollup: ${error.message}`);
+      setBalanceRollupByAccountId({});
+      return;
+    }
+
+    const map: Record<string, { txSum: number; txCount: number; lastTxDate: string | null }> = {};
+    for (const row of (data ?? []) as any[]) {
+      const accountId = String(row.account_id ?? '');
+      if (!accountId) continue;
+      map[accountId] = {
+        txSum: Number(row.tx_sum ?? 0),
+        txCount: Number(row.tx_count ?? 0),
+        lastTxDate: row.last_tx_date ? String(row.last_tx_date) : null,
+      };
+    }
+    setBalanceRollupByAccountId(map);
+  }, [supabase]);
+
   useEffect(() => {
     fetchAccounts();
-  }, [fetchAccounts]);
+    fetchBalanceRollup();
+  }, [fetchAccounts, fetchBalanceRollup]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -135,6 +160,20 @@ export default function AccountsPage() {
     setAccountType('checking');
   };
 
+  const getDisplayedBalance = useCallback(
+    (account: Account): { value: number; source: 'stored' | 'computed' } => {
+      const stored = Number(account.balance ?? 0);
+      const rollup = balanceRollupByAccountId[account.id];
+      const computed = Number(rollup?.txSum ?? 0);
+      const hasTx = Number(rollup?.txCount ?? 0) > 0;
+
+      if (stored !== 0) return { value: stored, source: 'stored' };
+      if (hasTx) return { value: computed, source: 'computed' };
+      return { value: stored, source: 'stored' };
+    },
+    [balanceRollupByAccountId]
+  );
+
   const handleAddAccount = async () => {
     if (!bank || !accountName) {
       showMessage('Please fill in all fields');
@@ -148,6 +187,7 @@ export default function AccountsPage() {
     if (error) showMessage(`Failed to create account: ${error.message}`);
     else {
       await fetchAccounts();
+      await fetchBalanceRollup();
       resetDialog();
       showMessage('Account created successfully!');
     }
@@ -167,6 +207,7 @@ export default function AccountsPage() {
     if (error) showMessage(`Failed to update account: ${error.message}`);
     else {
       await fetchAccounts();
+      await fetchBalanceRollup();
       resetDialog();
       showMessage('Account updated successfully!');
     }
@@ -179,6 +220,7 @@ export default function AccountsPage() {
     if (error) showMessage(`Failed to delete account: ${error.message}`);
     else {
       await fetchAccounts();
+      await fetchBalanceRollup();
       showMessage('Account deleted successfully!');
     }
   };
@@ -243,7 +285,7 @@ export default function AccountsPage() {
       let comparison = 0;
       switch (field) {
         case 'balance':
-          comparison = Number(a.balance ?? 0) - Number(b.balance ?? 0);
+          comparison = getDisplayedBalance(a).value - getDisplayedBalance(b).value;
           break;
         case 'name':
           comparison = String(a.name ?? '').localeCompare(String(b.name ?? ''));
@@ -421,18 +463,15 @@ export default function AccountsPage() {
           Add New Account
         </Button>
 
-        <Tooltip title="Balance refresh isn’t implemented yet in the Supabase version.">
-          <span>
-            <Button
-              variant="outlined"
-              color="secondary"
-              disabled
-              startIcon={<RefreshIcon />}
-            >
-              Refresh Balances
-            </Button>
-          </span>
-        </Tooltip>
+        <Button
+          variant="outlined"
+          color="secondary"
+          startIcon={<RefreshIcon />}
+          onClick={fetchBalanceRollup}
+          disabled={busy}
+        >
+          Refresh Balances
+        </Button>
 
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto', flexWrap: 'wrap' }}>
           <Typography variant="body2" color="text.secondary">
@@ -518,7 +557,11 @@ export default function AccountsPage() {
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary">
-                  Balance: ${Number(account.balance ?? 0).toLocaleString()}
+                  {(() => {
+                    const b = getDisplayedBalance(account);
+                    const suffix = b.source === 'computed' ? ' (computed)' : '';
+                    return `Balance: $${Number(b.value ?? 0).toLocaleString()}${suffix}`;
+                  })()}
                 </Typography>
 
                 <Button

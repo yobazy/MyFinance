@@ -56,8 +56,46 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [balanceRollupByAccountId, setBalanceRollupByAccountId] = useState<
+    Record<string, { txSum: number; txCount: number }>
+  >({});
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    (async () => {
+      const { data, error } = await supabase.rpc('get_account_balance_rollup');
+      if (error) {
+        setErrorMessage(`Failed to load balances: ${error.message}`);
+        setBalanceRollupByAccountId({});
+        return;
+      }
+      const map: Record<string, { txSum: number; txCount: number }> = {};
+      for (const row of (data ?? []) as any[]) {
+        const accountId = String(row.account_id ?? '');
+        if (!accountId) continue;
+        map[accountId] = {
+          txSum: Number(row.tx_sum ?? 0),
+          txCount: Number(row.tx_count ?? 0),
+        };
+      }
+      setBalanceRollupByAccountId(map);
+    })();
+  }, [isAuthenticated, supabase]);
+
+  const getDisplayedBalance = useMemo(() => {
+    return (account: Account | null | undefined): number => {
+      if (!account) return 0;
+      const stored = Number(account.balance ?? 0);
+      const rollup = balanceRollupByAccountId[account.id];
+      const computed = Number(rollup?.txSum ?? 0);
+      const hasTx = Number(rollup?.txCount ?? 0) > 0;
+      if (stored !== 0) return stored;
+      if (hasTx) return computed;
+      return stored;
+    };
+  }, [balanceRollupByAccountId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -89,8 +127,8 @@ export default function DashboardPage() {
 
         const totalBalance =
           selectedAccountId === 'all'
-            ? accounts.reduce((sum, a) => sum + Number(a.balance ?? 0), 0)
-            : Number(filteredAccount?.balance ?? 0);
+            ? accounts.reduce((sum, a) => sum + getDisplayedBalance(a), 0)
+            : getDisplayedBalance(filteredAccount);
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -168,7 +206,7 @@ export default function DashboardPage() {
         setLoading(false);
       }
     })();
-  }, [accounts, isAuthenticated, selectedAccountId, supabase]);
+  }, [accounts, getDisplayedBalance, isAuthenticated, selectedAccountId, supabase]);
 
   const handleAccountChange = (event: SelectChangeEvent) => {
     setSelectedAccountId(event.target.value);

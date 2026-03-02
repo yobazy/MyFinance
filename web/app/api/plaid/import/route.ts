@@ -99,6 +99,21 @@ export async function POST(req: Request) {
       return json(400, { error: 'Selected Plaid account was not linked.' });
     }
 
+    // Best-effort: write the Plaid-reported current balance into our `accounts.balance`.
+    // This makes the Accounts page show a meaningful balance even without a separate
+    // "refresh balances" flow (we aren't persisting the Plaid access token).
+    const selectedPlaidAccount = accountsResp.data.accounts.find(
+      (a) => a.account_id === selectedPlaidAccountId
+    );
+    const plaidCurrentBalance = selectedPlaidAccount?.balances?.current;
+    if (typeof plaidCurrentBalance === 'number' && Number.isFinite(plaidCurrentBalance)) {
+      await supabase
+        .from('accounts')
+        .update({ balance: plaidCurrentBalance })
+        .eq('id', accountId)
+        .eq('user_id', userId);
+    }
+
     const endDate = new Date();
     const startDate = new Date();
     startDate.setUTCDate(startDate.getUTCDate() - 365);
