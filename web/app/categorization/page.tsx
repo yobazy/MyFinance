@@ -8,10 +8,17 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   Grid,
   InputLabel,
+  List,
+  ListItem,
+  ListItemText,
   MenuItem,
   Select,
   TextField,
@@ -29,6 +36,7 @@ type Category = {
 };
 
 type CategoryPreset = {
+  id: string;
   key: string;
   name: string;
   description: string;
@@ -41,6 +49,13 @@ export default function CategorizationPage() {
   const [presets, setPresets] = useState<CategoryPreset[]>([]);
   const [selectedPresetKey, setSelectedPresetKey] = useState<string>('');
   const [overwritePreset, setOverwritePreset] = useState(false);
+  const [presetCategories, setPresetCategories] = useState<
+    Record<string, { canonical_key: string; name: string; description: string }>
+  >({});
+  const [presetDialogKey, setPresetDialogKey] = useState<string | null>(null);
+  const [presetCategoriesLoadingKey, setPresetCategoriesLoadingKey] = useState<string | null>(
+    null,
+  );
   const [name, setName] = useState('');
   const [color, setColor] = useState('#2196F3');
   const [message, setMessage] = useState<string>('');
@@ -62,7 +77,7 @@ export default function CategorizationPage() {
   const loadPresets = async () => {
     const { data, error } = await supabase
       .from('category_presets')
-      .select('key,name,description,version,is_active')
+      .select('id,key,name,description,version,is_active')
       .eq('is_active', true)
       .order('name', { ascending: true });
     if (error) {
@@ -130,6 +145,38 @@ export default function CategorizationPage() {
     setMessage('Preset categories applied.');
   };
 
+  const ensurePresetCategoriesLoaded = async (presetKey: string) => {
+    if (presetCategories[presetKey]) return;
+    const preset = presets.find((p) => p.key === presetKey);
+    if (!preset) return;
+    setPresetCategoriesLoadingKey(presetKey);
+    const { data, error } = await supabase
+      .from('category_preset_categories')
+      .select('canonical_key,name,description')
+      .eq('preset_id', preset.id)
+      .order('display_order', { ascending: true })
+      .order('name', { ascending: true });
+    setPresetCategoriesLoadingKey(null);
+    if (error) {
+      setMessage(`Failed to load preset categories: ${error.message}`);
+      return;
+    }
+    const rows = (data ?? []) as { canonical_key: string; name: string; description: string }[];
+    setPresetCategories((prev) => ({
+      ...prev,
+      [presetKey]: rows,
+    }));
+  };
+
+  const handleViewPresetCategories = async () => {
+    if (!selectedPresetKey) {
+      setMessage('Please select a preset to preview.');
+      return;
+    }
+    await ensurePresetCategoriesLoaded(selectedPresetKey);
+    setPresetDialogKey(selectedPresetKey);
+  };
+
   return (
     <Box>
       <Box mb={4}>
@@ -185,14 +232,24 @@ export default function CategorizationPage() {
                 />
               </Grid>
               <Grid item xs={12} md={3}>
-                <Button
-                  variant="contained"
-                  onClick={applyPreset}
-                  disabled={busy || !selectedPresetKey}
-                  fullWidth
-                >
-                  Apply preset
-                </Button>
+                <Box display="flex" flexDirection="column" gap={1}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleViewPresetCategories}
+                    disabled={!selectedPresetKey}
+                    fullWidth
+                  >
+                    View categories
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={applyPreset}
+                    disabled={busy || !selectedPresetKey}
+                    fullWidth
+                  >
+                    Apply preset
+                  </Button>
+                </Box>
               </Grid>
             </Grid>
           </CardContent>
@@ -261,6 +318,46 @@ export default function CategorizationPage() {
           </Grid>
         ))}
       </Grid>
+
+      <Dialog
+        open={!!presetDialogKey}
+        onClose={() => setPresetDialogKey(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {(() => {
+            const p = presets.find((preset) => preset.key === presetDialogKey);
+            return p ? `${p.name} categories` : 'Preset categories';
+          })()}
+        </DialogTitle>
+        <DialogContent dividers>
+          {presetDialogKey && presetCategoriesLoadingKey === presetDialogKey ? (
+            <Typography variant="body2" color="text.secondary">
+              Loading categories…
+            </Typography>
+          ) : null}
+          {presetDialogKey && presetCategories[presetDialogKey]?.length ? (
+            <List dense>
+              {presetCategories[presetDialogKey]!.map((cat) => (
+                <ListItem key={cat.canonical_key}>
+                  <ListItemText
+                    primary={cat.name}
+                    secondary={cat.description || undefined}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : presetDialogKey && presetCategoriesLoadingKey !== presetDialogKey ? (
+            <Typography variant="body2" color="text.secondary">
+              No categories found for this preset.
+            </Typography>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPresetDialogKey(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
