@@ -38,12 +38,12 @@ import {
   Category as CategoryIcon,
   AccountBalance as AccountIcon,
   UploadFile as UploadFileIcon,
+  RateReview as ReviewIcon,
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import { formatUnknownError } from '../../lib/errors';
-import { useAuth } from '../../lib/auth/AuthContext';
 
 type Transaction = {
   id: string;
@@ -56,6 +56,7 @@ type Transaction = {
   auto_categorized: boolean;
   suggested_category_name: string | null;
   confidence_score: number | null;
+  suggested_category_id: string | null;
 };
 
 type Filters = {
@@ -76,13 +77,12 @@ export default function TransactionsPage() {
   const router = useRouter();
   const theme = useTheme();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
-  const { user } = useAuth();
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [autoCatMode, setAutoCatMode] = useState<'auto' | 'suggestions_only'>('auto');
+  const [autoCatMode, setAutoCatMode] = useState<'auto' | 'suggestions_only'>('suggestions_only');
   const [autoCatBusy, setAutoCatBusy] = useState(false);
   const [autoCatMessage, setAutoCatMessage] = useState<string | null>(null);
 
@@ -112,7 +112,7 @@ export default function TransactionsPage() {
           // `transactions` has two FKs to `categories` (category_id + suggested_category_id),
           // so we must disambiguate which relationship to embed.
           .select(
-            'id,date,description,amount,source,auto_categorized,confidence_score,accounts(name),categories:categories!transactions_category_id_fkey(name),suggested:categories!transactions_suggested_category_id_fkey(name)'
+            'id,date,description,amount,source,auto_categorized,confidence_score,suggested_category_id,accounts(name),categories:categories!transactions_category_id_fkey(name),suggested:categories!transactions_suggested_category_id_fkey(name)'
           )
           .order('date', { ascending: false })
           .limit(2000);
@@ -138,6 +138,9 @@ export default function TransactionsPage() {
                 : r.confidence_score != null
                   ? parseFloat(String(r.confidence_score))
                   : null,
+            suggested_category_id: r.suggested_category_id
+              ? String(r.suggested_category_id)
+              : null,
           };
         });
         setAllTransactions(mapped);
@@ -151,6 +154,7 @@ export default function TransactionsPage() {
       }
     })();
   }, [supabase]);
+
 
   const uniqueSources = useMemo(
     () => [...new Set(allTransactions.map((t) => t.source).filter(Boolean))].sort(),
@@ -313,9 +317,7 @@ export default function TransactionsPage() {
       }
       const processed = body.rowsProcessed ?? 0;
       setAutoCatMessage(
-        autoCatMode === 'auto'
-          ? `Auto-categorization applied for ${processed} transactions. Refresh to see updated categories.`
-          : `Suggestions updated for ${processed} transactions. Refresh to see suggested categories.`,
+        `Suggestions updated for ${processed} transactions. Review and apply them on the review page.`,
       );
     } catch (e) {
       const msg = formatUnknownError(e);
@@ -504,6 +506,30 @@ export default function TransactionsPage() {
         </Grid>
       </Grid>
 
+      {allTransactions.some((t) => !t.category_name && t.suggested_category_id) ? (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Suggestions ready for review
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {allTransactions.filter((t) => !t.category_name && t.suggested_category_id).length}{' '}
+                  transaction{allTransactions.filter((t) => !t.category_name && t.suggested_category_id).length !== 1 ? 's' : ''} with suggested categories
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={<ReviewIcon />}
+                onClick={() => router.push('/transactions/review')}
+              >
+                Review suggestions
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      ) : null}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Box
@@ -516,33 +542,17 @@ export default function TransactionsPage() {
           >
             <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
               <Typography variant="subtitle1">Auto-categorization</Typography>
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel id="auto-cat-mode-label">Mode</InputLabel>
-                <Select
-                  labelId="auto-cat-mode-label"
-                  value={autoCatMode}
-                  label="Mode"
-                  onChange={(e) =>
-                    setAutoCatMode(
-                      e.target.value === 'suggestions_only' ? 'suggestions_only' : 'auto',
-                    )
-                  }
-                >
-                  <MenuItem value="auto">Apply categories (high confidence)</MenuItem>
-                  <MenuItem value="suggestions_only">Suggestions only</MenuItem>
-                </Select>
-              </FormControl>
               <Button
                 variant="contained"
                 disabled={autoCatBusy || allTransactions.length === 0}
                 onClick={runAutoCategorization}
               >
-                {autoCatBusy ? 'Queuing…' : 'Auto-categorize uncategorized'}
+                {autoCatBusy ? 'Running…' : 'Generate suggestions'}
               </Button>
             </Box>
             <Typography variant="body2" color="text.secondary">
-              Uses your rules and presets to categorize or suggest categories for uncategorized
-              transactions.
+              Generates suggestions for uncategorized transactions using your rules and presets.
+              Review and apply them on the review page.
             </Typography>
           </Box>
           {autoCatMessage ? (

@@ -126,15 +126,14 @@ export async function POST(req: Request) {
   const userId = userData.user?.id;
   if (!userId) return json(401, { error: 'Invalid token' });
 
-  let payload: { mode?: string } = {};
+  // For now we always operate in "suggestions only" mode. The client still sends a
+  // `mode` field for future extensibility, but we do not auto-apply categories here.
+  let _payload: { mode?: string } = {};
   try {
-    payload = (await req.json()) as { mode?: string };
+    _payload = (await req.json()) as { mode?: string };
   } catch {
-    payload = {};
+    _payload = {};
   }
-
-  const mode: ApplyRulesMode =
-    payload.mode === 'suggestions_only' ? 'suggestions_only' : 'auto';
 
   const { data: txRows, error: txErr } = await supabase
     .from('transactions')
@@ -189,72 +188,32 @@ export async function POST(req: Request) {
 
     const { categoryId, confidence, rule } = suggestion;
 
-    if (mode === 'auto') {
-      if (confidence >= 0.6) {
-        updates.push({
-          id: tx.id,
-          category_id: categoryId,
-          auto_categorized: true,
-          confidence_score: confidence,
-          suggested_category_id: null,
-        });
-        ruleUsageInserts.push({
-          user_id: userId,
-          rule_id: rule.id,
-          transaction_id: tx.id,
-          confidence_score: confidence,
-          was_applied: true,
-        });
-        continue;
-      }
-      if (confidence > 0.3) {
-        updates.push({
-          id: tx.id,
-          suggested_category_id: categoryId,
-          confidence_score: confidence,
-        });
-        ruleUsageInserts.push({
-          user_id: userId,
-          rule_id: rule.id,
-          transaction_id: tx.id,
-          confidence_score: confidence,
-          was_applied: false,
-        });
-        continue;
-      }
-      updates.push({
-        id: tx.id,
-        suggested_category_id: categoryId,
-        confidence_score: confidence,
-      });
-      ruleUsageInserts.push({
-        user_id: userId,
-        rule_id: rule.id,
-        transaction_id: tx.id,
-        confidence_score: confidence,
-        was_applied: false,
-      });
-    } else {
-      updates.push({
-        id: tx.id,
-        suggested_category_id: categoryId,
-        confidence_score: confidence,
-      });
-      ruleUsageInserts.push({
-        user_id: userId,
-        rule_id: rule.id,
-        transaction_id: tx.id,
-        confidence_score: confidence,
-        was_applied: false,
-      });
-    }
+    // Suggestions only: never change category_id here, only suggested_category_id.
+    updates.push({
+      id: tx.id,
+      suggested_category_id: categoryId,
+      confidence_score: confidence,
+    });
+    ruleUsageInserts.push({
+      user_id: userId,
+      rule_id: rule.id,
+      transaction_id: tx.id,
+      confidence_score: confidence,
+      was_applied: false,
+    });
   }
 
   if (updates.length > 0) {
-    const { error: updErr } = await supabase.from('transactions').upsert(updates, {
-      onConflict: 'id',
-    });
-    if (updErr) return json(500, { error: updErr.message });
+    // We only ever update existing transactions (selected above), so use per-row UPDATE
+    // instead of upsert to avoid accidental inserts missing required columns like user_id.
+    for (const row of updates) {
+      const { id, ...rest } = row;
+      const { error: updErr } = await supabase
+        .from('transactions')
+        .update(rest)
+        .eq('id', id);
+      if (updErr) return json(500, { error: updErr.message });
+    }
   }
 
   if (ruleUsageInserts.length > 0) {
