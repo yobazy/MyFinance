@@ -1,6 +1,7 @@
 import { getEnv } from './env.js';
 import { createServiceSupabaseClient } from './supabase.js';
 import { handleIngestUploadJob } from './jobs/ingestUpload.js';
+import { handleApplyRulesJob } from './jobs/applyRules.js';
 
 type ProcessingJob = {
   id: string;
@@ -54,7 +55,18 @@ async function main() {
 
         // eslint-disable-next-line no-console
         console.log(
-          `[worker] job ${j.id} succeeded rowsProcessed=${result.rowsProcessed}`
+          `[worker] job ${j.id} succeeded rowsProcessed=${result.rowsProcessed}`,
+        );
+      } else if (j.type === 'apply_rules') {
+        const result = await handleApplyRulesJob({ supabase, job: j });
+        await supabase
+          .from('processing_jobs')
+          .update({ status: 'succeeded', last_error: null })
+          .eq('id', j.id);
+
+        // eslint-disable-next-line no-console
+        console.log(
+          `[worker] job ${j.id} apply_rules processed rows=${result.rowsProcessed}`,
         );
       } else {
         throw new Error(`Unsupported job type: ${j.type}`);

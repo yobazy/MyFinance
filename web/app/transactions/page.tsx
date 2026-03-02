@@ -43,6 +43,7 @@ import { useTheme } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import { formatUnknownError } from '../../lib/errors';
+import { useAuth } from '../../lib/auth/AuthContext';
 
 type Transaction = {
   id: string;
@@ -75,6 +76,7 @@ export default function TransactionsPage() {
   const router = useRouter();
   const theme = useTheme();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { user } = useAuth();
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -292,20 +294,32 @@ export default function TransactionsPage() {
     setAutoCatMessage(null);
     setAutoCatBusy(true);
     try {
-      const { error } = await supabase.from('processing_jobs').insert({
-        type: 'apply_rules',
-        payload: { mode: autoCatMode },
-        status: 'queued',
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) {
+        throw new Error('Missing user session');
+      }
+      const res = await fetch('/api/auto-categorization/apply', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ mode: autoCatMode }),
       });
-      if (error) throw error;
+      const body = (await res.json()) as { ok?: boolean; error?: string; rowsProcessed?: number };
+      if (!res.ok || body.error) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const processed = body.rowsProcessed ?? 0;
       setAutoCatMessage(
         autoCatMode === 'auto'
-          ? 'Auto-categorization job queued. Refresh in a few seconds to see applied categories.'
-          : 'Suggestion job queued. Refresh in a few seconds to see suggested categories.',
+          ? `Auto-categorization applied for ${processed} transactions. Refresh to see updated categories.`
+          : `Suggestions updated for ${processed} transactions. Refresh to see suggested categories.`,
       );
     } catch (e) {
       const msg = formatUnknownError(e);
-      setAutoCatMessage(`Failed to queue auto-categorization: ${msg}`);
+      setAutoCatMessage(`Failed to run auto-categorization: ${msg}`);
     } finally {
       setAutoCatBusy(false);
     }
