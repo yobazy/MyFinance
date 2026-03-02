@@ -52,6 +52,9 @@ type Transaction = {
   source: string;
   account_name: string;
   category_name: string | null;
+  auto_categorized: boolean;
+  suggested_category_name: string | null;
+  confidence_score: number | null;
 };
 
 type Filters = {
@@ -77,6 +80,9 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [autoCatMode, setAutoCatMode] = useState<'auto' | 'suggestions_only'>('auto');
+  const [autoCatBusy, setAutoCatBusy] = useState(false);
+  const [autoCatMessage, setAutoCatMessage] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const rowsPerPage = 25;
@@ -104,7 +110,7 @@ export default function TransactionsPage() {
           // `transactions` has two FKs to `categories` (category_id + suggested_category_id),
           // so we must disambiguate which relationship to embed.
           .select(
-            'id,date,description,amount,source,accounts(name),categories:categories!transactions_category_id_fkey(name)'
+            'id,date,description,amount,source,auto_categorized,confidence_score,accounts(name),categories:categories!transactions_category_id_fkey(name),suggested:categories!transactions_suggested_category_id_fkey(name)'
           )
           .order('date', { ascending: false })
           .limit(2000);
@@ -112,6 +118,7 @@ export default function TransactionsPage() {
         const mapped: Transaction[] = (data ?? []).map((r: any) => {
           const account = (r.accounts ?? null) as null | { name?: string };
           const category = (r.categories ?? null) as null | { name?: string };
+          const suggested = (r.suggested ?? null) as null | { name?: string };
           const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
           return {
             id: String(r.id),
@@ -121,6 +128,14 @@ export default function TransactionsPage() {
             source: String(r.source ?? ''),
             account_name: String(account?.name ?? 'Unknown'),
             category_name: category?.name ?? null,
+            auto_categorized: Boolean(r.auto_categorized),
+            suggested_category_name: suggested?.name ?? null,
+            confidence_score:
+              typeof r.confidence_score === 'number'
+                ? r.confidence_score
+                : r.confidence_score != null
+                  ? parseFloat(String(r.confidence_score))
+                  : null,
           };
         });
         setAllTransactions(mapped);
@@ -271,6 +286,29 @@ export default function TransactionsPage() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  };
+
+  const runAutoCategorization = async () => {
+    setAutoCatMessage(null);
+    setAutoCatBusy(true);
+    try {
+      const { error } = await supabase.from('processing_jobs').insert({
+        type: 'apply_rules',
+        payload: { mode: autoCatMode },
+        status: 'queued',
+      });
+      if (error) throw error;
+      setAutoCatMessage(
+        autoCatMode === 'auto'
+          ? 'Auto-categorization job queued. Refresh in a few seconds to see applied categories.'
+          : 'Suggestion job queued. Refresh in a few seconds to see suggested categories.',
+      );
+    } catch (e) {
+      const msg = formatUnknownError(e);
+      setAutoCatMessage(`Failed to queue auto-categorization: ${msg}`);
+    } finally {
+      setAutoCatBusy(false);
+    }
   };
 
   const setQuickFilter = (filterType: 'uncategorized' | 'last30days' | 'expenses' | 'income') => {
@@ -452,6 +490,58 @@ export default function TransactionsPage() {
         </Grid>
       </Grid>
 
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box
+            display="flex"
+            flexWrap="wrap"
+            alignItems="center"
+            justifyContent="space-between"
+            rowGap={2}
+            columnGap={2}
+          >
+            <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+              <Typography variant="subtitle1">Auto-categorization</Typography>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel id="auto-cat-mode-label">Mode</InputLabel>
+                <Select
+                  labelId="auto-cat-mode-label"
+                  value={autoCatMode}
+                  label="Mode"
+                  onChange={(e) =>
+                    setAutoCatMode(
+                      e.target.value === 'suggestions_only' ? 'suggestions_only' : 'auto',
+                    )
+                  }
+                >
+                  <MenuItem value="auto">Apply categories (high confidence)</MenuItem>
+                  <MenuItem value="suggestions_only">Suggestions only</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="contained"
+                disabled={autoCatBusy || allTransactions.length === 0}
+                onClick={runAutoCategorization}
+              >
+                {autoCatBusy ? 'Queuing…' : 'Auto-categorize uncategorized'}
+              </Button>
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              Uses your rules and presets to categorize or suggest categories for uncategorized
+              transactions.
+            </Typography>
+          </Box>
+          {autoCatMessage ? (
+            <Alert
+              severity={autoCatMessage.toLowerCase().startsWith('failed') ? 'error' : 'info'}
+              sx={{ mt: 2 }}
+            >
+              {autoCatMessage}
+            </Alert>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <Box mb={2}>
         <Typography variant="subtitle2" gutterBottom>
           Quick Filters:
@@ -610,26 +700,50 @@ export default function TransactionsPage() {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    {t.category_name ? (
-                      <Chip
-                        label={t.category_name}
-                        size="small"
-                        color="secondary"
-                        variant="outlined"
-                        sx={(t) => ({
-                          backgroundColor:
-                            t.palette.mode === 'dark'
-                              ? 'rgba(236,231,220,0.04)'
-                              : 'rgba(11,18,32,0.03)',
-                          borderColor:
-                            t.palette.mode === 'dark'
-                              ? 'rgba(236,231,220,0.14)'
-                              : 'rgba(11,18,32,0.12)',
-                        })}
-                      />
-                    ) : (
-                      <Chip label="Uncategorized" size="small" color="warning" variant="outlined" />
-                    )}
+                    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+                      {t.category_name ? (
+                        <Chip
+                          label={t.category_name}
+                          size="small"
+                          color="secondary"
+                          variant="outlined"
+                          sx={(t) => ({
+                            backgroundColor:
+                              t.palette.mode === 'dark'
+                                ? 'rgba(236,231,220,0.04)'
+                                : 'rgba(11,18,32,0.03)',
+                            borderColor:
+                              t.palette.mode === 'dark'
+                                ? 'rgba(236,231,220,0.14)'
+                                : 'rgba(11,18,32,0.12)',
+                          })}
+                        />
+                      ) : (
+                        <Chip
+                          label="Uncategorized"
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                        />
+                      )}
+                      {t.category_name && t.auto_categorized ? (
+                        <Chip label="Auto" size="small" variant="outlined" />
+                      ) : null}
+                      {!t.category_name && t.suggested_category_name ? (
+                        <Chip
+                          label={
+                            t.confidence_score != null
+                              ? `Suggested: ${t.suggested_category_name} (${Math.round(
+                                  t.confidence_score * 100,
+                                )}%)`
+                              : `Suggested: ${t.suggested_category_name}`
+                          }
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                        />
+                      ) : null}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               );
