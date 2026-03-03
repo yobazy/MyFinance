@@ -257,7 +257,7 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
-  const [period, setPeriod] = useState<Period>('3m');
+  const [period, setPeriod] = useState<Period>('all');
   const [transactions, setTransactions] = useState<AnalyticsTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -277,7 +277,11 @@ export default function AnalyticsPage() {
           .order('date', { ascending: false })
           .limit(5000);
         const { data, error } = await (startDate ? baseQuery.gte('date', startDate) : baseQuery);
-        if (error) throw error;
+        if (error) {
+          console.error('AnalyticsPage query error:', error);
+          throw error;
+        }
+        console.log('AnalyticsPage query result:', { dataCount: data?.length ?? 0, period, startDate, sample: data?.[0] });
         if (!cancelled) {
           setTransactions(
             (data ?? []).map((r: any) => ({
