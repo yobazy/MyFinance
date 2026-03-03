@@ -12,6 +12,7 @@ import {
   FormControl,
   Grid,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Pagination,
   Paper,
@@ -87,6 +88,8 @@ export default function TransactionsPage() {
   const [autoCatMode, setAutoCatMode] = useState<'auto' | 'suggestions_only'>('suggestions_only');
   const [autoCatBusy, setAutoCatBusy] = useState(false);
   const [autoCatMessage, setAutoCatMessage] = useState<string | null>(null);
+  const [autoCatProgress, setAutoCatProgress] = useState<number>(0);
+  const [autoCatLogs, setAutoCatLogs] = useState<string[]>([]);
 
   const [page, setPage] = useState(1);
   const rowsPerPage = 25;
@@ -325,12 +328,63 @@ export default function TransactionsPage() {
   const runAutoCategorization = async () => {
     setAutoCatMessage(null);
     setAutoCatBusy(true);
+    setAutoCatProgress(0);
+    setAutoCatLogs([]);
+    
+    let success = false;
+    
+    const addLog = (message: string) => {
+      setAutoCatLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+    };
+    
+    const updateProgress = (progress: number) => {
+      setAutoCatProgress(Math.min(100, Math.max(0, progress)));
+    };
+    
     try {
+      addLog('Starting auto-categorization...');
+      updateProgress(5);
+      
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
       if (!token) {
         throw new Error('Missing user session');
       }
+      
+      addLog('Fetching uncategorized transactions...');
+      updateProgress(15);
+      
+      // Get count of uncategorized transactions for progress estimation
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .is('category_id', null);
+      
+      const totalUncategorized = count ?? 0;
+      addLog(`Found ${totalUncategorized} uncategorized transaction${totalUncategorized !== 1 ? 's' : ''} to process`);
+      updateProgress(25);
+      
+      if (totalUncategorized === 0) {
+        addLog('No uncategorized transactions found. Nothing to process.');
+        setAutoCatMessage('No uncategorized transactions found.');
+        setAutoCatBusy(false);
+        return;
+      }
+      
+      addLog('Processing transactions and applying categorization rules...');
+      updateProgress(30);
+      
+      // Simulate progress updates during processing
+      const progressInterval = setInterval(() => {
+        setAutoCatProgress((prev) => {
+          if (prev < 85) {
+            const increment = Math.random() * 5 + 2; // Random increment between 2-7%
+            return Math.min(85, prev + increment);
+          }
+          return prev;
+        });
+      }, 500);
+      
       const res = await fetch('/api/auto-categorization/apply', {
         method: 'POST',
         headers: {
@@ -339,19 +393,39 @@ export default function TransactionsPage() {
         },
         body: JSON.stringify({ mode: autoCatMode }),
       });
+      
+      clearInterval(progressInterval);
+      updateProgress(90);
+      
+      addLog('Finalizing results...');
+      updateProgress(95);
+      
       const body = (await res.json()) as { ok?: boolean; error?: string; rowsProcessed?: number };
       if (!res.ok || body.error) {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
+      
       const processed = body.rowsProcessed ?? 0;
+      updateProgress(100);
+      addLog(`Successfully processed ${processed} transaction${processed !== 1 ? 's' : ''}`);
+      success = true;
+      
       setAutoCatMessage(
         `Suggestions updated for ${processed} transactions. Review and apply them on the review page.`,
       );
     } catch (e) {
       const msg = formatUnknownError(e);
+      addLog(`Error: ${msg}`);
       setAutoCatMessage(`Failed to run auto-categorization: ${msg}`);
+      updateProgress(0);
     } finally {
       setAutoCatBusy(false);
+      // Keep progress at 100% for a moment before resetting (only on success)
+      if (success) {
+        setTimeout(() => {
+          setAutoCatProgress(0);
+        }, 2000);
+      }
     }
   };
 
@@ -553,14 +627,77 @@ export default function TransactionsPage() {
               Review and apply them on the review page.
             </Typography>
           </Box>
-          {autoCatMessage ? (
+          
+          {autoCatBusy && (
+            <Box sx={{ mt: 3 }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Processing transactions...
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {Math.round(autoCatProgress)}%
+                </Typography>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={autoCatProgress} 
+                sx={{ 
+                  height: 8, 
+                  borderRadius: 4,
+                  backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                    ? 'rgba(255, 255, 255, 0.1)' 
+                    : 'rgba(0, 0, 0, 0.1)',
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: 4,
+                  },
+                }} 
+              />
+              
+              {autoCatLogs.length > 0 && (
+                <Paper 
+                  variant="outlined" 
+                  sx={{ 
+                    mt: 2, 
+                    p: 2, 
+                    maxHeight: 200, 
+                    overflow: 'auto',
+                    backgroundColor: (theme) => theme.palette.mode === 'dark'
+                      ? 'rgba(255, 255, 255, 0.05)'
+                      : 'rgba(0, 0, 0, 0.02)',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    Activity log:
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    {autoCatLogs.map((log, index) => (
+                      <Typography 
+                        key={index} 
+                        variant="caption" 
+                        sx={{ 
+                          fontFamily: 'monospace',
+                          fontSize: '0.75rem',
+                          color: 'text.secondary',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {log}
+                      </Typography>
+                    ))}
+                  </Stack>
+                </Paper>
+              )}
+            </Box>
+          )}
+          
+          {autoCatMessage && !autoCatBusy && (
             <Alert
               severity={autoCatMessage.toLowerCase().startsWith('failed') ? 'error' : 'info'}
               sx={{ mt: 2 }}
             >
               {autoCatMessage}
             </Alert>
-          ) : null}
+          )}
         </CardContent>
       </Card>
 
