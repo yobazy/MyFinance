@@ -167,8 +167,12 @@ export default function AccountsPage() {
       const computed = Number(rollup?.txSum ?? 0);
       const hasTx = Number(rollup?.txCount ?? 0) > 0;
 
+      // If stored balance exists, use it (it should be correct)
+      // Otherwise, for computed balance: In this system, expenses are positive and income is negative.
+      // For account balance: income increases balance (should be positive), expenses decrease it (should be negative).
+      // So we need to invert the sign: balance = -sum(transactions)
       if (stored !== 0) return { value: stored, source: 'stored' };
-      if (hasTx) return { value: computed, source: 'computed' };
+      if (hasTx) return { value: -computed, source: 'computed' }; // Invert sign because expenses are + and income is -
       return { value: stored, source: 'stored' };
     },
     [balanceRollupByAccountId]

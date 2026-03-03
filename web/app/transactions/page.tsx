@@ -109,17 +109,41 @@ export default function TransactionsPage() {
     (async () => {
       try {
         setLoadError(null);
-        const { data, error } = await supabase
-          .from('transactions')
-          // `transactions` has two FKs to `categories` (category_id + suggested_category_id),
-          // so we must disambiguate which relationship to embed.
-          .select(
-            'id,date,description,amount,source,auto_categorized,confidence_score,suggested_category_id,accounts(name),categories:categories!transactions_category_id_fkey(name,color),suggested:categories!transactions_suggested_category_id_fkey(name,color)'
-          )
-          .order('date', { ascending: false })
-          .limit(2000);
-        if (error) throw error;
-        const mapped: Transaction[] = (data ?? []).map((r: any) => {
+        
+        // Supabase PostgREST has a default max limit of 1000 rows per query.
+        // We need to fetch in batches to get all transactions.
+        const batchSize = 1000;
+        let allData: any[] = [];
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('transactions')
+            // `transactions` has two FKs to `categories` (category_id + suggested_category_id),
+            // so we must disambiguate which relationship to embed.
+            .select(
+              'id,date,description,amount,source,auto_categorized,confidence_score,suggested_category_id,accounts(name),categories:categories!transactions_category_id_fkey(name,color),suggested:categories!transactions_suggested_category_id_fkey(name,color)'
+            )
+            .order('date', { ascending: false })
+            .range(offset, offset + batchSize - 1);
+          
+          if (error) throw error;
+          
+          if (!data || data.length === 0) {
+            hasMore = false;
+          } else {
+            allData = allData.concat(data);
+            // If we got fewer rows than the batch size, we've reached the end
+            if (data.length < batchSize) {
+              hasMore = false;
+            } else {
+              offset += batchSize;
+            }
+          }
+        }
+
+        const mapped: Transaction[] = allData.map((r: any) => {
           const account = (r.accounts ?? null) as null | { name?: string };
           const category = (r.categories ?? null) as null | { name?: string; color?: string };
           const suggested = (r.suggested ?? null) as null | { name?: string; color?: string };
