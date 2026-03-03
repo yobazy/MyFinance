@@ -4,11 +4,22 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
+  Collapse,
+  FormControl,
+  FormControlLabel,
   Grid,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
+  Switch,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import {
@@ -19,6 +30,9 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   UploadFile as UploadFileIcon,
+  FilterList as FilterListIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import {
@@ -42,7 +56,9 @@ import { formatUnknownError } from '../../lib/errors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Period = '1m' | '3m' | '6m' | '1y' | 'all';
+type Period = '1m' | '3m' | '6m' | '1y' | 'all' | 'custom';
+
+type TransactionType = 'all' | 'income' | 'expenses';
 
 type AnalyticsTransaction = {
   id: string;
@@ -69,6 +85,7 @@ const PERIOD_OPTIONS: { value: Period; label: string }[] = [
   { value: '6m', label: '6M' },
   { value: '1y', label: '1Y' },
   { value: 'all', label: 'All' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 const CATEGORY_COLORS = [
@@ -99,13 +116,25 @@ function fmtAxis(value: number): string {
 }
 
 function getPeriodStart(period: Period): string | null {
-  if (period === 'all') return null;
-  const d = new Date();
-  if (period === '1m') d.setMonth(d.getMonth() - 1);
-  else if (period === '3m') d.setMonth(d.getMonth() - 3);
-  else if (period === '6m') d.setMonth(d.getMonth() - 6);
-  else d.setFullYear(d.getFullYear() - 1);
+  if (period === 'all' || period === 'custom') return null;
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === '1m') {
+    d.setMonth(d.getMonth() - 1);
+  } else if (period === '3m') {
+    d.setMonth(d.getMonth() - 3);
+  } else if (period === '6m') {
+    d.setMonth(d.getMonth() - 6);
+  } else if (period === '1y') {
+    d.setFullYear(d.getFullYear() - 1);
+  }
   return d.toISOString().split('T')[0];
+}
+
+function getPeriodEnd(period: Period): string | null {
+  if (period === 'all' || period === 'custom') return null;
+  const today = new Date();
+  return today.toISOString().split('T')[0];
 }
 
 function buildMonthlyData(txs: AnalyticsTransaction[]): MonthRow[] {
@@ -261,6 +290,10 @@ export default function AnalyticsPage() {
   const [transactions, setTransactions] = useState<AnalyticsTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [transactionType, setTransactionType] = useState<TransactionType>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -268,7 +301,17 @@ export default function AnalyticsPage() {
       setLoading(true);
       setLoadError(null);
       try {
-        const startDate = getPeriodStart(period);
+        let startDate: string | null = null;
+        let endDate: string | null = null;
+
+        if (period === 'custom') {
+          startDate = customStartDate || null;
+          endDate = customEndDate || null;
+        } else {
+          startDate = getPeriodStart(period);
+          endDate = getPeriodEnd(period);
+        }
+
         const baseQuery = supabase
           .from('transactions')
           .select(
@@ -276,12 +319,21 @@ export default function AnalyticsPage() {
           )
           .order('date', { ascending: false })
           .limit(5000);
-        const { data, error } = await (startDate ? baseQuery.gte('date', startDate) : baseQuery);
+
+        let query = baseQuery;
+        if (startDate) {
+          query = query.gte('date', startDate);
+        }
+        if (endDate) {
+          query = query.lte('date', endDate);
+        }
+
+        const { data, error } = await query;
         if (error) {
           console.error('AnalyticsPage query error:', error);
           throw error;
         }
-        console.log('AnalyticsPage query result:', { dataCount: data?.length ?? 0, period, startDate, sample: data?.[0] });
+        console.log('AnalyticsPage query result:', { dataCount: data?.length ?? 0, period, startDate, endDate, sample: data?.[0] });
         if (!cancelled) {
           setTransactions(
             (data ?? []).map((r: any) => ({
@@ -304,21 +356,32 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [period, supabase]);
+  }, [period, customStartDate, customEndDate, supabase]);
+
+  // ── Filter transactions by type ────────────────────────────────────────────
+
+  const filteredTransactions = useMemo(() => {
+    if (transactionType === 'all') return transactions;
+    if (transactionType === 'income') {
+      return transactions.filter((t) => t.amount < 0);
+    }
+    // expenses
+    return transactions.filter((t) => t.amount > 0);
+  }, [transactions, transactionType]);
 
   // ── Aggregations ────────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
-    const totalExpenses = transactions
+    const totalExpenses = filteredTransactions
       .filter((t) => t.amount > 0)
       .reduce((s, t) => s + t.amount, 0);
-    const totalIncome = transactions
+    const totalIncome = filteredTransactions
       .filter((t) => t.amount < 0)
       .reduce((s, t) => s + Math.abs(t.amount), 0);
-    const uncategorized = transactions.filter(
+    const uncategorized = filteredTransactions.filter(
       (t) => t.amount > 0 && !t.category_name,
     ).length;
-    const months = new Set(transactions.map((t) => t.date.slice(0, 7)));
+    const months = new Set(filteredTransactions.map((t) => t.date.slice(0, 7)));
     return {
       totalExpenses,
       totalIncome,
@@ -326,28 +389,28 @@ export default function AnalyticsPage() {
       avgMonthlyExpense: totalExpenses / Math.max(months.size, 1),
       uncategorized,
     };
-  }, [transactions]);
+  }, [filteredTransactions]);
 
-  const monthlyData = useMemo(() => buildMonthlyData(transactions), [transactions]);
-  const categoryData = useMemo(() => buildCategoryData(transactions), [transactions]);
+  const monthlyData = useMemo(() => buildMonthlyData(filteredTransactions), [filteredTransactions]);
+  const categoryData = useMemo(() => buildCategoryData(filteredTransactions), [filteredTransactions]);
   const topExpenses = useMemo(
     () =>
-      transactions
+      filteredTransactions
         .filter((t) => t.amount > 0)
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 6),
-    [transactions],
+    [filteredTransactions],
   );
   const insights = useMemo(
     () =>
       buildInsights(
-        transactions,
+        filteredTransactions,
         categoryData,
         stats.totalIncome,
         stats.totalExpenses,
         stats.uncategorized,
       ),
-    [transactions, categoryData, stats],
+    [filteredTransactions, categoryData, stats],
   );
 
   const incomeColor = theme.palette.success.main;
@@ -374,7 +437,8 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (transactions.length === 0) {
+  if (filteredTransactions.length === 0) {
+    const hasFilters = period !== 'all' || transactionType !== 'all' || (period === 'custom' && (customStartDate || customEndDate));
     return (
       <Box>
         <Typography variant="h4" gutterBottom>
@@ -387,11 +451,11 @@ export default function AnalyticsPage() {
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            cursor: 'pointer',
+            cursor: hasFilters ? 'default' : 'pointer',
             transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': { transform: 'translateY(-3px)', boxShadow: theme.shadows[3] },
+            '&:hover': hasFilters ? {} : { transform: 'translateY(-3px)', boxShadow: theme.shadows[3] },
           }}
-          onClick={() => router.push('/upload')}
+          onClick={hasFilters ? undefined : () => router.push('/upload')}
         >
           <CardContent sx={{ textAlign: 'center' }}>
             <UploadFileIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
@@ -399,7 +463,9 @@ export default function AnalyticsPage() {
               No transactions for this period
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 420, mx: 'auto' }}>
-              Upload bank statements to start seeing spending insights and trends.
+              {hasFilters
+                ? 'Try adjusting your filters or selecting a different time period.'
+                : 'Upload bank statements to start seeing spending insights and trends.'}
             </Typography>
           </CardContent>
         </Card>
@@ -412,27 +478,96 @@ export default function AnalyticsPage() {
   return (
     <Box>
       {/* ── Header ── */}
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-        flexWrap="wrap"
-        gap={2}
-      >
-        <Typography variant="h4">Analytics</Typography>
-        <Stack direction="row" spacing={0.5}>
-          {PERIOD_OPTIONS.map((opt) => (
-            <Chip
-              key={opt.value}
-              label={opt.label}
-              onClick={() => setPeriod(opt.value)}
-              color={period === opt.value ? 'primary' : 'default'}
-              variant={period === opt.value ? 'filled' : 'outlined'}
-              sx={{ fontWeight: period === opt.value ? 600 : 400 }}
-            />
-          ))}
-        </Stack>
+      <Box mb={3}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={2}
+          flexWrap="wrap"
+          gap={2}
+        >
+          <Typography variant="h4">Analytics</Typography>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Stack direction="row" spacing={0.5}>
+              {PERIOD_OPTIONS.map((opt) => (
+                <Chip
+                  key={opt.value}
+                  label={opt.label}
+                  onClick={() => {
+                    setPeriod(opt.value);
+                    if (opt.value !== 'custom') {
+                      setCustomStartDate('');
+                      setCustomEndDate('');
+                    }
+                  }}
+                  color={period === opt.value ? 'primary' : 'default'}
+                  variant={period === opt.value ? 'filled' : 'outlined'}
+                  sx={{ fontWeight: period === opt.value ? 600 : 400 }}
+                />
+              ))}
+            </Stack>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FilterListIcon />}
+              endIcon={showAdvancedFilters ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              Filters
+            </Button>
+          </Stack>
+        </Box>
+
+        {/* ── Advanced Filters ── */}
+        <Collapse in={showAdvancedFilters}>
+          <Card sx={{ mb: 2 }}>
+            <CardContent>
+              <Grid container spacing={2} alignItems="center">
+                {period === 'custom' && (
+                  <>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <TextField
+                        fullWidth
+                        label="Start Date"
+                        type="date"
+                        size="small"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <TextField
+                        fullWidth
+                        label="End Date"
+                        type="date"
+                        size="small"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                  </>
+                )}
+                <Grid item xs={12} sm={6} md={period === 'custom' ? 6 : 12}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Transaction Type</InputLabel>
+                    <Select
+                      value={transactionType}
+                      label="Transaction Type"
+                      onChange={(e) => setTransactionType(e.target.value as TransactionType)}
+                    >
+                      <MenuItem value="all">All Transactions</MenuItem>
+                      <MenuItem value="income">Income Only</MenuItem>
+                      <MenuItem value="expenses">Expenses Only</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Collapse>
       </Box>
 
       {/* ── KPI cards ── */}
