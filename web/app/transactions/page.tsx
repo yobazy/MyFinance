@@ -374,44 +374,82 @@ export default function TransactionsPage() {
       addLog('Processing transactions and applying categorization rules...');
       updateProgress(30);
       
-      // Simulate progress updates during processing
-      const progressInterval = setInterval(() => {
-        setAutoCatProgress((prev) => {
-          if (prev < 85) {
-            const increment = Math.random() * 5 + 2; // Random increment between 2-7%
-            return Math.min(85, prev + increment);
-          }
-          return prev;
-        });
-      }, 500);
-      
+      // Use streaming API for real-time progress updates
       const res = await fetch('/api/auto-categorization/apply', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
+          'accept': 'text/event-stream',
           authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ mode: autoCatMode }),
       });
       
-      clearInterval(progressInterval);
-      updateProgress(90);
-      
-      addLog('Finalizing results...');
-      updateProgress(95);
-      
-      const body = (await res.json()) as { ok?: boolean; error?: string; rowsProcessed?: number };
-      if (!res.ok || body.error) {
-        throw new Error(body.error || `HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
       
-      const processed = body.rowsProcessed ?? 0;
-      updateProgress(100);
-      addLog(`Successfully processed ${processed} transaction${processed !== 1 ? 's' : ''}`);
-      success = true;
+      if (!res.body) {
+        throw new Error('No response body');
+      }
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let totalTransactions = totalUncategorized;
+      let processed = 0;
+      let matched = 0;
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === 'progress') {
+                  totalTransactions = data.total;
+                  processed = data.current;
+                  matched = data.matched;
+                  const progressPercent = 30 + (data.progress * 0.6); // 30% to 90% for processing
+                  updateProgress(progressPercent);
+                  addLog(data.message || `Processing transaction ${data.current} of ${data.total}${data.matched > 0 ? ` (${data.matched} matched)` : ''}`);
+                } else if (data.type === 'status') {
+                  addLog(data.message);
+                  updateProgress(90);
+                } else if (data.type === 'complete') {
+                  processed = data.rowsProcessed ?? 0;
+                  matched = data.matched ?? 0;
+                  updateProgress(100);
+                  addLog(`Successfully processed ${processed} transaction${processed !== 1 ? 's' : ''}${matched > 0 ? ` (${matched} with suggestions)` : ''}`);
+                  success = true;
+                } else if (data.type === 'error') {
+                  throw new Error(data.error || 'Unknown error');
+                }
+              } catch (parseError) {
+                // Ignore JSON parse errors for malformed lines
+                console.warn('Failed to parse SSE data:', parseError);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      
+      if (!success) {
+        throw new Error('Stream completed without success message');
+      }
       
       setAutoCatMessage(
-        `Suggestions updated for ${processed} transactions. Review and apply them on the review page.`,
+        `Suggestions updated for ${processed} transaction${processed !== 1 ? 's' : ''}. Review and apply them on the review page.`,
       );
     } catch (e) {
       const msg = formatUnknownError(e);

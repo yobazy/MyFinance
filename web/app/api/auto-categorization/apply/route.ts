@@ -185,6 +185,9 @@ export async function POST(req: Request) {
     return json(200, { ok: true, rowsProcessed: 0 });
   }
 
+  // Check if client wants streaming progress updates
+  const wantsStream = req.headers.get('accept')?.includes('text/event-stream');
+  
   const updates: {
     id: string;
     category_id?: string | null;
@@ -201,6 +204,150 @@ export async function POST(req: Request) {
     was_applied: boolean;
   }[] = [];
 
+  const totalTransactions = transactions.length;
+  let processedCount = 0;
+  let matchedCount = 0;
+
+  // If streaming, create a ReadableStream to send progress updates
+  if (wantsStream) {
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        
+          const sendProgress = (current: number, total: number, matched: number) => {
+            const progress = Math.round((current / total) * 100);
+            const data = JSON.stringify({
+              type: 'progress',
+              current,
+              total,
+              matched,
+              progress,
+              message: `Categorizing transaction ${current} of ${total}${matched > 0 ? ` (${matched} with suggestions so far)` : ''}`,
+            });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+          };
+
+        try {
+          // Send initial progress
+          sendProgress(0, totalTransactions, 0);
+
+          for (let i = 0; i < transactions.length; i++) {
+            const tx = transactions[i];
+            const suggestion = await getBestSuggestion(supabase, userId, tx, rules);
+            
+            processedCount++;
+            
+            if (suggestion) {
+              matchedCount++;
+              const { categoryId, confidence, rule } = suggestion;
+
+              updates.push({
+                id: tx.id,
+                suggested_category_id: categoryId,
+                confidence_score: confidence,
+              });
+              ruleUsageInserts.push({
+                user_id: userId,
+                rule_id: rule.id,
+                transaction_id: tx.id,
+                confidence_score: confidence,
+                was_applied: false,
+              });
+            }
+
+            // Send progress updates at reasonable intervals
+            // For small batches: every transaction
+            // For medium batches: every 10 transactions
+            // For large batches: every 1% or every 50 transactions, whichever is more frequent
+            const updateInterval = totalTransactions < 100 
+              ? 1 
+              : Math.max(10, Math.min(50, Math.floor(totalTransactions / 100)));
+            
+            if (i % updateInterval === 0 || i === transactions.length - 1) {
+              sendProgress(processedCount, totalTransactions, matchedCount);
+            }
+          }
+
+          // Send final progress
+          sendProgress(totalTransactions, totalTransactions, matchedCount);
+          
+          // Now do the database updates
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Saving results...' })}\n\n`));
+
+          if (updates.length > 0) {
+            for (const row of updates) {
+              const { id, ...rest } = row;
+              const { error: updErr } = await supabase
+                .from('transactions')
+                .update(rest)
+                .eq('id', id);
+              if (updErr) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: updErr.message })}\n\n`));
+                controller.close();
+                return;
+              }
+            }
+          }
+
+          if (ruleUsageInserts.length > 0) {
+            const { error: usageErr } = await supabase.from('rule_usage').insert(ruleUsageInserts);
+            if (usageErr) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: usageErr.message })}\n\n`));
+              controller.close();
+              return;
+            }
+
+            const uniqueRuleIds = [...new Set(ruleUsageInserts.map((ru) => ru.rule_id))];
+            for (const ruleId of uniqueRuleIds) {
+              try {
+                await supabase.rpc('increment_rule_match_count', { rule_id: ruleId });
+              } catch {
+                const { data: rule } = await supabase
+                  .from('categorization_rules')
+                  .select('match_count')
+                  .eq('id', ruleId)
+                  .single();
+                if (rule) {
+                  await supabase
+                    .from('categorization_rules')
+                    .update({
+                      match_count: (rule.match_count || 0) + ruleUsageInserts.filter((ru) => ru.rule_id === ruleId).length,
+                      last_matched: new Date().toISOString(),
+                    })
+                    .eq('id', ruleId);
+                }
+              }
+            }
+          }
+
+          // Send final result
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+            type: 'complete', 
+            ok: true, 
+            rowsProcessed: totalTransactions,
+            matched: matchedCount,
+          })}\n\n`));
+          controller.close();
+        } catch (error: any) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+            type: 'error', 
+            error: error?.message || 'Unknown error' 
+          })}\n\n`));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
+  // Non-streaming path (original behavior)
   for (const tx of transactions) {
     const suggestion = await getBestSuggestion(supabase, userId, tx, rules);
     if (!suggestion) continue;
