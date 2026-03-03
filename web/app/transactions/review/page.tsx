@@ -28,6 +28,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Check as CheckIcon,
   Close as CloseIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase';
@@ -61,6 +62,7 @@ export default function ReviewSuggestionsPage() {
   const [reviewSelections, setReviewSelections] = useState<Record<string, string>>({});
   const [applyingIds, setApplyingIds] = useState<Set<string>>(new Set());
   const [skippingIds, setSkippingIds] = useState<Set<string>>(new Set());
+  const [applyingAllOnPage, setApplyingAllOnPage] = useState(false);
 
   const [page, setPage] = useState(1);
   const rowsPerPage = 25;
@@ -218,6 +220,90 @@ export default function ReviewSuggestionsPage() {
     }
   };
 
+  const handleApplyAllOnPage = async () => {
+    if (paginatedTransactions.length === 0) return;
+
+    setApplyingAllOnPage(true);
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+    if (!token) {
+      alert('Missing user session');
+      setApplyingAllOnPage(false);
+      return;
+    }
+
+    const toApply = paginatedTransactions.map((tx) => ({
+      tx,
+      categoryId: reviewSelections[tx.id] ?? tx.suggested_category_id,
+    })).filter((item) => item.categoryId);
+
+    if (toApply.length === 0) {
+      alert('No valid suggestions to apply on this page');
+      setApplyingAllOnPage(false);
+      return;
+    }
+
+    try {
+      // Apply all in parallel
+      const results = await Promise.allSettled(
+        toApply.map((item) =>
+          fetch('/api/auto-categorization/apply-suggestion', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              transaction_id: item.tx.id,
+              category_id: item.categoryId,
+              description_snapshot: item.tx.description,
+            }),
+          }).then((res) => {
+            if (!res.ok) {
+              return res.json().then((body) => {
+                throw new Error(body.error || `HTTP ${res.status}`);
+              });
+            }
+            return res.json();
+          })
+        )
+      );
+
+      const failed: string[] = [];
+      const succeeded: string[] = [];
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          succeeded.push(toApply[index].tx.id);
+        } else {
+          failed.push(toApply[index].tx.id);
+          console.error(`Failed to apply ${toApply[index].tx.id}:`, result.reason);
+        }
+      });
+
+      // Remove succeeded transactions from list
+      if (succeeded.length > 0) {
+        setTransactions((prev) => prev.filter((t) => !succeeded.includes(t.id)));
+        setReviewSelections((prev) => {
+          const next = { ...prev };
+          succeeded.forEach((id) => delete next[id]);
+          return next;
+        });
+      }
+
+      if (failed.length > 0) {
+        alert(`Failed to apply ${failed.length} suggestion(s). Check console for details.`);
+      } else if (succeeded.length > 0) {
+        // Success message is optional, but we could show a snackbar here
+      }
+    } catch (e) {
+      const msg = formatUnknownError(e);
+      alert(`Failed to apply suggestions: ${msg}`);
+    } finally {
+      setApplyingAllOnPage(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -259,10 +345,21 @@ export default function ReviewSuggestionsPage() {
         <>
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                {transactions.length} suggestion{transactions.length !== 1 ? 's' : ''} to review.
-                Confirm or adjust suggested categories before applying them.
-              </Typography>
+              <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+                <Typography variant="body2" color="text.secondary">
+                  {transactions.length} suggestion{transactions.length !== 1 ? 's' : ''} to review.
+                  Confirm or adjust suggested categories before applying them.
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={applyingAllOnPage ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                  onClick={handleApplyAllOnPage}
+                  disabled={applyingAllOnPage || paginatedTransactions.length === 0}
+                >
+                  {applyingAllOnPage ? 'Applying...' : `Apply all on page (${paginatedTransactions.length})`}
+                </Button>
+              </Box>
             </CardContent>
           </Card>
 
@@ -288,7 +385,7 @@ export default function ReviewSuggestionsPage() {
                       : null;
                   const isApplying = applyingIds.has(tx.id);
                   const isSkipping = skippingIds.has(tx.id);
-                  const isBusy = isApplying || isSkipping;
+                  const isBusy = isApplying || isSkipping || applyingAllOnPage;
 
                   return (
                     <TableRow key={tx.id}>

@@ -121,18 +121,19 @@ export default function AppShell(props: { children: React.ReactNode }) {
   const appBar = (
     <>
       <AppBar position="sticky">
-        <Toolbar sx={{ py: 0, overflow: 'visible' }}>
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Toolbar sx={{ minHeight: '64px !important', height: '64px !important', py: 0, overflow: 'visible' }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1.25, height: '100%' }}>
             <Box
               component="img"
               src={mode === 'dark' ? '/logo_dark.svg' : '/logo_light.svg'}
               alt="MyFinance"
               onClick={() => router.push('/')}
               sx={{
-                height: 26,
+                height: 80,
                 width: 'auto',
                 cursor: 'pointer',
                 userSelect: 'none',
+                objectFit: 'contain',
               }}
             />
             {!isMobile ? (
