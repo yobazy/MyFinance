@@ -24,6 +24,16 @@ import {
   TrendingUp as TrendingUpIcon,
   Upload as UploadIcon,
 } from '@mui/icons-material';
+import { useTheme, alpha } from '@mui/material/styles';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ReTooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../lib/supabase';
 import { formatUnknownError } from '../lib/errors';
@@ -49,6 +59,11 @@ type DashboardData = {
   recentTransactions: RecentTx[];
 };
 
+type BalanceOverTime = {
+  date: string;
+  balance: number;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const { loading: authLoading, isAuthenticated } = useAuth();
@@ -61,6 +76,8 @@ export default function DashboardPage() {
   >({});
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [balanceOverTime, setBalanceOverTime] = useState<BalanceOverTime[]>([]);
+  const theme = useTheme();
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -197,11 +214,53 @@ export default function DashboardPage() {
           hasMonthTransactions,
           recentTransactions,
         });
+
+        // Fetch balance over time data
+        let balanceQuery = supabase
+          .from('transactions')
+          .select('date,amount')
+          .order('date', { ascending: true });
+
+        if (selectedAccountId !== 'all') {
+          balanceQuery = balanceQuery.eq('account_id', selectedAccountId);
+        }
+
+        const { data: balanceData, error: balanceError } = await balanceQuery;
+        if (balanceError) throw balanceError;
+
+        // Calculate running balance
+        const balanceMap = new Map<string, number>();
+        let runningBalance = 0;
+
+        // Group transactions by date and calculate cumulative balance
+        const sortedTxs = (balanceData ?? []).sort((a, b) => {
+          const dateA = new Date(a.date as string).getTime();
+          const dateB = new Date(b.date as string).getTime();
+          return dateA - dateB;
+        });
+
+        for (const tx of sortedTxs) {
+          const date = String(tx.date);
+          const amount = typeof tx.amount === 'number' ? tx.amount : parseFloat(String(tx.amount));
+          runningBalance += amount;
+          balanceMap.set(date, runningBalance);
+        }
+
+        // Convert to array and format for chart
+        const balanceArray: BalanceOverTime[] = Array.from(balanceMap.entries())
+          .map(([date, balance]) => ({
+            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            balance: parseFloat(balance.toFixed(2)),
+          }))
+          .slice(-30); // Show last 30 data points for readability
+
+        setBalanceOverTime(balanceArray);
       } catch (e) {
         const msg = formatUnknownError(e);
         console.error('Error loading dashboard:', e);
         setErrorMessage(`Failed to load dashboard: ${msg}`);
         setDashboardData(null);
+        setBalanceOverTime([]);
       } finally {
         setLoading(false);
       }
@@ -320,39 +379,93 @@ export default function DashboardPage() {
       </Box>
 
       {dashboardData ? (
-        <Grid container spacing={3} mb={4}>
-          <Grid item xs={12} md={6}>
-            <Card>
+        <>
+          <Grid container spacing={3} mb={4}>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <Typography variant="h6" gutterBottom>
+                    Total Balance {selectedAccountId !== 'all' && '(Filtered)'}
+                  </Typography>
+                  <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'flex-end' }}>
+                    <Typography variant="h3">${dashboardData.totalBalance.toLocaleString()}</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <Typography variant="h6" gutterBottom>
+                    Monthly spending (this month) {selectedAccountId !== 'all' && '(Filtered)'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    {dashboardData.hasMonthTransactions && dashboardData.lastMonthTransactionDate
+                      ? `Updated ${new Date(dashboardData.lastMonthTransactionDate).toLocaleDateString()}`
+                      : dashboardData.hasAnyTransactions
+                        ? 'No transactions this month'
+                        : 'No transactions yet'}
+                  </Typography>
+                  <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'flex-end' }}>
+                    <Typography variant="h3" color={dashboardData.hasAnyTransactions ? 'text.primary' : 'text.secondary'}>
+                      {dashboardData.hasAnyTransactions
+                        ? `$${dashboardData.monthlySpending.toLocaleString()}`
+                        : '—'}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {balanceOverTime.length > 0 && (
+            <Card sx={{ mb: 4 }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Total Balance {selectedAccountId !== 'all' && '(Filtered)'}
+                  Balance Over Time {selectedAccountId !== 'all' && '(Filtered)'}
                 </Typography>
-                <Typography variant="h3">${dashboardData.totalBalance.toLocaleString()}</Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={balanceOverTime}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={alpha(theme.palette.divider, 0.7)}
+                    />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => {
+                        if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
+                        return `$${value}`;
+                      }}
+                    />
+                    <ReTooltip
+                      contentStyle={{
+                        backgroundColor: theme.palette.background.paper,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: theme.shape.borderRadius,
+                      }}
+                      formatter={(value: number) => `$${value.toLocaleString()}`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="balance"
+                      stroke={theme.palette.primary.main}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6">
-                  Monthly spending (this month) {selectedAccountId !== 'all' && '(Filtered)'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {dashboardData.hasMonthTransactions && dashboardData.lastMonthTransactionDate
-                    ? `Updated ${new Date(dashboardData.lastMonthTransactionDate).toLocaleDateString()}`
-                    : dashboardData.hasAnyTransactions
-                      ? 'No transactions this month'
-                      : 'No transactions yet'}
-                </Typography>
-                <Typography variant="h3" color={dashboardData.hasAnyTransactions ? 'text.primary' : 'text.secondary'}>
-                  {dashboardData.hasAnyTransactions
-                    ? `$${dashboardData.monthlySpending.toLocaleString()}`
-                    : '—'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+          )}
+        </>
       ) : (
         <Paper sx={{ p: 3, mb: 4, textAlign: 'center' }}>
           <Typography variant="h6" gutterBottom>
