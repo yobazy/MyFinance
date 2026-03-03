@@ -10,7 +10,6 @@ import {
   Chip,
   Divider,
   FormControl,
-  FormControlLabel,
   InputLabel,
   LinearProgress,
   List,
@@ -20,7 +19,6 @@ import {
   MenuItem,
   Paper,
   Select,
-  Switch,
   Typography,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -53,9 +51,7 @@ export default function UploadPage() {
   const [accountId, setAccountId] = useState<string>('');
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [fileType, setFileType] = useState<string>('Amex');
-  const [file, setFile] = useState<File | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [isMultipleMode, setIsMultipleMode] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
@@ -104,18 +100,15 @@ export default function UploadPage() {
 
   const handleFileChange = (picked: FileList | null) => {
     if (!picked || picked.length === 0) return;
-    if (isMultipleMode) setFiles((prev) => [...prev, ...Array.from(picked)]);
-    else setFile(picked[0]);
+    setFiles((prev) => [...prev, ...Array.from(picked)]);
   };
 
   const handleRemoveFile = (idx: number) => {
-    if (isMultipleMode) setFiles((prev) => prev.filter((_, i) => i !== idx));
-    else setFile(null);
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleClearAllFiles = () => {
-    if (isMultipleMode) setFiles([]);
-    else setFile(null);
+    setFiles([]);
   };
 
   const handleDragOver = (event: React.DragEvent) => event.preventDefault();
@@ -123,8 +116,7 @@ export default function UploadPage() {
     event.preventDefault();
     const dropped = Array.from(event.dataTransfer.files);
     if (dropped.length === 0) return;
-    if (isMultipleMode) setFiles((prev) => [...prev, ...dropped]);
-    else setFile(dropped[0]);
+    setFiles((prev) => [...prev, ...dropped]);
   };
 
   const uploadOne = async (f: File): Promise<UploadResult> => {
@@ -215,19 +207,18 @@ export default function UploadPage() {
     setUploadResults([]);
     setMessage('');
 
-    const list = isMultipleMode ? files : file ? [file] : [];
-    if (!selectedAccount || !accountId || list.length === 0) {
+    if (!selectedAccount || !accountId || files.length === 0) {
       setMessage('Please select an account and file(s).');
       setUploading(false);
       return;
     }
 
     const results: UploadResult[] = [];
-    for (let i = 0; i < list.length; i++) {
-      const r = await uploadOne(list[i]);
+    for (let i = 0; i < files.length; i++) {
+      const r = await uploadOne(files[i]);
       results.push(r);
       setUploadResults([...results]);
-      setUploadProgress(Math.round(((i + 1) / list.length) * 100));
+      setUploadProgress(Math.round(((i + 1) / files.length) * 100));
     }
 
     const okCount = results.filter((r) => r.success).length;
@@ -264,22 +255,6 @@ export default function UploadPage() {
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isMultipleMode}
-                  onChange={(e) => {
-                    setIsMultipleMode(e.target.checked);
-                    setMessage('');
-                    setUploadResults([]);
-                    if (e.target.checked) setFile(null);
-                    else setFiles([]);
-                  }}
-                />
-              }
-              label="Upload multiple files"
-            />
-
             <FormControl fullWidth>
               <InputLabel>Account</InputLabel>
               <Select value={accountId} label="Account" onChange={(e) => handleAccountChange(e.target.value)}>
@@ -365,7 +340,7 @@ export default function UploadPage() {
               <input
                 id="file-input"
                 type="file"
-                multiple={isMultipleMode}
+                multiple
                 accept={accept}
                 onChange={(e) => handleFileChange(e.target.files)}
                 style={{ display: 'none' }}
@@ -373,13 +348,9 @@ export default function UploadPage() {
               <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
                 <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
                 <Typography variant="body1" gutterBottom>
-                  {isMultipleMode
-                    ? files.length > 0
-                      ? `${files.length} file(s) selected`
-                      : 'Drag and drop or click to select files'
-                    : file
-                      ? file.name
-                      : 'Drag and drop or click to select file'}
+                  {files.length > 0
+                    ? `${files.length} file(s) selected`
+                    : 'Drag and drop or click to select files'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Supported formats: {accept}
@@ -387,7 +358,7 @@ export default function UploadPage() {
               </label>
             </Box>
 
-            {isMultipleMode && files.length > 0 ? (
+            {files.length > 0 ? (
               <Paper sx={{ p: 2, mt: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                   <Typography variant="h6">Selected Files ({files.length})</Typography>
@@ -409,14 +380,6 @@ export default function UploadPage() {
                   ))}
                 </List>
               </Paper>
-            ) : null}
-
-            {!isMultipleMode && file ? (
-              <Box display="flex" justifyContent="flex-end">
-                <Button size="small" onClick={() => setFile(null)} startIcon={<DeleteIcon />}>
-                  Remove
-                </Button>
-              </Box>
             ) : null}
 
             {uploading ? (
@@ -489,15 +452,13 @@ export default function UploadPage() {
               disabled={
                 uploading ||
                 !selectedAccount ||
-                (isMultipleMode ? files.length === 0 : !file) ||
+                files.length === 0 ||
                 !accountId
               }
               fullWidth
               sx={{ mt: 1 }}
             >
-              {isMultipleMode
-                ? `Upload ${files.length} Statement${files.length !== 1 ? 's' : ''}`
-                : 'Upload Statement'}
+              {`Upload ${files.length} Statement${files.length !== 1 ? 's' : ''}`}
             </Button>
 
             {message ? (
