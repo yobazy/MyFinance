@@ -64,6 +64,7 @@ export async function POST(req: Request) {
   if (txErr || !tx) return json(404, { error: 'Transaction not found' });
 
   const fromCategoryId = tx.category_id;
+  const suggestedCategoryId = tx.suggested_category_id;
 
   // Update transaction
   const { error: updErr } = await supabase
@@ -79,15 +80,58 @@ export async function POST(req: Request) {
 
   if (updErr) return json(500, { error: updErr.message });
 
-  // Log feedback
+  // Log feedback - track if user accepted the suggestion or changed it
+  const source = suggestedCategoryId === categoryId ? 'suggestion_apply' : 'suggestion_override';
+  
   const { error: feedbackErr } = await supabase.from('categorization_feedback').insert({
     user_id: userId,
     transaction_id: transactionId,
     from_category_id: fromCategoryId,
     to_category_id: categoryId,
-    source: 'suggestion_apply',
+    source,
     description_snapshot: descriptionSnapshot,
   });
+
+  // If user accepted a suggestion, update rule_usage to mark it as accepted
+  if (suggestedCategoryId === categoryId) {
+    // Find the rule_usage record for this suggestion
+    const { data: ruleUsage, error: ruleUsageErr } = await supabase
+      .from('rule_usage')
+      .select('id, rule_id')
+      .eq('user_id', userId)
+      .eq('transaction_id', transactionId)
+      .eq('was_applied', false)
+      .order('matched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!ruleUsageErr && ruleUsage) {
+      // Update the rule's match_count (function may not exist in all environments)
+      try {
+        const { error: rpcErr } = await supabase.rpc('increment_rule_match_count', {
+          rule_id: ruleUsage.rule_id,
+        });
+        if (rpcErr) throw rpcErr;
+      } catch (rpcErr) {
+        // If function doesn't exist, get current count and increment manually (fallback)
+        const { data: rule } = await supabase
+          .from('categorization_rules')
+          .select('match_count')
+          .eq('id', ruleUsage.rule_id)
+          .single();
+
+        if (rule) {
+          await supabase
+            .from('categorization_rules')
+            .update({
+              match_count: (rule.match_count || 0) + 1,
+              last_matched: new Date().toISOString(),
+            })
+            .eq('id', ruleUsage.rule_id);
+        }
+      }
+    }
+  }
 
   if (feedbackErr) {
     // Log error but don't fail the request

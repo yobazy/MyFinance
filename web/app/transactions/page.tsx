@@ -409,37 +409,7 @@ export default function TransactionsPage() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
-        <Typography variant="h4">Transactions</Typography>
-        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-          <TextField
-            size="small"
-            placeholder="Search description…"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-            }}
-            sx={{ minWidth: { xs: '100%', sm: 220 } }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<FilterIcon />}
-            onClick={() => setShowFilters(!showFilters)}
-            color={showFilters ? 'primary' : 'inherit'}
-          >
-            Filters
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={exportToCSV}
-            disabled={filteredAndSortedTransactions.length === 0}
-          >
-            Export CSV
-          </Button>
-        </Box>
-      </Box>
+      <Typography variant="h4" mb={3}>Transactions</Typography>
 
       <Grid container spacing={2} mb={3}>
         <Grid item xs={12} sm={6} md={2.4 as any}>
@@ -656,6 +626,35 @@ export default function TransactionsPage() {
           </CardContent>
         </Card>
       </Collapse>
+
+      <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" justifyContent="flex-end" mb={2}>
+        <TextField
+          size="small"
+          placeholder="Search description…"
+          value={filters.search}
+          onChange={(e) => handleFilterChange('search', e.target.value)}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+          }}
+          sx={{ minWidth: { xs: '100%', sm: 220 } }}
+        />
+        <Button
+          variant="outlined"
+          startIcon={<FilterIcon />}
+          onClick={() => setShowFilters(!showFilters)}
+          color={showFilters ? 'primary' : 'inherit'}
+        >
+          Filters
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={exportToCSV}
+          disabled={filteredAndSortedTransactions.length === 0}
+        >
+          Export CSV
+        </Button>
+      </Box>
 
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
         <Typography variant="body2" color="text.secondary">

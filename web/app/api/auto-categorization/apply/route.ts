@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from '../../../../lib/supabaseAdmin';
+import { calculateConfidence } from '../../../../lib/confidenceCalculator';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -32,6 +33,7 @@ type RuleRow = {
   is_active: boolean;
   case_sensitive: boolean;
   created_by: string;
+  match_count: number;
 };
 
 type Suggestion = {
@@ -47,10 +49,22 @@ function normalizeAmount(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function buildSuggestionForRule(rule: RuleRow): Suggestion {
-  const high = 0.95;
-  const normal = 0.8;
-  const confidence = rule.created_by === 'user' ? high : normal;
+async function buildSuggestionForRule(
+  supabase: any,
+  userId: string,
+  rule: RuleRow,
+  transactionDescription: string
+): Promise<Suggestion> {
+  // Calculate dynamic confidence based on historical performance
+  const confidence = await calculateConfidence(
+    supabase,
+    userId,
+    rule.id,
+    transactionDescription,
+    rule.created_by,
+    rule.match_count || 0
+  );
+
   return {
     categoryId: rule.category_id,
     confidence,
@@ -101,11 +115,16 @@ function ruleMatches(tx: TxRow, rule: RuleRow): boolean {
   }
 }
 
-function getBestSuggestion(tx: TxRow, rules: RuleRow[]): Suggestion | null {
+async function getBestSuggestion(
+  supabase: any,
+  userId: string,
+  tx: TxRow,
+  rules: RuleRow[]
+): Promise<Suggestion | null> {
   for (const rule of rules) {
     if (!rule.is_active) continue;
     if (ruleMatches(tx, rule)) {
-      return buildSuggestionForRule(rule);
+      return await buildSuggestionForRule(supabase, userId, rule, tx.description);
     }
   }
   return null;
@@ -152,7 +171,7 @@ export async function POST(req: Request) {
   const { data: ruleRows, error: rulesErr } = await supabase
     .from('categorization_rules')
     .select(
-      'id,name,rule_type,pattern,conditions,category_id,priority,is_active,case_sensitive,created_by',
+      'id,name,rule_type,pattern,conditions,category_id,priority,is_active,case_sensitive,created_by,match_count',
     )
     .eq('user_id', userId)
     .eq('is_active', true)
@@ -183,7 +202,7 @@ export async function POST(req: Request) {
   }[] = [];
 
   for (const tx of transactions) {
-    const suggestion = getBestSuggestion(tx, rules);
+    const suggestion = await getBestSuggestion(supabase, userId, tx, rules);
     if (!suggestion) continue;
 
     const { categoryId, confidence, rule } = suggestion;
@@ -219,6 +238,30 @@ export async function POST(req: Request) {
   if (ruleUsageInserts.length > 0) {
     const { error: usageErr } = await supabase.from('rule_usage').insert(ruleUsageInserts);
     if (usageErr) return json(500, { error: usageErr.message });
+
+    // Update match_count for rules that were used
+    const uniqueRuleIds = [...new Set(ruleUsageInserts.map((ru) => ru.rule_id))];
+    for (const ruleId of uniqueRuleIds) {
+      try {
+        await supabase.rpc('increment_rule_match_count', { rule_id: ruleId });
+      } catch {
+        // Fallback: manually increment if function doesn't exist
+        const { data: rule } = await supabase
+          .from('categorization_rules')
+          .select('match_count')
+          .eq('id', ruleId)
+          .single();
+        if (rule) {
+          await supabase
+            .from('categorization_rules')
+            .update({
+              match_count: (rule.match_count || 0) + ruleUsageInserts.filter((ru) => ru.rule_id === ruleId).length,
+              last_matched: new Date().toISOString(),
+            })
+            .eq('id', ruleId);
+        }
+      }
+    }
   }
 
   return json(200, { ok: true, rowsProcessed: transactions.length });
