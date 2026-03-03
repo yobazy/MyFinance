@@ -53,8 +53,10 @@ type Transaction = {
   source: string;
   account_name: string;
   category_name: string | null;
+  category_color: string | null;
   auto_categorized: boolean;
   suggested_category_name: string | null;
+  suggested_category_color: string | null;
   confidence_score: number | null;
   suggested_category_id: string | null;
 };
@@ -112,15 +114,15 @@ export default function TransactionsPage() {
           // `transactions` has two FKs to `categories` (category_id + suggested_category_id),
           // so we must disambiguate which relationship to embed.
           .select(
-            'id,date,description,amount,source,auto_categorized,confidence_score,suggested_category_id,accounts(name),categories:categories!transactions_category_id_fkey(name),suggested:categories!transactions_suggested_category_id_fkey(name)'
+            'id,date,description,amount,source,auto_categorized,confidence_score,suggested_category_id,accounts(name),categories:categories!transactions_category_id_fkey(name,color),suggested:categories!transactions_suggested_category_id_fkey(name,color)'
           )
           .order('date', { ascending: false })
           .limit(2000);
         if (error) throw error;
         const mapped: Transaction[] = (data ?? []).map((r: any) => {
           const account = (r.accounts ?? null) as null | { name?: string };
-          const category = (r.categories ?? null) as null | { name?: string };
-          const suggested = (r.suggested ?? null) as null | { name?: string };
+          const category = (r.categories ?? null) as null | { name?: string; color?: string };
+          const suggested = (r.suggested ?? null) as null | { name?: string; color?: string };
           const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
           return {
             id: String(r.id),
@@ -130,8 +132,10 @@ export default function TransactionsPage() {
             source: String(r.source ?? ''),
             account_name: String(account?.name ?? 'Unknown'),
             category_name: category?.name ?? null,
+            category_color: category?.color ?? null,
             auto_categorized: Boolean(r.auto_categorized),
             suggested_category_name: suggested?.name ?? null,
+            suggested_category_color: suggested?.color ?? null,
             confidence_score:
               typeof r.confidence_score === 'number'
                 ? r.confidence_score
@@ -729,18 +733,43 @@ export default function TransactionsPage() {
                         <Chip
                           label={t.category_name}
                           size="small"
-                          color="secondary"
                           variant="outlined"
-                          sx={(t) => ({
-                            backgroundColor:
-                              t.palette.mode === 'dark'
-                                ? 'rgba(236,231,220,0.04)'
-                                : 'rgba(11,18,32,0.03)',
-                            borderColor:
-                              t.palette.mode === 'dark'
-                                ? 'rgba(236,231,220,0.14)'
-                                : 'rgba(11,18,32,0.12)',
-                          })}
+                          sx={(theme) => {
+                            const categoryColor = t.category_color || '#2196F3';
+                            const isDark = theme.palette.mode === 'dark';
+                            // Convert hex to rgba for better contrast
+                            const hexToRgb = (hex: string) => {
+                              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                              return result
+                                ? {
+                                    r: parseInt(result[1], 16),
+                                    g: parseInt(result[2], 16),
+                                    b: parseInt(result[3], 16),
+                                  }
+                                : null;
+                            };
+                            const rgb = hexToRgb(categoryColor);
+                            if (rgb) {
+                              return {
+                                backgroundColor: isDark
+                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
+                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`,
+                                borderColor: isDark
+                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`
+                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`,
+                                color: categoryColor,
+                                '&:hover': {
+                                  backgroundColor: isDark
+                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
+                                    : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`,
+                                },
+                              };
+                            }
+                            return {
+                              borderColor: categoryColor,
+                              color: categoryColor,
+                            };
+                          }}
                         />
                       ) : (
                         <Chip
@@ -763,8 +792,44 @@ export default function TransactionsPage() {
                               : `Suggested: ${t.suggested_category_name}`
                           }
                           size="small"
-                          color="info"
                           variant="outlined"
+                          sx={(theme) => {
+                            const suggestedColor = t.suggested_category_color || '#2196F3';
+                            const isDark = theme.palette.mode === 'dark';
+                            const hexToRgb = (hex: string) => {
+                              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                              return result
+                                ? {
+                                    r: parseInt(result[1], 16),
+                                    g: parseInt(result[2], 16),
+                                    b: parseInt(result[3], 16),
+                                  }
+                                : null;
+                            };
+                            const rgb = hexToRgb(suggestedColor);
+                            if (rgb) {
+                              return {
+                                backgroundColor: isDark
+                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
+                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.05)`,
+                                borderColor: isDark
+                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`
+                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`,
+                                color: suggestedColor,
+                                borderStyle: 'dashed',
+                                '&:hover': {
+                                  backgroundColor: isDark
+                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
+                                    : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`,
+                                },
+                              };
+                            }
+                            return {
+                              borderColor: suggestedColor,
+                              color: suggestedColor,
+                              borderStyle: 'dashed',
+                            };
+                          }}
                         />
                       ) : null}
                     </Stack>
