@@ -126,3 +126,4 @@ uploads/
 !web/app/uploads/**
 !web/app/api/uploads/
 !web/app/api/uploads/**
+.vercel

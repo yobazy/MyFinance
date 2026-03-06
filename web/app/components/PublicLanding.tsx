@@ -155,13 +155,13 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
         },
       }}
     >
-      <Container maxWidth="lg" sx={{ position: 'relative', py: { xs: 4, md: 7 } }}>
+      <Container maxWidth="lg" sx={{ position: 'relative', py: { xs: 3, md: 4 } }}>
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            mb: { xs: 6, md: 10 },
+            mb: { xs: 4, md: 6 },
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -170,7 +170,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
               src={mode === 'dark' ? '/logo_dark.svg' : '/logo_light.svg'}
               alt="MyFinance"
               sx={{
-                height: 28,
+                height: 72,
                 width: 'auto',
               }}
             />
@@ -363,7 +363,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
             elevation={0}
             sx={{
               p: { xs: 3, sm: 3.5 },
-              borderRadius: 4,
+              borderRadius: 1.5,
               border: `1px solid ${alpha(theme.palette.divider, mode === 'dark' ? 0.9 : 0.7)}`,
               bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.35 : 0.7),
               backdropFilter: 'blur(12px)',
