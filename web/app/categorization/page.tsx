@@ -53,7 +53,7 @@ export default function CategorizationPage() {
   const [selectedPresetKey, setSelectedPresetKey] = useState<string>('');
   const [overwritePreset, setOverwritePreset] = useState(false);
   const [presetCategories, setPresetCategories] = useState<
-    Record<string, { canonical_key: string; name: string; description: string }>
+    Record<string, { canonical_key: string; name: string; description: string }[]>
   >({});
   const [presetDialogKey, setPresetDialogKey] = useState<string | null>(null);
   const [presetCategoriesLoadingKey, setPresetCategoriesLoadingKey] = useState<string | null>(

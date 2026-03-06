@@ -438,7 +438,9 @@ export default function AnalyticsPage() {
   }
 
   if (filteredTransactions.length === 0) {
-    const hasFilters = period !== 'all' || transactionType !== 'all' || (period === 'custom' && (customStartDate || customEndDate));
+    const hasPeriodFilter = period !== 'all';
+    const hasCustomDateFilter = period === 'custom' && Boolean(customStartDate || customEndDate);
+    const hasFilters = hasPeriodFilter || transactionType !== 'all' || hasCustomDateFilter;
     return (
       <Box>
         <Typography variant="h4" gutterBottom>

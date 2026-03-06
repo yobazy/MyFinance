@@ -561,7 +561,8 @@ export default function DashboardPage() {
                         border: `1px solid ${theme.palette.divider}`,
                         borderRadius: theme.shape.borderRadius,
                       }}
-                      formatter={(value: number) => {
+                      formatter={(value: number | undefined) => {
+                        if (value === undefined) return '$0.00';
                         const formatted = value.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,

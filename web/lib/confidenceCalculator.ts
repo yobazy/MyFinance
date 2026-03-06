@@ -138,7 +138,8 @@ async function getRuleAccuracyStats(
     .select('id, category_id, suggested_category_id')
     .in('id', transactionIds);
 
-  const txMap = new Map(transactions?.map((t: any) => [t.id, t]) || []);
+  type TransactionRow = { id: string; category_id: string | null; suggested_category_id: string | null };
+  const txMap = new Map<string, TransactionRow>(transactions?.map((t: TransactionRow) => [t.id, t]) || []);
 
   let acceptedMatches = 0;
   let rejectedMatches = 0;
