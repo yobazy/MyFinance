@@ -97,6 +97,7 @@ export default function UploadPage() {
 
   const accept =
     selectedAccount?.bank?.toUpperCase().includes('AMEX') ? '.csv,.xls,.xlsx' : '.csv,.xlsx';
+  const manualUploadSupported = selectedAccount?.bank?.toUpperCase().includes('AMEX') ?? false;
 
   const handleFileChange = (picked: FileList | null) => {
     if (!picked || picked.length === 0) return;
@@ -123,7 +124,7 @@ export default function UploadPage() {
     try {
       if (!accountId) throw new Error('Please select an account.');
       if (fileType !== 'Amex') {
-        throw new Error('Only Amex ingest is wired up right now (API route: /api/ingest/amex).');
+        throw new Error('Manual upload is currently available for Amex accounts only. Use Plaid from Accounts for other banks.');
       }
 
       const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
@@ -230,12 +231,12 @@ export default function UploadPage() {
     return (
       <Box>
         <Typography variant="h4" gutterBottom>
-          Upload statements
+          Upload an Amex statement
         </Typography>
         <Card sx={{ p: 2 }}>
           <CardContent>
             <Typography variant="body1" color="text.secondary">
-              You need an account first.
+              Add an account before you upload a statement.
             </Typography>
             <Button variant="contained" sx={{ mt: 2 }} onClick={() => router.push('/accounts?create=true')}>
               Create an account
@@ -248,9 +249,18 @@ export default function UploadPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Upload statements
-      </Typography>
+      <Box mb={4}>
+        <Typography variant="h4" gutterBottom>
+          Upload an Amex statement
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Manual statement upload is ready for Amex accounts. For other banks, connect Plaid from Accounts.
+        </Typography>
+      </Box>
+
+      <Alert severity="info" sx={{ mb: 3 }}>
+        This page is for manual Amex imports. If the selected account is not Amex, use Plaid instead.
+      </Alert>
 
       <Card>
         <CardContent>
@@ -297,66 +307,81 @@ export default function UploadPage() {
                 </Typography>
                 <Box mt={1} display="flex" gap={1} flexWrap="wrap">
                   <Chip size="small" label={`Allowed file types: ${accept}`} />
-                  {fileType !== 'Amex' ? (
-                    <Chip size="small" color="warning" label="Ingest not wired yet" />
+                  {!manualUploadSupported ? (
+                    <Chip size="small" color="warning" label="Use Plaid for this bank" />
                   ) : (
-                    <Chip size="small" color="success" label="Supported" />
+                    <Chip size="small" color="success" label="Amex upload ready" />
                   )}
                 </Box>
               </Box>
             ) : null}
 
-            <Box sx={{ mb: 1 }}>
-              <Typography variant="body1" gutterBottom>
-                File Requirements:
-              </Typography>
-              <ul
-                style={{
-                  marginTop: 0,
-                  paddingLeft: '1.5rem',
-                  color: theme.palette.text.secondary as any,
-                }}
-              >
-                <li>Amex: CSV, XLS, or XLSX files</li>
-                <li>CSV format: YearEndSummary format with Category, Date, Transaction, Charges $, Credits $ columns</li>
-                <li>Excel format: Standard Amex export with optional 11-row preamble</li>
-                <li>Must contain transaction date, description, and amount</li>
-              </ul>
-            </Box>
+            {manualUploadSupported ? (
+              <>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body1" gutterBottom>
+                    File requirements
+                  </Typography>
+                  <ul
+                    style={{
+                      marginTop: 0,
+                      paddingLeft: '1.5rem',
+                      color: theme.palette.text.secondary as any,
+                    }}
+                  >
+                    <li>Amex CSV, XLS, or XLSX files</li>
+                    <li>CSV: YearEndSummary export with transaction and amount columns</li>
+                    <li>Excel: standard Amex export with the optional preamble rows</li>
+                  </ul>
+                </Box>
 
-            <Box
-              sx={{
-                border: `2px dashed ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.55 : 0.45)}`,
-                borderRadius: 3,
-                p: 3,
-                textAlign: 'center',
-                cursor: 'pointer',
-                backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.35 : 0.55),
-                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.10 : 0.07) },
-              }}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            >
-              <input
-                id="file-input"
-                type="file"
-                multiple
-                accept={accept}
-                onChange={(e) => handleFileChange(e.target.files)}
-                style={{ display: 'none' }}
-              />
-              <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
-                <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                <Box
+                  sx={{
+                    border: `2px dashed ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.55 : 0.45)}`,
+                    borderRadius: 3,
+                    p: 3,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.35 : 0.55),
+                    '&:hover': { backgroundColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.10 : 0.07) },
+                  }}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    id="file-input"
+                    type="file"
+                    multiple
+                    accept={accept}
+                    onChange={(e) => handleFileChange(e.target.files)}
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
+                    <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                    <Typography variant="body1" gutterBottom>
+                      {files.length > 0
+                        ? `${files.length} file(s) selected`
+                        : 'Drag and drop or click to select Amex files'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Supported formats: {accept}
+                    </Typography>
+                  </label>
+                </Box>
+              </>
+            ) : (
+              <Paper sx={{ p: 2, backgroundColor: alpha(theme.palette.warning.main, 0.08) }}>
                 <Typography variant="body1" gutterBottom>
-                  {files.length > 0
-                    ? `${files.length} file(s) selected`
-                    : 'Drag and drop or click to select files'}
+                  Manual upload is not ready for {selectedAccount?.bank}.
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Supported formats: {accept}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Use Plaid from Accounts for this bank, or switch to an Amex account to upload a statement here.
                 </Typography>
-              </label>
-            </Box>
+                <Button variant="outlined" onClick={() => router.push('/accounts')}>
+                  Go to accounts
+                </Button>
+              </Paper>
+            )}
 
             {files.length > 0 ? (
               <Paper sx={{ p: 2, mt: 1 }}>
@@ -453,7 +478,8 @@ export default function UploadPage() {
                 uploading ||
                 !selectedAccount ||
                 files.length === 0 ||
-                !accountId
+                !accountId ||
+                !manualUploadSupported
               }
               fullWidth
               sx={{ mt: 1 }}

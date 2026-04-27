@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   Divider,
   IconButton,
@@ -16,6 +17,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PersonIcon from '@mui/icons-material/Person';
+import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -28,6 +30,7 @@ const STARTERS = [
 ];
 
 export default function ChatPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const theme = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -92,9 +95,17 @@ export default function ChatPage() {
     <Box sx={{ maxWidth: 760, mx: 'auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
         <SmartToyIcon color="primary" />
-        <Typography variant="h5" fontWeight={700}>
-          Finance Assistant
-        </Typography>
+        <Box sx={{ flexGrow: 1 }}>
+          <Typography variant="h5" fontWeight={700}>
+            Insights: Ask
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Ask follow-up questions about the data behind your insights.
+          </Typography>
+        </Box>
+        <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
+          Back to insights
+        </Button>
       </Box>
 
       {/* Message area */}

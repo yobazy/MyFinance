@@ -11,17 +11,17 @@ export default function HelpPage() {
           Help
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Quick guidance for getting started.
+          Quick answers for common setup and support questions.
         </Typography>
       </Box>
 
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Getting started
+            Common tasks
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Typical flow:
+            Where to go next:
           </Typography>
           <Box
             component="ul"
@@ -33,14 +33,14 @@ export default function HelpPage() {
               '& li': { marginBottom: 0.5 },
             }}
           >
-            <li>Create an account in “Accounts”.</li>
-            <li>Upload a statement in “Upload”.</li>
-            <li>Review transactions in “Transactions”.</li>
-            <li>Define categories and rules in “Manage”.</li>
+            <li>Add or edit accounts in "Accounts".</li>
+            <li>Connect Plaid from an account card for ongoing imports.</li>
+            <li>Use "Upload statement" for manual Amex imports.</li>
+            <li>Review and clean up activity in "Transactions".</li>
           </Box>
 
           <Typography variant="body2" color="text.secondary">
-            If you hit an auth issue, visit “Settings” and sign out/in again.
+            If auth or AI features stop working, visit "Settings" and sign out/in again.
           </Typography>
         </CardContent>
       </Card>

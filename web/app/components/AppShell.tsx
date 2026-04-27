@@ -22,7 +22,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RuleIcon from '@mui/icons-material/Rule';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
@@ -31,11 +30,10 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import LogoutIcon from '@mui/icons-material/Logout';
 import CategoryIcon from '@mui/icons-material/Category';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { useThemeMode } from '../../lib/themeMode';
 
-type NavItem = { href: string; icon: React.ReactNode; label: string };
+type NavItem = { href: string; icon: React.ReactNode; label: string; activePrefixes?: string[] };
 
 function RequireAuth(props: { children: React.ReactNode }) {
   const router = useRouter();
@@ -80,15 +78,21 @@ export default function AppShell(props: { children: React.ReactNode }) {
 
   const navItems = useMemo<NavItem[]>(
     () => [
-      { href: '/', icon: <DashboardIcon />, label: 'Dashboard' },
+      { href: '/', icon: <DashboardIcon />, label: 'Home' },
       { href: '/accounts', icon: <AccountBalanceIcon />, label: 'Accounts' },
-      { href: '/upload', icon: <UploadFileIcon />, label: 'Upload' },
       { href: '/transactions', icon: <ReceiptIcon />, label: 'Transactions' },
-      { href: '/visualizations', icon: <BarChartIcon />, label: 'Analytics' },
-      { href: '/insights', icon: <AutoAwesomeIcon />, label: 'Insights' },
-      { href: '/chat', icon: <SmartToyIcon />, label: 'AI Chat' },
-      { href: '/help', icon: <HelpIcon />, label: 'Help' },
+      { href: '/insights', icon: <AutoAwesomeIcon />, label: 'Insights', activePrefixes: ['/insights', '/visualizations', '/chat'] },
       { href: '/user-settings', icon: <SettingsIcon />, label: 'Settings' },
+    ],
+    []
+  );
+  const secondaryItems = useMemo<NavItem[]>(
+    () => [
+      { href: '/upload', icon: <UploadFileIcon />, label: 'Upload statement' },
+      { href: '/categorization', icon: <CategoryIcon />, label: 'Categories' },
+      { href: '/rules', icon: <RuleIcon />, label: 'Rules' },
+      { href: '/uploads', icon: <UploadFileIcon />, label: 'Upload history' },
+      { href: '/help', icon: <HelpIcon />, label: 'Help' },
     ],
     []
   );
@@ -105,7 +109,8 @@ export default function AppShell(props: { children: React.ReactNode }) {
     router.push('/login');
   };
 
-  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname?.startsWith(href));
+  const isActive = (item: NavItem) =>
+    (item.activePrefixes ?? [item.href]).some((href) => (href === '/' ? pathname === '/' : pathname?.startsWith(href)));
 
   const navButtonSx = (active: boolean) => ({
     borderRadius: 999,
@@ -189,7 +194,7 @@ export default function AppShell(props: { children: React.ReactNode }) {
                   },
                 }}
               >
-                {navItems.slice(0, -1).map((item) => (
+                {navItems.map((item) => (
                   <MenuItem
                     key={item.href}
                     component={NextLink}
@@ -206,17 +211,8 @@ export default function AppShell(props: { children: React.ReactNode }) {
                   sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                 >
                   <ManageAccountsIcon />
-                  Manage
+                  Manage data
                   <ArrowDropDownIcon />
-                </MenuItem>
-                <MenuItem
-                  component={NextLink}
-                  href={navItems[navItems.length - 1].href}
-                  onClick={() => setMobileAnchorEl(null)}
-                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                >
-                  {navItems[navItems.length - 1].icon}
-                  {navItems[navItems.length - 1].label}
                 </MenuItem>
                 <MenuItem onClick={handleLogout} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <LogoutIcon />
@@ -226,14 +222,14 @@ export default function AppShell(props: { children: React.ReactNode }) {
             </>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {navItems.slice(0, -1).map((item) => (
+              {navItems.map((item) => (
                 <Button
                   key={item.href}
                   color="inherit"
                   component={NextLink}
                   href={item.href}
                   startIcon={item.icon}
-                  sx={{ ...navButtonSx(isActive(item.href)), ml: 0.5 }}
+                  sx={{ ...navButtonSx(isActive(item)), ml: 0.5 }}
                 >
                   {item.label}
                 </Button>
@@ -245,16 +241,7 @@ export default function AppShell(props: { children: React.ReactNode }) {
                 onClick={(e) => setManageAnchorEl(e.currentTarget)}
                 sx={{ ...navButtonSx(Boolean(manageAnchorEl)), ml: 0.5 }}
               >
-                Manage
-              </Button>
-              <Button
-                color="inherit"
-                component={NextLink}
-                href={navItems[navItems.length - 1].href}
-                startIcon={navItems[navItems.length - 1].icon}
-                sx={{ ...navButtonSx(isActive(navItems[navItems.length - 1].href)), ml: 0.5 }}
-              >
-                {navItems[navItems.length - 1].label}
+                Manage data
               </Button>
               {user ? (
                 <>
@@ -303,33 +290,21 @@ export default function AppShell(props: { children: React.ReactNode }) {
           },
         }}
       >
-        <MenuItem
-          component={NextLink}
-          href="/categorization"
-          onClick={() => setManageAnchorEl(null)}
-          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-        >
-          <CategoryIcon />
-          Categories
-        </MenuItem>
-        <MenuItem
-          component={NextLink}
-          href="/rules"
-          onClick={() => setManageAnchorEl(null)}
-          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-        >
-          <RuleIcon />
-          Rules
-        </MenuItem>
-        <MenuItem
-          component={NextLink}
-          href="/uploads"
-          onClick={() => setManageAnchorEl(null)}
-          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-        >
-          <UploadFileIcon />
-          Uploads
-        </MenuItem>
+        {secondaryItems.map((item) => (
+          <MenuItem
+            key={item.href}
+            component={NextLink}
+            href={item.href}
+            onClick={() => {
+              setManageAnchorEl(null);
+              setMobileAnchorEl(null);
+            }}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          >
+            {item.icon}
+            {item.label}
+          </MenuItem>
+        ))}
       </Menu>
     </>
   );

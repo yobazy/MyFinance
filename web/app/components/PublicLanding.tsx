@@ -238,8 +238,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
             </Typography>
 
             <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 620, mb: 4, fontWeight: 500 }}>
-              Upload statements, categorize automatically, and get a clear view of spending across accounts — with a
-              clean dashboard you’ll actually enjoy using.
+              Connect your bank with Plaid, upload Amex statements, and keep your spending in one calm place.
             </Typography>
 
             <Stack spacing={2.25} sx={{ mb: 4 }}>
@@ -320,42 +319,26 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
               </Box>
             </Stack>
 
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
+            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
+              <Chip
+                size="small"
+                label="Plaid bank connections"
+                sx={{
+                  fontWeight: 600,
+                  bgcolor: alpha(theme.palette.success.main, mode === 'dark' ? 0.16 : 0.1),
+                }}
+              />
+              <Chip
+                size="small"
+                label="Amex statement upload today"
+                sx={{
+                  fontWeight: 600,
+                  bgcolor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.16 : 0.1),
+                }}
+              />
               <Typography variant="body2" color="text.secondary">
-                Works with statement exports from:
+                Manual statement upload is currently focused on Amex. Other banks are best connected through Plaid.
               </Typography>
-              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-                <Box
-                  component="img"
-                  src="/bank_td_icon.svg"
-                  alt="TD"
-                  sx={{
-                    height: 22,
-                    width: 'auto',
-                    filter: mode === 'dark' ? 'grayscale(100%) brightness(1.2)' : 'grayscale(100%) opacity(0.8)',
-                  }}
-                />
-                <Box
-                  component="img"
-                  src="/bank_scotia_icon.svg"
-                  alt="Scotiabank"
-                  sx={{
-                    height: 22,
-                    width: 'auto',
-                    filter: mode === 'dark' ? 'grayscale(100%) brightness(1.2)' : 'grayscale(100%) opacity(0.8)',
-                  }}
-                />
-                <Box
-                  component="img"
-                  src="/bank_amex_icon.svg"
-                  alt="American Express"
-                  sx={{
-                    height: 22,
-                    width: 'auto',
-                    filter: mode === 'dark' ? 'grayscale(100%) brightness(1.2)' : 'grayscale(100%) opacity(0.8)',
-                  }}
-                />
-              </Stack>
             </Stack>
           </Box>
 

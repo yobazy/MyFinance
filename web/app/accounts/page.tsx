@@ -27,6 +27,7 @@ import {
   AccountBalance as AccountIcon,
   ArrowDownward as ArrowDownwardIcon,
   ArrowUpward as ArrowUpwardIcon,
+  UploadFile as UploadFileIcon,
   CreditCard as CreditCardIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
@@ -448,10 +449,10 @@ export default function AccountsPage() {
     <Box>
       <Box mb={4}>
         <Typography variant="h4" gutterBottom>
-          Manage Accounts
+          Accounts
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Add and manage your bank accounts to track your finances
+          Add an account first, then either connect it with Plaid or upload an Amex statement.
         </Typography>
       </Box>
 
@@ -465,6 +466,14 @@ export default function AccountsPage() {
           }}
         >
           Add New Account
+        </Button>
+
+        <Button
+          variant="outlined"
+          startIcon={<UploadFileIcon />}
+          onClick={() => router.push('/upload')}
+        >
+          Upload Amex statement
         </Button>
 
         <Button
@@ -515,6 +524,32 @@ export default function AccountsPage() {
           </Button>
         </Box>
       </Box>
+
+      <Alert severity="info" sx={{ mb: 4 }}>
+        Plaid is the main path for ongoing imports. Manual statement upload is currently available for Amex accounts.
+      </Alert>
+
+      {accounts.length === 0 ? (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Start here
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Create your first account so you have somewhere to connect Plaid or attach an Amex statement.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => {
+                setEditingAccount(null);
+                setOpenDialog(true);
+              }}
+            >
+              Add first account
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Grid container spacing={3}>
         {sortAccounts(accounts, sortBy, sortOrder).map((account) => (
@@ -576,7 +611,7 @@ export default function AccountsPage() {
                   onClick={() => handleConnectPlaid(account)}
                   disabled={busy || plaidBusy || plaidImporting}
                 >
-                  Connect with Plaid
+                  Connect bank
                 </Button>
               </CardContent>
             </Card>

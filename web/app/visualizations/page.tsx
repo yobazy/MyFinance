@@ -429,9 +429,12 @@ export default function AnalyticsPage() {
   if (loadError) {
     return (
       <Box>
-        <Typography variant="h4" gutterBottom>
-          Analytics
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
+          <Typography variant="h4">Insights: Charts</Typography>
+          <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
+            Back to insights
+          </Button>
+        </Box>
         <Alert severity="error">Failed to load data: {loadError}</Alert>
       </Box>
     );
@@ -443,9 +446,12 @@ export default function AnalyticsPage() {
     const hasFilters = hasPeriodFilter || transactionType !== 'all' || hasCustomDateFilter;
     return (
       <Box>
-        <Typography variant="h4" gutterBottom>
-          Analytics
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
+          <Typography variant="h4">Insights: Charts</Typography>
+          <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
+            Back to insights
+          </Button>
+        </Box>
         <Card
           sx={{
             minHeight: '60vh',
@@ -489,8 +495,16 @@ export default function AnalyticsPage() {
           flexWrap="wrap"
           gap={2}
         >
-          <Typography variant="h4">Analytics</Typography>
+          <Box>
+            <Typography variant="h4">Insights: Charts</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Use charts when you want a visual read on the same data behind narrative insights.
+            </Typography>
+          </Box>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
+              Back to insights
+            </Button>
             <Stack direction="row" spacing={0.5}>
               {PERIOD_OPTIONS.map((opt) => (
                 <Chip

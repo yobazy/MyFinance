@@ -9,11 +9,15 @@ import {
   CardContent,
   CircularProgress,
   Divider,
+  Grid,
   Skeleton,
   Typography,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 
 type Insight = {
@@ -31,6 +35,7 @@ function formatPeriod(start: string, end: string) {
 }
 
 export default function InsightsPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,33 +91,91 @@ export default function InsightsPage() {
 
   return (
     <Box sx={{ maxWidth: 760, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <AutoAwesomeIcon color="primary" />
-          <Typography variant="h5" fontWeight={700}>
-            AI Spending Insights
-          </Typography>
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <AutoAwesomeIcon color="primary" />
+            <Box>
+              <Typography variant="h5" fontWeight={700}>
+                Insights
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Narrative summaries live here, with charts and the assistant one step away.
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={fetchInsights}
+              disabled={loading}
+              variant="outlined"
+              size="small"
+            >
+              Refresh
+            </Button>
+            <Button
+              startIcon={generating ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+              onClick={handleGenerate}
+              disabled={generating}
+              variant="contained"
+              size="small"
+            >
+              Generate summary
+            </Button>
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={fetchInsights}
-            disabled={loading}
-            variant="outlined"
-            size="small"
-          >
-            Refresh
-          </Button>
-          <Button
-            startIcon={generating ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
-            onClick={handleGenerate}
-            disabled={generating}
-            variant="contained"
-            size="small"
-          >
-            Generate
-          </Button>
-        </Box>
+
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  Overview
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Read AI-generated monthly summaries and queue a fresh one when you need it.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <BarChartIcon color="primary" fontSize="small" />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Charts
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Open the detailed charts view for spending trends, top categories, and balances.
+                </Typography>
+                <Button size="small" onClick={() => router.push('/visualizations')}>
+                  Open charts
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <SmartToyIcon color="primary" fontSize="small" />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Ask
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Ask the finance assistant about recent spending, accounts, or transactions.
+                </Typography>
+                <Button size="small" onClick={() => router.push('/chat')}>
+                  Open assistant
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       </Box>
 
       {error && (
@@ -147,7 +210,7 @@ export default function InsightsPage() {
               No insights yet
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Generate your first AI spending summary to see patterns and trends.
+              Generate your first narrative summary, then use charts or the assistant for follow-up.
             </Typography>
             <Button
               variant="contained"
@@ -155,7 +218,7 @@ export default function InsightsPage() {
               onClick={handleGenerate}
               disabled={generating}
             >
-              Generate Insight
+              Generate summary
             </Button>
           </CardContent>
         </Card>

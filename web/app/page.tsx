@@ -22,7 +22,9 @@ import {
 } from '@mui/material';
 import {
   AccountBalance as AccountIcon,
+  AutoAwesome as AutoAwesomeIcon,
   Category as CategoryIcon,
+  Link as LinkIcon,
   TrendingUp as TrendingUpIcon,
   Upload as UploadIcon,
 } from '@mui/icons-material';
@@ -82,6 +84,7 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [balanceOverTime, setBalanceOverTime] = useState<BalanceOverTime[]>([]);
   const [balancePeriod, setBalancePeriod] = useState<BalancePeriod>('3m');
+  const [reviewSuggestionCount, setReviewSuggestionCount] = useState(0);
   const theme = useTheme();
 
   useEffect(() => {
@@ -137,6 +140,22 @@ export default function DashboardPage() {
       }
       setErrorMessage(null);
       setAccounts((data ?? []) as Account[]);
+    })();
+  }, [isAuthenticated, supabase]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    (async () => {
+      const { count, error } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .is('category_id', null)
+        .not('suggested_category_id', 'is', null);
+      if (error) {
+        setReviewSuggestionCount(0);
+        return;
+      }
+      setReviewSuggestionCount(count ?? 0);
     })();
   }, [isAuthenticated, supabase]);
 
@@ -365,35 +384,6 @@ export default function DashboardPage() {
     setSelectedAccountId(event.target.value);
   };
 
-  const QuickActionCard = (p: {
-    icon: React.ReactNode;
-    title: string;
-    description: string;
-    path: string;
-  }) => (
-    <Card
-      sx={{
-        height: '100%',
-        cursor: 'pointer',
-        transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
-      }}
-      onClick={() => router.push(p.path)}
-    >
-      <CardContent>
-        <Box display="flex" alignItems="center" mb={2}>
-          {p.icon}
-          <Typography variant="h6" ml={1}>
-            {p.title}
-          </Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary">
-          {p.description}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-
   if (authLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -414,32 +404,73 @@ export default function DashboardPage() {
     );
   }
 
-  const quickActions = [
-    {
-      icon: <UploadIcon color="primary" />,
-      title: 'Upload Statements',
-      description: 'Import your bank statements to track expenses',
-      path: '/upload',
-    },
-    {
-      icon: <CategoryIcon color="primary" />,
-      title: 'Categorize',
-      description: 'Organize your transactions by category',
-      path: '/categorization',
-    },
-    {
-      icon: <TrendingUpIcon color="primary" />,
-      title: 'Analytics',
-      description: 'View spending insights and trends',
-      path: '/visualizations',
-    },
-    {
-      icon: <AccountIcon color="primary" />,
-      title: 'Manage Accounts',
-      description: 'Add or edit your bank accounts',
-      path: '/accounts',
-    },
-  ];
+  const hasAccounts = accounts.length > 0;
+  const hasTransactions = dashboardData?.hasAnyTransactions ?? false;
+  const hasSuggestions = reviewSuggestionCount > 0;
+
+  const homeState: 'no_accounts' | 'no_data' | 'review' | 'active' =
+    !hasAccounts ? 'no_accounts' : !hasTransactions ? 'no_data' : hasSuggestions ? 'review' : 'active';
+
+  const nextStepActions =
+    homeState === 'no_accounts'
+      ? [
+          {
+            icon: <AccountIcon color="primary" />,
+            title: 'Add your first account',
+            description: 'Create an account before you connect Plaid or upload a statement.',
+            path: '/accounts?create=true',
+          },
+        ]
+      : homeState === 'no_data'
+        ? [
+            {
+              icon: <LinkIcon color="primary" />,
+              title: 'Connect a bank',
+              description: 'Use Plaid from Accounts to bring in transactions automatically.',
+              path: '/accounts',
+            },
+            {
+              icon: <UploadIcon color="primary" />,
+              title: 'Upload an Amex statement',
+              description: 'Manual statement upload is ready for Amex accounts today.',
+              path: '/upload',
+            },
+          ]
+        : homeState === 'review'
+          ? [
+              {
+                icon: <CategoryIcon color="primary" />,
+                title: 'Review suggestions',
+                description: 'Apply suggested categories before you dive into reports.',
+                path: '/transactions/review',
+              },
+              {
+                icon: <UploadIcon color="primary" />,
+                title: 'Add more data',
+                description: 'Upload another statement or connect another account.',
+                path: '/upload',
+              },
+            ]
+          : [
+              {
+                icon: <CategoryIcon color="primary" />,
+                title: 'Review transactions',
+                description: 'Search, filter, and clean up recent activity.',
+                path: '/transactions',
+              },
+              {
+                icon: <AutoAwesomeIcon color="primary" />,
+                title: 'Open insights',
+                description: 'See charts, summaries, and the finance assistant in one place.',
+                path: '/insights',
+              },
+              {
+                icon: <UploadIcon color="primary" />,
+                title: 'Add more data',
+                description: 'Keep the dashboard current with another import.',
+                path: '/upload',
+              },
+            ];
 
   return (
     <Box sx={{ py: 2 }}>
@@ -448,31 +479,143 @@ export default function DashboardPage() {
           {errorMessage}
         </Alert>
       ) : null}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
-        <Typography variant="h3" component="h1">
-          Dashboard
-        </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4} flexWrap="wrap" gap={2}>
+        <Box>
+          <Typography variant="h3" component="h1" gutterBottom>
+            Home
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {homeState === 'no_accounts'
+              ? 'Set up one account first, then bring in your data.'
+              : homeState === 'no_data'
+                ? 'Your accounts are ready. The next step is importing transactions.'
+                : homeState === 'review'
+                  ? 'You have fresh category suggestions waiting for review.'
+                  : 'Your financial overview is ready.'}
+          </Typography>
+        </Box>
 
-        <FormControl sx={{ minWidth: 240 }}>
-          <InputLabel id="account-filter-label">Filter by Account</InputLabel>
-          <Select
-            labelId="account-filter-label"
-            id="account-filter"
-            value={selectedAccountId}
-            label="Filter by Account"
-            onChange={handleAccountChange}
-          >
-            <MenuItem value="all">All Accounts</MenuItem>
-            {accounts.map((account) => (
-              <MenuItem key={account.id} value={account.id}>
-                {account.bank} - {account.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {hasTransactions && accounts.length > 1 ? (
+          <FormControl sx={{ minWidth: 240 }}>
+            <InputLabel id="account-filter-label">Filter by account</InputLabel>
+            <Select
+              labelId="account-filter-label"
+              id="account-filter"
+              value={selectedAccountId}
+              label="Filter by account"
+              onChange={handleAccountChange}
+            >
+              <MenuItem value="all">All accounts</MenuItem>
+              {accounts.map((account) => (
+                <MenuItem key={account.id} value={account.id}>
+                  {account.bank} - {account.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        ) : null}
       </Box>
 
-      {dashboardData ? (
+      <Paper
+        sx={{
+          p: { xs: 3, md: 4 },
+          mb: 4,
+          borderRadius: 4,
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
+          border: `1px solid ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.24 : 0.14)}`,
+        }}
+      >
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              {homeState === 'no_accounts'
+                ? 'Start with your first account'
+                : homeState === 'no_data'
+                  ? 'Bring in your first transactions'
+                  : homeState === 'review'
+                    ? 'Review suggestions before anything else'
+                    : 'Everything is in place'}
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 760 }}>
+              {homeState === 'no_accounts'
+                ? 'Accounts anchor the rest of the app. Once you add one, you can either connect Plaid or upload an Amex statement.'
+                : homeState === 'no_data'
+                  ? 'The fastest way in is Plaid from Accounts. If you use Amex, you can also upload a statement right now.'
+                  : homeState === 'review'
+                    ? `${reviewSuggestionCount} transaction${reviewSuggestionCount === 1 ? '' : 's'} have suggested categories. Clear those first so your reports stay useful.`
+                    : 'Use this page for the overview, then head to transactions or insights when you want to dig in.'}
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+            {homeState === 'no_accounts' ? (
+              <Button variant="contained" size="large" startIcon={<AccountIcon />} onClick={() => router.push('/accounts?create=true')}>
+                Add account
+              </Button>
+            ) : homeState === 'no_data' ? (
+              <>
+                <Button variant="contained" size="large" startIcon={<LinkIcon />} onClick={() => router.push('/accounts')}>
+                  Connect bank
+                </Button>
+                <Button variant="outlined" size="large" startIcon={<UploadIcon />} onClick={() => router.push('/upload')}>
+                  Upload Amex statement
+                </Button>
+              </>
+            ) : homeState === 'review' ? (
+              <>
+                <Button variant="contained" size="large" startIcon={<CategoryIcon />} onClick={() => router.push('/transactions/review')}>
+                  Review suggestions
+                </Button>
+                <Button variant="outlined" size="large" startIcon={<TrendingUpIcon />} onClick={() => router.push('/insights')}>
+                  Open insights
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="contained" size="large" startIcon={<TrendingUpIcon />} onClick={() => router.push('/insights')}>
+                  Open insights
+                </Button>
+                <Button variant="outlined" size="large" startIcon={<CategoryIcon />} onClick={() => router.push('/transactions')}>
+                  Review transactions
+                </Button>
+              </>
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <Box mb={4}>
+        <Typography variant="h5" gutterBottom>
+          Next step
+        </Typography>
+        <Grid container spacing={3}>
+          {nextStepActions.map((action) => (
+            <Grid item xs={12} md={12 / nextStepActions.length} key={action.path}>
+              <Card
+                sx={{
+                  height: '100%',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': { transform: 'translateY(-3px)', boxShadow: 3 },
+                }}
+                onClick={() => router.push(action.path)}
+              >
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
+                    {action.icon}
+                    <Typography variant="h6">{action.title}</Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {action.description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+
+      {dashboardData && hasTransactions ? (
         <>
           <Grid container spacing={3} mb={4}>
             <Grid item xs={12} md={6}>
@@ -584,30 +727,7 @@ export default function DashboardPage() {
             </Card>
           )}
         </>
-      ) : (
-        <Paper sx={{ p: 3, mb: 4, textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom>
-            No financial data yet
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Start by uploading your bank statements to see your financial overview
-          </Typography>
-          <Button variant="contained" onClick={() => router.push('/upload')}>
-            Upload Statements
-          </Button>
-        </Paper>
-      )}
-
-      <Typography variant="h5" gutterBottom mb={3}>
-        Quick actions
-      </Typography>
-      <Grid container spacing={3} mb={4}>
-        {quickActions.map((action) => (
-          <Grid item xs={12} sm={6} md={3} key={action.path}>
-            <QuickActionCard {...action} />
-          </Grid>
-        ))}
-      </Grid>
+      ) : null}
 
       {dashboardData?.recentTransactions?.length ? (
         <>

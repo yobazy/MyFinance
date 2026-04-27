@@ -85,6 +85,7 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
   const [autoCatMode, setAutoCatMode] = useState<'auto' | 'suggestions_only'>('suggestions_only');
   const [autoCatBusy, setAutoCatBusy] = useState(false);
   const [autoCatMessage, setAutoCatMessage] = useState<string | null>(null);
@@ -651,91 +652,109 @@ export default function TransactionsPage() {
             columnGap={2}
           >
             <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-              <Typography variant="subtitle1">Auto-categorization</Typography>
+              <Typography variant="subtitle1">Advanced automation</Typography>
               <Button
-                variant="contained"
-                disabled={autoCatBusy || allTransactions.length === 0}
-                onClick={runAutoCategorization}
+                variant={showAutomation ? 'contained' : 'outlined'}
+                onClick={() => setShowAutomation((value) => !value)}
               >
-                {autoCatBusy ? 'Running…' : 'Generate suggestions'}
+                {showAutomation ? 'Hide tools' : 'Show tools'}
+              </Button>
+              <Button variant="text" onClick={() => router.push('/rules')}>
+                Manage rules
               </Button>
             </Box>
             <Typography variant="body2" color="text.secondary">
-              Generates suggestions for uncategorized transactions using your rules and presets.
-              Review and apply them on the review page.
+              Browse transactions first. Open these tools when you want to generate suggestions in bulk.
             </Typography>
           </Box>
-          
-          {autoCatBusy && (
+
+          <Collapse in={showAutomation}>
             <Box sx={{ mt: 3 }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+              <Box display="flex" alignItems="center" gap={2} flexWrap="wrap" mb={1.5}>
+                <Button
+                  variant="contained"
+                  disabled={autoCatBusy || allTransactions.length === 0}
+                  onClick={runAutoCategorization}
+                >
+                  {autoCatBusy ? 'Running…' : 'Generate suggestions'}
+                </Button>
                 <Typography variant="body2" color="text.secondary">
-                  Processing transactions...
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {Math.round(autoCatProgress)}%
+                  Generates suggestions for uncategorized transactions using your rules and presets.
                 </Typography>
               </Box>
-              <LinearProgress 
-                variant="determinate" 
-                value={autoCatProgress} 
-                sx={{ 
-                  height: 8, 
-                  borderRadius: 4,
-                  backgroundColor: (theme) => theme.palette.mode === 'dark' 
-                    ? 'rgba(255, 255, 255, 0.1)' 
-                    : 'rgba(0, 0, 0, 0.1)',
-                  '& .MuiLinearProgress-bar': {
-                    borderRadius: 4,
-                  },
-                }} 
-              />
-              
-              {autoCatLogs.length > 0 && (
-                <Paper 
-                  variant="outlined" 
-                  sx={{ 
-                    mt: 2, 
-                    p: 2, 
-                    maxHeight: 200, 
-                    overflow: 'auto',
-                    backgroundColor: (theme) => theme.palette.mode === 'dark'
-                      ? 'rgba(255, 255, 255, 0.05)'
-                      : 'rgba(0, 0, 0, 0.02)',
-                  }}
-                >
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                    Activity log:
-                  </Typography>
-                  <Stack spacing={0.5}>
-                    {autoCatLogs.map((log, index) => (
-                      <Typography 
-                        key={index} 
-                        variant="caption" 
-                        sx={{ 
-                          fontFamily: 'monospace',
-                          fontSize: '0.75rem',
-                          color: 'text.secondary',
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {log}
+
+              {autoCatBusy && (
+                <Box sx={{ mt: 2 }}>
+                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                    <Typography variant="body2" color="text.secondary">
+                      Processing transactions...
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {Math.round(autoCatProgress)}%
+                    </Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={autoCatProgress}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: (theme) => theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : 'rgba(0, 0, 0, 0.1)',
+                      '& .MuiLinearProgress-bar': {
+                        borderRadius: 4,
+                      },
+                    }}
+                  />
+
+                  {autoCatLogs.length > 0 && (
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        mt: 2,
+                        p: 2,
+                        maxHeight: 200,
+                        overflow: 'auto',
+                        backgroundColor: (theme) => theme.palette.mode === 'dark'
+                          ? 'rgba(255, 255, 255, 0.05)'
+                          : 'rgba(0, 0, 0, 0.02)',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                        Activity log:
                       </Typography>
-                    ))}
-                  </Stack>
-                </Paper>
+                      <Stack spacing={0.5}>
+                        {autoCatLogs.map((log, index) => (
+                          <Typography
+                            key={index}
+                            variant="caption"
+                            sx={{
+                              fontFamily: 'monospace',
+                              fontSize: '0.75rem',
+                              color: 'text.secondary',
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {log}
+                          </Typography>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  )}
+                </Box>
+              )}
+
+              {autoCatMessage && !autoCatBusy && (
+                <Alert
+                  severity={autoCatMessage.toLowerCase().startsWith('failed') ? 'error' : 'info'}
+                  sx={{ mt: 2 }}
+                >
+                  {autoCatMessage}
+                </Alert>
               )}
             </Box>
-          )}
-          
-          {autoCatMessage && !autoCatBusy && (
-            <Alert
-              severity={autoCatMessage.toLowerCase().startsWith('failed') ? 'error' : 'info'}
-              sx={{ mt: 2 }}
-            >
-              {autoCatMessage}
-            </Alert>
-          )}
+          </Collapse>
         </CardContent>
       </Card>
 
