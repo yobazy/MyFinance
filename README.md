@@ -1,268 +1,133 @@
 # MyFinance Dashboard
 
-MyFinance Dashboard is a comprehensive personal finance management application built with **React** frontend and **Django** backend. This modern web application allows users to upload bank statements, categorize transactions, and generate detailed financial insights and visualizations.
+Personal finance dashboard for uploading bank statements, categorizing transactions, and visualizing spending patterns.
 
-> Note: this repo is currently **mid-migration**. The legacy stack (Django + CRA) is still present, but the recommended multi-user path is **Supabase + Next.js + TS worker**.
+**Stack**: Next.js 15 · React 19 · TypeScript · Supabase (Postgres + Auth) · Material-UI 6 · TypeScript worker
 
-## Architecture
-
-- **Frontend**: React with Material-UI components
-- **Backend**: Django REST API with SQLite database
-- **Data Storage**: Local SQLite database (configurable)
+> The legacy Django + Create React App stack is archived in `legacy/` for reference only. All active development is in `web/` and `worker/`.
 
 ---
 
 ## Features
 
-### 🏦 **Multi-Bank Support**
-- **TD Bank**: CSV statement uploads
-- **American Express**: XLSX statement uploads
-
-### 📊 **Interactive Dashboard**
-- Financial overview with key metrics
-- Quick action buttons for common tasks
-- Real-time data visualization
-
-### �� **File Management**
-- Drag-and-drop file upload interface
-- Support for CSV and XLSX formats
-- Automatic transaction processing and categorization
-
-### 🏷️ **Transaction Management**
-- View all transactions in a searchable table
-- Manual categorization of uncategorized transactions
-- Transaction filtering and search capabilities
-
-### 📈 **Advanced Analytics & Visualizations**
-- Spending breakdown by category (pie charts)
-- Monthly spending trends (line charts)
-- Category variance analysis
-- Interactive charts with hover details
-
-### 🏪 **Account Management**
-- Create and manage multiple bank accounts
-- Account-specific transaction tracking
-- Bank-specific data processing
-
-### ⚙️ **User Settings**
-- Theme customization (light/dark mode)
-- Database management options
-- Application preferences
+- **Statement uploads** — Amex XLSX statements parsed and deduplicated on import
+- **Plaid integration** — Connect bank accounts and import transactions directly
+- **Auto-categorization** — Rule-based categorization with a feedback loop and suggestion review
+- **Undo uploads** — Roll back any upload and its associated transactions
+- **Visualizations** — Spending by category, monthly trends, and account balance tracking
+- **Multi-user** — Full per-user data isolation via Supabase RLS
+- **Auth** — Email/password, Google OAuth, and GitHub OAuth
 
 ---
 
-## 📸 Screenshots (legacy UI)
+## Repo Structure
 
-Legacy CRA UI screenshots are archived under `legacy/django-cra/screenshots/`.
-
----
-
-## Installation & Setup
-
-### Prerequisites
-- Python 3.8+
-- Node.js 16+
-- npm or yarn
-
-### Legacy Quick Start (Production Mode)
-
-The easiest way to run the web app is using the provided startup script:
-
-```bash
-# Make scripts executable (first time only)
-chmod +x legacy/django-cra/start.sh legacy/django-cra/start-dev.sh
-
-# Run in production mode (single server, Django serves React build)
-./legacy/django-cra/start.sh
+```
+web/          # Next.js 15 frontend + API routes
+worker/       # TypeScript polling worker (parses uploads, applies rules)
+supabase/     # 11 SQL migrations
+docs/         # Architecture docs & migration notes
+legacy/       # Archived Django + CRA stack (do not modify)
 ```
 
-The application will be available at `http://localhost:8000/`
+---
+
+## Prerequisites
+
+- Node.js 18+
+- A [Supabase](https://supabase.com) project (free tier works)
+- Plaid API credentials (optional — only needed for bank connection)
 
 ---
 
-## Supabase + Next.js (New path)
+## Setup
 
-If you’re moving to a multi-user hosted version, the recommended direction is:
-- **Supabase** for Auth + Postgres + Storage
-- **TypeScript worker** for async statement ingestion (Excel parsing)
+### 1. Database
 
-### What’s already in this repo
-- Supabase migrations in `supabase/migrations/`
-- A TS worker in `worker/` that can process `processing_jobs` of type `ingest_upload` (Amex `.xlsx` first)
-
-### Supabase setup (minimum)
-- Run migrations:
-  - `supabase/migrations/001_init.sql`
-  - `supabase/migrations/002_queue_rpc.sql`
-  - `supabase/migrations/003_transactions_metadata_and_dedupe.sql`
-  - `supabase/migrations/005_transactions_dedupe_on_conflict.sql` (required for statement upload upserts)
-- `supabase/migrations/004_storage_policies.sql` is only needed if you decide to store uploads in Supabase Storage.
-
-### Supabase Auth setup
-- In Supabase Auth settings, enable **Email** if you want users to sign up/sign in with email/password (in addition to Google/GitHub OAuth).
-- For local development, set the Auth **Site URL** to `http://localhost:3000` (see `web/README.md`).
-
-### Run the worker
-See `worker/README.md`.
-
-### Run the Next.js app
-See `web/README.md`.
-
-### Repo structure (high-level)
-- **New**: `web/`, `worker/`, `supabase/`
-- **Legacy**: `legacy/django-cra/`
-- Details: `docs/repo-audit.md`
-
-### Legacy Development Mode (Two Servers)
-
-For development with hot-reloading:
+Apply migrations to your Supabase project via the CLI or the dashboard SQL editor:
 
 ```bash
-# Run development mode (Django on 8000, React on 3000)
-./legacy/django-cra/start-dev.sh
+supabase db push
 ```
 
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000/api/`
+Migrations are in `supabase/migrations/` (001 through 011).
 
-### Manual Setup
-
-#### Backend Setup
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd MyFinance
-   ```
-
-2. **Set up Python environment**:
-   ```bash
-   # Create virtual environment
-   python3 -m venv venv
-   
-   # Activate virtual environment
-   # On macOS/Linux:
-   source venv/bin/activate
-   # On Windows:
-   venv\Scripts\activate
-   ```
-
-3. **Install Python dependencies**:
-   ```bash
-   pip install -r legacy/django-cra/requirements.txt
-   ```
-
-4. **Run Django migrations**:
-   ```bash
-   python legacy/django-cra/manage.py migrate
-   ```
-
-#### Frontend Setup
-1. **Navigate to frontend directory**:
-   ```bash
-   cd legacy/django-cra/frontend
-   ```
-
-2. **Install Node.js dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Build React app for production**:
-   ```bash
-   npm run build
-   ```
-
-4. **Return to root and collect static files**:
-   ```bash
-   cd ../../
-   python legacy/django-cra/manage.py collectstatic --noinput
-   ```
-
-5. **Start Django server** (serves both API and React app):
-   ```bash
-   python legacy/django-cra/manage.py runserver
-   ```
-   The application will be available at `http://localhost:8000/`
-
----
-
-## Usage
-
-### Getting Started
-1. **Start the web application** using one of the methods above
-2. **Open your browser** to `http://localhost:8000` (production) or `http://localhost:3000` (development)
-3. **Create your first account** in the Accounts section
-4. **Upload bank statements** using the Upload page
-5. **Categorize transactions** as needed
-6. **View insights** in the Analytics section
-
-### Key Workflows
-- **Upload Statements**: Select bank type, choose account, upload CSV/XLSX files
-- **Categorize Transactions**: Review uncategorized transactions and assign categories
-- **View Analytics**: Explore spending patterns through interactive visualizations
-- **Manage Accounts**: Add, edit, or remove bank accounts
-
----
-
-## API Endpoints
-
-The Django backend provides RESTful APIs for:
-- `/api/upload/` - File upload processing
-- `/api/transactions/` - Transaction management
-- `/api/accounts/` - Account management
-- `/api/categories/` - Category management
-- `/api/visualizations/` - Analytics data
-- `/api/dashboard/` - Dashboard metrics
-
----
-
-## Development
-
-### Building for Production
-```bash
-# Frontend build
-cd legacy/django-cra/frontend
-npm run build
-cd ../../
-
-# Collect static files
-python legacy/django-cra/manage.py collectstatic --noinput
-
-# Start Django server (serves both API and React app)
-python legacy/django-cra/manage.py runserver
-```
-
-### Environment Variables (Optional)
-You can configure the app using environment variables:
+### 2. Frontend (`web/`)
 
 ```bash
-# Production settings
-export DEBUG=False
-export SECRET_KEY='your-secret-key-here'
-export ALLOWED_HOSTS='yourdomain.com,www.yourdomain.com'
-
-# Then run
-python legacy/django-cra/manage.py runserver
+cd web
+cp env.example .env.local   # fill in your Supabase + Plaid credentials
+npm install
+npm run dev                  # http://localhost:3000
 ```
 
-### Database Management
-- Database is automatically initialized on first run
-- Local SQLite database: `myfinance.db`
-- Reset database: Use the reset option in the application
+**Required env vars** (`web/.env.local`):
 
-### Web App Architecture
-- **Production Mode**: Django serves the built React app from a single server
-- **Development Mode**: React dev server (port 3000) communicates with Django API (port 8000)
-- **Static Files**: Served via WhiteNoise middleware in production
-- **API Routes**: All API endpoints are under `/api/`
-- **Frontend Routes**: All other routes are handled by React Router
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+| `PLAID_CLIENT_ID` | Plaid client ID (optional) |
+| `PLAID_SECRET` | Plaid secret (optional) |
+| `PLAID_ENV` | `sandbox` \| `development` \| `production` |
+
+### 3. Worker (`worker/`)
+
+The worker polls Supabase for pending jobs (statement parsing, rule application) and processes them asynchronously.
+
+```bash
+cd worker
+cp .env.example .env        # fill in Supabase credentials
+npm install
+npm run dev                  # tsx watch mode
+```
+
+**Required env vars** (`worker/.env`):
+
+| Variable | Description |
+|---|---|
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+| `WORKER_ID` | Unique worker identifier (e.g. `worker-local-1`) |
+| `POLL_INTERVAL_MS` | Polling interval in ms (e.g. `1000`) |
+
+### 4. Auth
+
+In your Supabase project's Auth settings:
+- Enable **Email** provider for email/password sign-in
+- Set **Site URL** to `http://localhost:3000` for local development
+- Optionally enable Google and GitHub OAuth providers
 
 ---
 
-## Technology Stack
+## Dev Commands
 
-- **Frontend**: React 19, Material-UI, Recharts, React Router
-- **Backend**: Django 5.1, Django REST Framework
-- **Database**: SQLite (local storage)
-- **Charts**: Recharts library
-- **Styling**: Material-UI with custom theming
+```bash
+# From repo root
+npm run web:dev        # Next.js frontend (port 3000)
+npm run worker:dev     # TypeScript worker (auto-reload)
+
+# From web/
+npm run build          # Production build
+npm run lint
+npm run test:e2e       # Playwright E2E tests
+npm run test:e2e:ui    # Playwright UI mode
+
+# From worker/
+npm run build          # tsc → dist/
+npm run start          # Run compiled worker
+```
+
+---
+
+## Key API Routes
+
+| Route | Purpose |
+|---|---|
+| `POST /api/ingest/amex` | Upload & parse Amex XLSX statement |
+| `POST /api/plaid/link-token` | Generate Plaid Link token |
+| `POST /api/plaid/import` | Import transactions from Plaid |
+| `POST /api/auto-categorization/apply` | Bulk apply categorization rules |
+| `POST /api/auto-categorization/apply-suggestion` | Accept a single suggestion |
+| `POST /api/uploads/[uploadId]/undo` | Undo an upload |
