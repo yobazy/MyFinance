@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateConfidence } from '../lib/confidenceCalculator';
 import { aiSuggestCategory } from '../lib/aiCategorizer';
+import { getUserAnthropicKey } from '../lib/getUserAnthropicKey';
 
 type JobRow = {
   id: string;
@@ -133,11 +134,12 @@ async function getBestSuggestion(
 export async function handleApplyRulesJob(params: {
   supabase: SupabaseClient;
   job: JobRow;
-  anthropicApiKey?: string;
 }): Promise<{ rowsProcessed: number }> {
-  const { supabase, job, anthropicApiKey } = params;
+  const { supabase, job } = params;
   const userId = String(job.user_id ?? '');
   if (!userId) throw new Error('apply_rules job missing user_id');
+
+  const anthropicApiKey = await getUserAnthropicKey(supabase, userId);
 
   const mode: ApplyRulesMode =
     job.payload && job.payload['mode'] === 'suggestions_only' ? 'suggestions_only' : 'auto';

@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from '../../../../lib/supabaseAdmin';
+import { getUserAnthropicKey } from '../../../../lib/getUserAnthropicKey';
 
 export const runtime = 'nodejs';
 
@@ -21,8 +22,9 @@ export async function POST(req: Request) {
   const userId = userData.user?.id;
   if (!userId) return json(401, { error: 'Invalid token' });
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return json(503, { error: 'AI features not configured' });
+  const hasKey = !!(await getUserAnthropicKey(userId));
+  if (!hasKey) {
+    return json(402, { error: 'No Anthropic API key saved. Add one in Settings.' });
   }
 
   const { error } = await supabase.from('processing_jobs').insert({

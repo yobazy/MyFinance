@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
+import { getUserAnthropicKey } from '../lib/getUserAnthropicKey';
 
 type JobRow = {
   id: string;
@@ -11,11 +12,13 @@ type JobRow = {
 export async function handleGenerateInsightsJob(params: {
   supabase: SupabaseClient;
   job: JobRow;
-  anthropicApiKey: string;
 }): Promise<{ ok: boolean }> {
-  const { supabase, job, anthropicApiKey } = params;
+  const { supabase, job } = params;
   const userId = String(job.user_id ?? '');
   if (!userId) throw new Error('generate_insights job missing user_id');
+
+  const anthropicApiKey = await getUserAnthropicKey(supabase, userId);
+  if (!anthropicApiKey) throw new Error('No Anthropic API key configured for this user');
 
   const now = new Date();
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of current month

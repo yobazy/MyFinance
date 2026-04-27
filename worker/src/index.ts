@@ -59,7 +59,7 @@ async function main() {
           `[worker] job ${j.id} succeeded rowsProcessed=${result.rowsProcessed}`,
         );
       } else if (j.type === 'apply_rules') {
-        const result = await handleApplyRulesJob({ supabase, job: j, anthropicApiKey: env.ANTHROPIC_API_KEY });
+        const result = await handleApplyRulesJob({ supabase, job: j });
         await supabase
           .from('processing_jobs')
           .update({ status: 'succeeded', last_error: null })
@@ -70,12 +70,7 @@ async function main() {
           `[worker] job ${j.id} apply_rules processed rows=${result.rowsProcessed}`,
         );
       } else if (j.type === 'generate_insights') {
-        if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
-        const result = await handleGenerateInsightsJob({
-          supabase,
-          job: j,
-          anthropicApiKey: env.ANTHROPIC_API_KEY,
-        });
+        const result = await handleGenerateInsightsJob({ supabase, job: j });
         await supabase
           .from('processing_jobs')
           .update({ status: 'succeeded', last_error: null })

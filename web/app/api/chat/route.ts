@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createSupabaseAdminClient } from '../../../lib/supabaseAdmin';
+import { getUserAnthropicKey } from '../../../lib/getUserAnthropicKey';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -144,10 +145,6 @@ async function runTool(
 }
 
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return json(503, { error: 'AI features not configured' });
-  }
-
   const supabase = createSupabaseAdminClient();
 
   const authz = req.headers.get('authorization') ?? '';
@@ -171,7 +168,12 @@ export async function POST(req: Request) {
     return json(400, { error: 'messages array required' });
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const apiKey = await getUserAnthropicKey(userId);
+  if (!apiKey) {
+    return json(402, { error: 'No Anthropic API key saved. Add one in Settings.' });
+  }
+
+  const client = new Anthropic({ apiKey });
 
   const systemPrompt = `You are a helpful personal finance assistant. You have access to the user's real financial data via tools. When answering questions about spending, accounts, or transactions, always call the appropriate tool to get accurate data rather than guessing. Be concise and specific — include dollar amounts and dates when relevant. Today's date is ${new Date().toISOString().split('T')[0]}.`;
 
