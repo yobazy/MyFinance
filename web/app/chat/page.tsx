@@ -17,7 +17,6 @@ import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PersonIcon from '@mui/icons-material/Person';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
-import AppShell from '../components/AppShell';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 
@@ -90,57 +89,56 @@ export default function ChatPage() {
   const isDark = theme.palette.mode === 'dark';
 
   return (
-    <AppShell>
-      <Box sx={{ maxWidth: 760, mx: 'auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-          <SmartToyIcon color="primary" />
-          <Typography variant="h5" fontWeight={700}>
-            Finance Assistant
-          </Typography>
-        </Box>
+    <Box sx={{ maxWidth: 760, mx: 'auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+        <SmartToyIcon color="primary" />
+        <Typography variant="h5" fontWeight={700}>
+          Finance Assistant
+        </Typography>
+      </Box>
 
-        {/* Message area */}
-        <Paper
-          variant="outlined"
-          sx={{
-            flex: 1,
-            overflow: 'auto',
-            p: 2,
-            borderRadius: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1.5,
-            minHeight: 0,
-          }}
-        >
-          {messages.length === 0 && (
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, py: 4 }}>
-              <SmartToyIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
-              <Typography color="text.secondary" variant="body1">
-                Ask anything about your finances
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', maxWidth: 480 }}>
-                {STARTERS.map((s) => (
-                  <Box
-                    key={s}
-                    onClick={() => sendMessage(s)}
-                    sx={{
-                      px: 1.5,
-                      py: 0.75,
-                      borderRadius: 2,
-                      border: `1px solid ${theme.palette.divider}`,
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      color: 'text.secondary',
-                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: 'primary.main', color: 'primary.main' },
-                    }}
-                  >
-                    {s}
-                  </Box>
-                ))}
-              </Box>
+      {/* Message area */}
+      <Paper
+        variant="outlined"
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          p: 2,
+          borderRadius: 3,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.5,
+          minHeight: 0,
+        }}
+      >
+        {messages.length === 0 && (
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, py: 4 }}>
+            <SmartToyIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
+            <Typography color="text.secondary" variant="body1">
+              Ask anything about your finances
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', maxWidth: 480 }}>
+              {STARTERS.map((s) => (
+                <Box
+                  key={s}
+                  onClick={() => sendMessage(s)}
+                  sx={{
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.divider}`,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    color: 'text.secondary',
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: 'primary.main', color: 'primary.main' },
+                  }}
+                >
+                  {s}
+                </Box>
+              ))}
             </Box>
-          )}
+          </Box>
+        )}
 
           {messages.map((msg, idx) => {
             const isUser = msg.role === 'user';
@@ -210,50 +208,49 @@ export default function ChatPage() {
               </Box>
             </Box>
           )}
-          <div ref={bottomRef} />
-        </Paper>
+        <div ref={bottomRef} />
+      </Paper>
 
-        {error && (
-          <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
+      {error && (
+        <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-        <Divider sx={{ my: 1 }} />
+      <Divider sx={{ my: 1 }} />
 
-        {/* Input */}
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Ask about your spending, accounts, or transactions…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={loading}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(input);
-              }
-            }}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    type="submit"
-                    disabled={!input.trim() || loading}
-                    size="small"
-                    color="primary"
-                  >
-                    <SendIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Box>
+      {/* Input */}
+      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', gap: 1 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Ask about your spending, accounts, or transactions…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={loading}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage(input);
+            }
+          }}
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  type="submit"
+                  disabled={!input.trim() || loading}
+                  size="small"
+                  color="primary"
+                >
+                  <SendIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
       </Box>
-    </AppShell>
+    </Box>
   );
 }
