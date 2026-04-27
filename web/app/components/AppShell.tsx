@@ -30,6 +30,8 @@ import HelpIcon from '@mui/icons-material/Help';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import LogoutIcon from '@mui/icons-material/Logout';
 import CategoryIcon from '@mui/icons-material/Category';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { useThemeMode } from '../../lib/themeMode';
 
@@ -83,6 +85,8 @@ export default function AppShell(props: { children: React.ReactNode }) {
       { href: '/upload', icon: <UploadFileIcon />, label: 'Upload' },
       { href: '/transactions', icon: <ReceiptIcon />, label: 'Transactions' },
       { href: '/visualizations', icon: <BarChartIcon />, label: 'Analytics' },
+      { href: '/insights', icon: <AutoAwesomeIcon />, label: 'Insights' },
+      { href: '/chat', icon: <SmartToyIcon />, label: 'AI Chat' },
       { href: '/help', icon: <HelpIcon />, label: 'Help' },
       { href: '/user-settings', icon: <SettingsIcon />, label: 'Settings' },
     ],

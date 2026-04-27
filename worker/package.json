@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@supabase/supabase-js": "^2.49.1",
     "exceljs": "^4.4.0",
     "xlsx": "^0.18.5",

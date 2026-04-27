@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateConfidence } from '../lib/confidenceCalculator';
+import { aiSuggestCategory } from '../lib/aiCategorizer';
 
 type JobRow = {
   id: string;
@@ -132,13 +133,21 @@ async function getBestSuggestion(
 export async function handleApplyRulesJob(params: {
   supabase: SupabaseClient;
   job: JobRow;
+  anthropicApiKey?: string;
 }): Promise<{ rowsProcessed: number }> {
-  const { supabase, job } = params;
+  const { supabase, job, anthropicApiKey } = params;
   const userId = String(job.user_id ?? '');
   if (!userId) throw new Error('apply_rules job missing user_id');
 
   const mode: ApplyRulesMode =
     job.payload && job.payload['mode'] === 'suggestions_only' ? 'suggestions_only' : 'auto';
+
+  // Fetch categories for AI fallback
+  const { data: categoryRows } = await supabase
+    .from('categories')
+    .select('id,name')
+    .eq('user_id', userId);
+  const categories = (categoryRows ?? []) as { id: string; name: string }[];
 
   // Fetch uncategorized transactions for this user.
   const { data: txRows, error: txErr } = await supabase
@@ -189,9 +198,13 @@ export async function handleApplyRulesJob(params: {
     was_applied: boolean;
   }[] = [];
 
+  // Track which transactions were matched by rules for AI fallback
+  const ruleMatchedIds = new Set<string>();
+
   for (const tx of transactions) {
     const suggestion = await getBestSuggestion(supabase, userId, tx, rules);
     if (!suggestion) continue;
+    ruleMatchedIds.add(tx.id);
 
     const { categoryId, confidence, rule } = suggestion;
 
@@ -255,6 +268,30 @@ export async function handleApplyRulesJob(params: {
         confidence_score: confidence,
         was_applied: false,
       });
+    }
+  }
+
+  // AI fallback: categorize transactions that no rule matched
+  if (anthropicApiKey && categories.length > 0) {
+    const unmatched = transactions.filter((tx) => !ruleMatchedIds.has(tx.id));
+    for (const tx of unmatched) {
+      try {
+        const aiResult = await aiSuggestCategory(
+          tx.description,
+          tx.amount,
+          categories,
+          anthropicApiKey,
+        );
+        if (aiResult) {
+          updates.push({
+            id: tx.id,
+            suggested_category_id: aiResult.categoryId,
+            confidence_score: aiResult.confidence,
+          });
+        }
+      } catch {
+        // Skip individual AI failures silently
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import { getEnv } from './env.js';
 import { createServiceSupabaseClient } from './supabase.js';
 import { handleIngestUploadJob } from './jobs/ingestUpload.js';
 import { handleApplyRulesJob } from './jobs/applyRules.js';
+import { handleGenerateInsightsJob } from './jobs/generateInsights.js';
 
 type ProcessingJob = {
   id: string;
@@ -58,7 +59,7 @@ async function main() {
           `[worker] job ${j.id} succeeded rowsProcessed=${result.rowsProcessed}`,
         );
       } else if (j.type === 'apply_rules') {
-        const result = await handleApplyRulesJob({ supabase, job: j });
+        const result = await handleApplyRulesJob({ supabase, job: j, anthropicApiKey: env.ANTHROPIC_API_KEY });
         await supabase
           .from('processing_jobs')
           .update({ status: 'succeeded', last_error: null })
@@ -68,6 +69,19 @@ async function main() {
         console.log(
           `[worker] job ${j.id} apply_rules processed rows=${result.rowsProcessed}`,
         );
+      } else if (j.type === 'generate_insights') {
+        if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+        const result = await handleGenerateInsightsJob({
+          supabase,
+          job: j,
+          anthropicApiKey: env.ANTHROPIC_API_KEY,
+        });
+        await supabase
+          .from('processing_jobs')
+          .update({ status: 'succeeded', last_error: null })
+          .eq('id', j.id);
+        // eslint-disable-next-line no-console
+        console.log(`[worker] job ${j.id} generate_insights ok=${result.ok}`);
       } else {
         throw new Error(`Unsupported job type: ${j.type}`);
       }
