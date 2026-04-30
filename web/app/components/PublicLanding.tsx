@@ -34,7 +34,8 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
   const theme = useTheme();
   const { mode, toggleMode } = useThemeMode();
   const [loggingIn, setLoggingIn] = React.useState<'google' | 'github' | null>(null);
-  const [emailMode, setEmailMode] = React.useState<'signin' | 'signup'>('signin');
+  const defaultEmailMode = props.redirectIfAuthenticated ? 'signin' : 'signup';
+  const [emailMode, setEmailMode] = React.useState<'signin' | 'signup'>(defaultEmailMode);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -90,12 +91,17 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
         await signInWithPassword(normalizedEmail, password);
       } else {
         const { needsEmailConfirmation } = await signUpWithPassword(normalizedEmail, password, next);
+        setPassword('');
+        setConfirmPassword('');
         setMessage({
-          severity: 'success',
+          severity: needsEmailConfirmation ? 'info' : 'success',
           text: needsEmailConfirmation
-            ? 'Account created. Check your email to confirm your address, then sign in.'
+            ? 'Check your email to confirm your address. Once that is done, sign in here.'
             : 'Account created. Signing you in…',
         });
+        if (needsEmailConfirmation) {
+          setEmailMode('signin');
+        }
       }
     } catch (err) {
       const text = err instanceof Error ? err.message : String(err);
@@ -136,22 +142,10 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
           pointerEvents: 'none',
           background:
             mode === 'dark'
-              ? `radial-gradient(1200px 800px at 15% 10%, ${alpha(theme.palette.primary.main, 0.22)} 0%, transparent 60%),
-                 radial-gradient(900px 700px at 85% 30%, ${alpha(theme.palette.warning.main, 0.12)} 0%, transparent 55%),
-                 radial-gradient(1000px 800px at 50% 100%, ${alpha(theme.palette.secondary.main, 0.12)} 0%, transparent 60%)`
-              : `radial-gradient(1200px 800px at 15% 10%, ${alpha(theme.palette.primary.main, 0.14)} 0%, transparent 60%),
-                 radial-gradient(900px 700px at 85% 30%, ${alpha(theme.palette.warning.main, 0.10)} 0%, transparent 55%),
-                 radial-gradient(1000px 800px at 50% 100%, ${alpha(theme.palette.secondary.main, 0.10)} 0%, transparent 60%)`,
-        },
-        '&:after': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          opacity: mode === 'dark' ? 0.18 : 0.12,
-          backgroundImage:
-            'repeating-linear-gradient(0deg, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 1px, transparent 1px, transparent 7px)',
-          mixBlendMode: mode === 'dark' ? 'overlay' : 'multiply',
+              ? `radial-gradient(900px 600px at 12% 8%, ${alpha(theme.palette.primary.main, 0.18)} 0%, transparent 60%),
+                 radial-gradient(700px 500px at 82% 20%, ${alpha(theme.palette.secondary.main, 0.10)} 0%, transparent 60%)`
+              : `radial-gradient(900px 600px at 12% 8%, ${alpha(theme.palette.primary.main, 0.10)} 0%, transparent 60%),
+                 radial-gradient(700px 500px at 82% 20%, ${alpha(theme.palette.secondary.main, 0.08)} 0%, transparent 60%)`,
         },
       }}
     >
@@ -174,24 +168,9 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                 width: 'auto',
               }}
             />
-            <Chip
-              size="small"
-              label="Beta"
-              sx={{
-                fontWeight: 650,
-                borderRadius: 999,
-                bgcolor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.22 : 0.12),
-                color: 'text.primary',
-                border: `1px solid ${alpha(theme.palette.primary.main, mode === 'dark' ? 0.35 : 0.22)}`,
-              }}
-            />
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Personal finance, without the mess
-            </Typography>
-            <IconButton
+          <IconButton
               aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               onClick={toggleMode}
               sx={{
@@ -209,45 +188,53 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                 <DarkModeOutlinedIcon fontSize="small" />
               )}
             </IconButton>
-          </Box>
         </Box>
 
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '1.15fr 0.85fr' },
-            gap: { xs: 6, md: 10 },
+            gridTemplateColumns: { xs: '1fr', md: '1.1fr 0.9fr' },
+            gap: { xs: 5, md: 8 },
             alignItems: 'center',
           }}
         >
           <Box>
+            <Chip
+              size="small"
+              label="Private beta"
+              sx={{
+                mb: 2,
+                fontWeight: 650,
+                borderRadius: 999,
+                bgcolor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.18 : 0.10),
+                color: 'text.primary',
+                border: `1px solid ${alpha(theme.palette.primary.main, mode === 'dark' ? 0.30 : 0.18)}`,
+              }}
+            />
             <Typography
               variant="h2"
               component="h1"
               sx={{
-                fontSize: { xs: 42, sm: 52, md: 58 },
-                lineHeight: 1.03,
+                fontSize: { xs: 40, sm: 50, md: 56 },
+                lineHeight: 1.02,
                 mb: 2,
+                maxWidth: 620,
               }}
             >
-              Your money,
-              <Box component="span" sx={{ color: 'primary.main' }}>
-                {' '}
-                beautifully organized.
-              </Box>
+              A calmer home for your money.
             </Typography>
 
-            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 620, mb: 4, fontWeight: 500 }}>
-              Connect your bank with Plaid, upload Amex statements, and keep your spending in one calm place.
+            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 560, mb: 4, fontWeight: 500 }}>
+              Track spending, import transactions, and keep everything tidy without turning the app into a spreadsheet.
             </Typography>
 
-            <Stack spacing={2.25} sx={{ mb: 4 }}>
+            <Stack spacing={2} sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
                 <Box
                   sx={{
                     mt: '2px',
-                    width: 36,
-                    height: 36,
+                    width: 34,
+                    height: 34,
                     borderRadius: 12,
                     display: 'grid',
                     placeItems: 'center',
@@ -258,12 +245,11 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   <LockOutlinedIcon fontSize="small" />
                 </Box>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 650, mb: 0.25 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 650, mb: 0.2 }}>
                     Private by default
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
-                    Your data stays in your account. Sign in with OAuth or email/password and manage access with
-                    Supabase auth + RLS.
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
+                    Your data stays in your workspace with Supabase auth and row-level security behind the scenes.
                   </Typography>
                 </Box>
               </Box>
@@ -272,8 +258,8 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                 <Box
                   sx={{
                     mt: '2px',
-                    width: 36,
-                    height: 36,
+                    width: 34,
+                    height: 34,
                     borderRadius: 12,
                     display: 'grid',
                     placeItems: 'center',
@@ -284,11 +270,11 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   <CategoryOutlinedIcon fontSize="small" />
                 </Box>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 650, mb: 0.25 }}>
-                    Faster categorization
+                  <Typography variant="subtitle1" sx={{ fontWeight: 650, mb: 0.2 }}>
+                    Less cleanup work
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
-                    Tag transactions consistently and keep your budgets clean — with rules you control.
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
+                    Rules help keep categories consistent, so you spend less time fixing transaction history by hand.
                   </Typography>
                 </Box>
               </Box>
@@ -297,8 +283,8 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                 <Box
                   sx={{
                     mt: '2px',
-                    width: 36,
-                    height: 36,
+                    width: 34,
+                    height: 34,
                     borderRadius: 12,
                     display: 'grid',
                     placeItems: 'center',
@@ -309,60 +295,72 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   <AutoGraphOutlinedIcon fontSize="small" />
                 </Box>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 650, mb: 0.25 }}>
-                    Clear insights
+                  <Typography variant="subtitle1" sx={{ fontWeight: 650, mb: 0.2 }}>
+                    Clean reporting
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
-                    Understand trends at a glance — monthly spending, balances, and recent activity in one place.
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
+                    See spending, balances, and recent activity in one place, without a crowded dashboard.
                   </Typography>
                 </Box>
               </Box>
             </Stack>
 
-            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
-              <Chip
-                size="small"
-                label="Plaid bank connections"
-                sx={{
-                  fontWeight: 600,
-                  bgcolor: alpha(theme.palette.success.main, mode === 'dark' ? 0.16 : 0.1),
-                }}
-              />
-              <Chip
-                size="small"
-                label="Amex statement upload today"
-                sx={{
-                  fontWeight: 600,
-                  bgcolor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.16 : 0.1),
-                }}
-              />
-              <Typography variant="body2" color="text.secondary">
-                Manual statement upload is currently focused on Amex. Other banks are best connected through Plaid.
-              </Typography>
-            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
+              Plaid handles bank connections. Manual uploads are available for Amex statements today.
+            </Typography>
           </Box>
 
           <Paper
             elevation={0}
             sx={{
               p: { xs: 3, sm: 3.5 },
-              borderRadius: 1.5,
+              borderRadius: 2,
               border: `1px solid ${alpha(theme.palette.divider, mode === 'dark' ? 0.9 : 0.7)}`,
-              bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.35 : 0.7),
+              bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.52 : 0.82),
               backdropFilter: 'blur(12px)',
               boxShadow:
                 mode === 'dark'
-                  ? '0 20px 60px rgba(0,0,0,0.55)'
-                  : '0 20px 60px rgba(15,23,42,0.14)',
+                  ? '0 20px 60px rgba(0,0,0,0.45)'
+                  : '0 18px 50px rgba(15,23,42,0.10)',
             }}
           >
+            <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
+              <Button
+                fullWidth
+                variant={emailMode === 'signup' ? 'contained' : 'text'}
+                onClick={() => {
+                  setMessage(null);
+                  setPassword('');
+                  setConfirmPassword('');
+                  setEmailMode('signup');
+                }}
+                disabled={emailSubmitting || !!loggingIn}
+                sx={{ textTransform: 'none' }}
+              >
+                Create account
+              </Button>
+              <Button
+                fullWidth
+                variant={emailMode === 'signin' ? 'contained' : 'text'}
+                onClick={() => {
+                  setMessage(null);
+                  setPassword('');
+                  setConfirmPassword('');
+                  setEmailMode('signin');
+                }}
+                disabled={emailSubmitting || !!loggingIn}
+                sx={{ textTransform: 'none' }}
+              >
+                Sign in
+              </Button>
+            </Stack>
             <Typography variant="h5" component="h2" sx={{ mb: 0.75 }}>
-              {emailMode === 'signin' ? 'Sign in' : 'Create account'}
+              {emailMode === 'signin' ? 'Welcome back' : 'Create your account'}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               {emailMode === 'signin'
-                ? 'Continue with a provider or email/password to access your dashboard.'
-                : 'Create an account with email/password, or continue with a provider.'}
+                ? 'Use a provider or email to get back to your dashboard.'
+                : 'Start with Google, GitHub, or email. Setup takes about a minute.'}
             </Typography>
 
             <Stack spacing={1.5}>
@@ -380,7 +378,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   py: 1.25,
                 }}
               >
-                {loggingIn === 'google' ? 'Signing in…' : 'Continue with Google'}
+                {loggingIn === 'google' ? 'Signing in…' : emailMode === 'signup' ? 'Continue with Google' : 'Sign in with Google'}
               </Button>
 
               <Button
@@ -403,7 +401,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   },
                 }}
               >
-                {loggingIn === 'github' ? 'Signing in…' : 'Continue with GitHub'}
+                {loggingIn === 'github' ? 'Signing in…' : emailMode === 'signup' ? 'Continue with GitHub' : 'Sign in with GitHub'}
               </Button>
             </Stack>
 
@@ -415,7 +413,10 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   label="Email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (message) setMessage(null);
+                  }}
                   autoComplete="email"
                   fullWidth
                   size="medium"
@@ -425,7 +426,10 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                   label="Password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (message) setMessage(null);
+                  }}
                   autoComplete={emailMode === 'signup' ? 'new-password' : 'current-password'}
                   fullWidth
                   size="medium"
@@ -436,7 +440,10 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                     label="Confirm password"
                     type="password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (message) setMessage(null);
+                    }}
                     autoComplete="new-password"
                     fullWidth
                     size="medium"
@@ -463,23 +470,11 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                       ? 'Sign in with email'
                       : 'Create account'}
                 </Button>
-
-                <Button
-                  variant="text"
-                  onClick={() => {
-                    setMessage(null);
-                    setEmailMode((m) => (m === 'signin' ? 'signup' : 'signin'));
-                  }}
-                  disabled={emailSubmitting || !!loggingIn}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {emailMode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-                </Button>
               </Stack>
             </Box>
 
             <Typography variant="caption" color="text.secondary">
-              By continuing, you agree to store your imported statements in your own workspace.
+              Imported data stays in your own workspace.
             </Typography>
           </Paper>
         </Box>
