@@ -121,6 +121,15 @@ Migrations live in `supabase/migrations/`. Apply via Supabase CLI (`supabase db 
 - `009–010` Category presets + seed data
 - `011` Categorization feedback
 
+## UI Conventions (web/)
+
+- **Shell**: `app/components/AppShell.tsx` renders a collapsible left sidebar (desktop) / drawer (mobile) with grouped nav, the user menu (theme: light/dark/system, sign out) and wraps authenticated routes in `RequireAuth`. `/login` and `/auth/*` render without the shell.
+- **Theme**: `lib/theme.ts` holds all design tokens and MUI component overrides (hairline borders, 12–14px radii, flat cards, uppercase table headers). `chartPalette` is exported for Recharts series. `lib/themeMode.tsx` persists a `light | dark | system` preference and exposes `themeInitScript` (inlined in `app/layout.tsx`) to avoid a theme flash.
+- **Shared primitives** live in `app/components/ui/` and should be used instead of ad-hoc markup: `PageHeader`, `StatCard`, `SectionCard`, `EmptyState`, `Money`, `CategoryChip`, `BankLogo`, `ChartTooltip`, `PageSkeleton`, `SegmentedControl`, `StatusChip`.
+- **Feedback**: `useToast()` (`app/components/ToastProvider.tsx`) for transient success/error; `useConfirm()` (`app/components/ConfirmProvider.tsx`) for confirmations. Never use `alert()` / `window.confirm()`.
+- **Formatting**: `lib/format.ts` (`formatMoney`, `formatSignedMoney`, `formatCompactMoney`, `formatDate`, `formatRelative`, `plural`, …). Amount convention: expenses are stored positive, income negative; `Money` accepts `stored={amount}` and flips the sign for display.
+- **Layout**: prefer `Box` with CSS grid over legacy MUI `Grid item`. Loading states use skeletons, not spinners. Empty states use `EmptyState`.
+
 ## Coding Conventions
 
 - TypeScript strict mode throughout; no `any` unless unavoidable

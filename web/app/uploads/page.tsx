@@ -5,13 +5,7 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  IconButton,
   Stack,
   Table,
   TableBody,
@@ -19,11 +13,18 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import UndoIcon from '@mui/icons-material/Undo';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import UndoIcon from '@mui/icons-material/UndoRounded';
+import RefreshIcon from '@mui/icons-material/RefreshRounded';
+import HistoryIcon from '@mui/icons-material/HistoryRounded';
+import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
+import { formatDateTime, formatRelative, plural } from '../../lib/format';
+import { PageHeader, SectionCard, EmptyState, BankLogo, StatusChip, PageSkeleton } from '../components/ui';
+import { useToast } from '../components/ToastProvider';
+import { useConfirm } from '../components/ConfirmProvider';
 
 type UploadWithAccount = {
   id: string;
@@ -42,22 +43,14 @@ type UploadWithAccount = {
 
 const canUndoStatus = new Set(['succeeded', 'reverse_failed']);
 
-function statusChipColor(status: string): 'default' | 'success' | 'warning' | 'error' | 'info' {
-  if (status === 'succeeded') return 'success';
-  if (status === 'reversing') return 'warning';
-  if (status === 'reversed') return 'default';
-  if (status === 'reverse_failed' || status === 'failed') return 'error';
-  if (status === 'processing' || status === 'uploaded') return 'info';
-  return 'default';
-}
-
 export default function UploadsPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<UploadWithAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<string>('');
-  const [undoTarget, setUndoTarget] = useState<UploadWithAccount | null>(null);
   const [undoingId, setUndoingId] = useState<string | null>(null);
 
   const loadUploads = useCallback(async () => {
@@ -86,157 +79,165 @@ export default function UploadsPage() {
     void loadUploads();
   }, [loadUploads]);
 
-  const handleUndo = async () => {
-    if (!undoTarget) return;
+  const handleUndo = async (target: UploadWithAccount) => {
+    const ok = await confirm({
+      title: 'Undo this upload?',
+      description: `Transactions created by "${target.original_filename}" will be deleted and the file removed from storage. This cannot be reversed.`,
+      confirmLabel: 'Undo upload',
+      destructive: true,
+    });
+    if (!ok) return;
 
-    setUndoingId(undoTarget.id);
-    setMessage('');
+    setUndoingId(target.id);
     setError('');
-
     try {
       const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
       if (sessionErr) throw sessionErr;
       const token = sessionData.session?.access_token;
       if (!token) throw new Error('Missing session access token.');
 
-      const resp = await fetch(`/api/uploads/${encodeURIComponent(undoTarget.id)}/undo`, {
+      const resp = await fetch(`/api/uploads/${encodeURIComponent(target.id)}/undo`, {
         method: 'POST',
         headers: { authorization: `Bearer ${token}` },
       });
       const body = (await resp.json()) as { error?: string; rowsReversed?: number };
       if (!resp.ok) throw new Error(body.error ?? `HTTP ${resp.status}`);
 
-      setMessage(
-        `Upload "${undoTarget.original_filename}" reversed. ${body.rowsReversed ?? 0} transaction(s) removed.`
-      );
-      setUndoTarget(null);
+      toast.success(`"${target.original_filename}" reversed. ${plural(body.rowsReversed ?? 0, 'transaction')} removed.`);
       await loadUploads();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setUndoingId(null);
     }
   };
 
+  const header = (
+    <PageHeader
+      title="Upload history"
+      description="Every statement you've imported, with the option to reverse it."
+      actions={
+        <Tooltip title="Refresh">
+          <span>
+            <IconButton onClick={() => void loadUploads()} disabled={loading} aria-label="Refresh uploads">
+              <RefreshIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+      }
+    />
+  );
+
+  if (loading && rows.length === 0) {
+    return (
+      <Box>
+        {header}
+        <PageSkeleton stats={0} rows={5} />
+      </Box>
+    );
+  }
+
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={1}>
-        <Typography variant="h4">Upload history</Typography>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={() => void loadUploads()}
-          disabled={loading}
-        >
-          Refresh
-        </Button>
-      </Box>
+      {header}
 
-      {message ? <Alert sx={{ mb: 2 }}>{message}</Alert> : null}
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       ) : null}
 
-      <Card>
-        <CardContent>
-          {loading ? (
-            <Typography color="text.secondary">Loading uploads...</Typography>
-          ) : rows.length === 0 ? (
-            <Typography color="text.secondary">No uploads yet.</Typography>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>File</TableCell>
-                    <TableCell>Account</TableCell>
-                    <TableCell>Bank</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Rows</TableCell>
-                    <TableCell>Created</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {rows.map((u) => {
-                    const undoable = canUndoStatus.has(u.status);
-                    const isUndoing = undoingId === u.id;
-                    return (
-                      <TableRow key={u.id} hover>
-                        <TableCell>
-                          <Stack spacing={0.5}>
-                            <Typography variant="body2">{u.original_filename}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Type: {u.file_type}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>{u.accounts?.name ?? 'Unknown'}</TableCell>
-                        <TableCell>{u.bank}</TableCell>
-                        <TableCell>
-                          <Chip size="small" label={u.status} color={statusChipColor(u.status)} />
-                          {u.error ? (
-                            <Typography variant="caption" color="error.main" display="block">
-                              {u.error}
-                            </Typography>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          {u.status === 'reversed'
-                            ? `${u.rows_reversed ?? 0} reversed`
-                            : `${u.rows_processed ?? 0} processed`}
-                        </TableCell>
-                        <TableCell>{new Date(u.created_at).toLocaleString()}</TableCell>
-                        <TableCell align="right">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<UndoIcon />}
-                            disabled={!undoable || isUndoing}
-                            onClick={() => setUndoTarget(u)}
-                          >
-                            Undo
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={Boolean(undoTarget)} onClose={() => setUndoTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Undo upload?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            This will delete transactions created by this upload and remove the uploaded file from
-            storage. This action cannot be undone.
-          </Typography>
-          {undoTarget ? (
-            <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-              {undoTarget.original_filename}
-            </Typography>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUndoTarget(null)} disabled={Boolean(undoingId)}>
-            Cancel
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void handleUndo()}
-            disabled={!undoTarget || Boolean(undoingId)}
-          >
-            Undo upload
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={<HistoryIcon />}
+          title="No uploads yet"
+          description="Imported statements will show up here so you can review or undo them."
+          actions={
+            <Button variant="contained" onClick={() => router.push('/upload')}>
+              Upload a statement
+            </Button>
+          }
+        />
+      ) : (
+        <SectionCard disablePadding>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>File</TableCell>
+                  <TableCell>Account</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Rows</TableCell>
+                  <TableCell>Uploaded</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rows.map((u) => {
+                  const undoable = canUndoStatus.has(u.status);
+                  const isUndoing = undoingId === u.id;
+                  return (
+                    <TableRow key={u.id} hover>
+                      <TableCell sx={{ maxWidth: 320 }}>
+                        <Typography variant="body2" noWrap sx={{ fontWeight: 560 }}>
+                          {u.original_filename}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase' }}>
+                          {u.file_type}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" gap={1}>
+                          <BankLogo bank={u.bank} size={24} />
+                          <Typography variant="body2" noWrap>
+                            {u.accounts?.name ?? 'Unknown'}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <StatusChip status={u.status} />
+                        {u.error ? (
+                          <Typography variant="caption" color="error.main" display="block" sx={{ mt: 0.5, maxWidth: 260 }}>
+                            {u.error}
+                          </Typography>
+                        ) : null}
+                      </TableCell>
+                      <TableCell align="right" className="tabular-nums">
+                        <Typography variant="body2">
+                          {u.status === 'reversed' ? u.rows_reversed ?? 0 : u.rows_processed ?? 0}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {u.status === 'reversed' ? 'reversed' : 'processed'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" noWrap>
+                          {formatDateTime(u.created_at)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatRelative(u.created_at)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="inherit"
+                          startIcon={<UndoIcon />}
+                          disabled={!undoable || isUndoing || Boolean(undoingId)}
+                          onClick={() => void handleUndo(u)}
+                        >
+                          {isUndoing ? 'Undoing…' : 'Undo'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </SectionCard>
+      )}
     </Box>
   );
 }

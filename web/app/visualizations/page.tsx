@@ -3,36 +3,32 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Badge,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Collapse,
   FormControl,
-  FormControlLabel,
-  Grid,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  Switch,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import {
   TrendingDown as TrendingDownIcon,
   TrendingUp as TrendingUpIcon,
   Lightbulb as LightbulbIcon,
-  Category as CategoryIcon,
-  Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon,
+  ErrorOutline as ErrorIcon,
   UploadFile as UploadFileIcon,
   FilterList as FilterListIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  AccountBalanceWallet as WalletIcon,
+  CalendarMonth as CalendarIcon,
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import {
@@ -47,12 +43,23 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as ReTooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import { formatUnknownError } from '../../lib/errors';
+import { chartPalette } from '../../lib/theme';
+import { formatCompactMoney, formatDate, formatMoney, formatSignedMoney, parseDateOnly, plural } from '../../lib/format';
+import {
+  ChartTooltip,
+  EmptyState,
+  Money,
+  PageHeader,
+  PageSkeleton,
+  SectionCard,
+  SegmentedControl,
+  StatCard,
+} from '../components/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,32 +95,7 @@ const PERIOD_OPTIONS: { value: Period; label: string }[] = [
   { value: 'custom', label: 'Custom' },
 ];
 
-const CATEGORY_COLORS = [
-  '#6366f1',
-  '#f59e0b',
-  '#10b981',
-  '#ec4899',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ef4444',
-  '#14b8a6',
-  '#f97316',
-  '#84cc16',
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-function fmtAxis(value: number): string {
-  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-  return `$${value}`;
-}
 
 function getPeriodStart(period: Period): string | null {
   if (period === 'all' || period === 'custom') return null;
@@ -149,7 +131,7 @@ function buildMonthlyData(txs: AnalyticsTransaction[]): MonthRow[] {
   return Array.from(map.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, v]) => ({
-      month: new Date(key + '-01').toLocaleDateString('en-US', {
+      month: parseDateOnly(key + '-01').toLocaleDateString('en-US', {
         month: 'short',
         year: '2-digit',
       }),
@@ -205,7 +187,7 @@ function buildInsights(
     const rate = (saved / totalIncome) * 100;
     insights.push({
       severity: 'success',
-      message: `Savings rate of ${Math.round(rate)}% — you kept $${fmt(saved)} this period. Keep it up.`,
+      message: `Savings rate of ${Math.round(rate)}% — you kept ${formatMoney(saved)} this period. Keep it up.`,
     });
   }
 
@@ -213,7 +195,7 @@ function buildInsights(
   if (totalIncome > 0 && totalExpenses > totalIncome) {
     insights.push({
       severity: 'error',
-      message: `You overspent by $${fmt(totalExpenses - totalIncome)} this period. Review your top spending categories below.`,
+      message: `You overspent by ${formatMoney(totalExpenses - totalIncome)} this period. Review your top spending categories below.`,
     });
   }
 
@@ -223,7 +205,7 @@ function buildInsights(
     const saving = topCat.amount * 0.1;
     insights.push({
       severity: 'info',
-      message: `${topCat.name} is ${Math.round(topCat.pct)}% of your spending ($${fmt(topCat.amount)}). A 10% reduction there would save you $${fmt(saving)}/period.`,
+      message: `${topCat.name} is ${Math.round(topCat.pct)}% of your spending (${formatMoney(topCat.amount)}). A 10% reduction there would save you ${formatMoney(saving)}/period.`,
     });
   }
 
@@ -240,41 +222,47 @@ function buildInsights(
   return insights;
 }
 
-// ─── Chart sub-components ─────────────────────────────────────────────────────
+// ─── Small presentational pieces ──────────────────────────────────────────────
 
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
+function LegendRow(props: { items: { label: string; color: string }[] }) {
+  return (
+    <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+      {props.items.map((it) => (
+        <Stack key={it.label} direction="row" spacing={0.75} alignItems="center">
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: it.color }} />
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+            {it.label}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
+function InsightIcon(props: { severity: Insight['severity'] }) {
+  const theme = useTheme();
+  const map = {
+    success: { color: theme.palette.success.main, Icon: CheckCircleIcon },
+    warning: { color: theme.palette.warning.main, Icon: WarningIcon },
+    error: { color: theme.palette.error.main, Icon: ErrorIcon },
+    info: { color: theme.palette.info.main, Icon: InfoIcon },
+  } as const;
+  const { color, Icon } = map[props.severity];
   return (
     <Box
       sx={{
-        bgcolor: 'background.paper',
-        border: '1px solid',
-        borderColor: 'divider',
+        width: 28,
+        height: 28,
         borderRadius: 2,
-        p: 1.5,
-        boxShadow: 4,
+        display: 'grid',
+        placeItems: 'center',
+        flexShrink: 0,
+        color,
+        bgcolor: alpha(color, theme.palette.mode === 'dark' ? 0.16 : 0.1),
+        '& svg': { fontSize: 16 },
       }}
     >
-      {label && (
-        <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-          {label}
-        </Typography>
-      )}
-      {payload.map((entry: any) => (
-        <Box key={entry.name} display="flex" alignItems="center" gap={1}>
-          <Box
-            sx={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              bgcolor: entry.color ?? entry.fill,
-            }}
-          />
-          <Typography variant="body2">
-            {entry.name}: ${fmt(Math.abs(entry.value))}
-          </Typography>
-        </Box>
-      ))}
+      <Icon />
     </Box>
   );
 }
@@ -333,7 +321,6 @@ export default function AnalyticsPage() {
           console.error('AnalyticsPage query error:', error);
           throw error;
         }
-        console.log('AnalyticsPage query result:', { dataCount: data?.length ?? 0, period, startDate, endDate, sample: data?.[0] });
         if (!cancelled) {
           setTransactions(
             (data ?? []).map((r: any) => ({
@@ -388,6 +375,7 @@ export default function AnalyticsPage() {
       net: totalIncome - totalExpenses,
       avgMonthlyExpense: totalExpenses / Math.max(months.size, 1),
       uncategorized,
+      monthCount: months.size,
     };
   }, [filteredTransactions]);
 
@@ -414,313 +402,259 @@ export default function AnalyticsPage() {
   );
 
   const incomeColor = theme.palette.success.main;
-  const expenseColor = theme.palette.error.main;
+  const expenseColor = alpha(theme.palette.error.main, 0.85);
+  const gridStroke = theme.palette.divider;
+  const tickStyle = { fontSize: 12, fill: theme.palette.text.secondary };
+
+  const hasCustomDates = period === 'custom' && Boolean(customStartDate || customEndDate);
+  const activeFilterCount = (transactionType !== 'all' ? 1 : 0) + (hasCustomDates ? 1 : 0);
+
+  const handlePeriodChange = (value: Period) => {
+    setPeriod(value);
+    if (value !== 'custom') {
+      setCustomStartDate('');
+      setCustomEndDate('');
+    } else {
+      setShowAdvancedFilters(true);
+    }
+  };
+
+  const header = (
+    <PageHeader
+      eyebrow="Insights"
+      title="Charts"
+      description="A visual read on the same data behind your narrative summaries."
+      actions={
+        <>
+          <SegmentedControl
+            value={period}
+            onChange={handlePeriodChange}
+            options={PERIOD_OPTIONS}
+            aria-label="Time period"
+          />
+          <Badge badgeContent={activeFilterCount} color="primary" overlap="rectangular">
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              startIcon={<FilterListIcon />}
+              endIcon={showAdvancedFilters ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              onClick={() => setShowAdvancedFilters((v) => !v)}
+            >
+              Filters
+            </Button>
+          </Badge>
+        </>
+      }
+    >
+      <Collapse in={showAdvancedFilters}>
+        <SectionCard sx={{ mb: 1 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: period === 'custom' ? '1fr 1fr 1fr' : '1fr' },
+              gap: 2,
+            }}
+          >
+            {period === 'custom' ? (
+              <>
+                <TextField
+                  fullWidth
+                  label="Start date"
+                  type="date"
+                  size="small"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  fullWidth
+                  label="End date"
+                  type="date"
+                  size="small"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </>
+            ) : null}
+            <FormControl fullWidth size="small">
+              <InputLabel>Transaction type</InputLabel>
+              <Select
+                value={transactionType}
+                label="Transaction type"
+                onChange={(e) => setTransactionType(e.target.value as TransactionType)}
+              >
+                <MenuItem value="all">All transactions</MenuItem>
+                <MenuItem value="income">Income only</MenuItem>
+                <MenuItem value="expenses">Expenses only</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </SectionCard>
+      </Collapse>
+    </PageHeader>
+  );
 
   // ── Render guards ───────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <Typography color="text.secondary">Loading analytics…</Typography>
-      </Box>
-    );
+    return <PageSkeleton stats={4} chart rows={4} />;
   }
 
   if (loadError) {
     return (
       <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-          <Typography variant="h4">Insights: Charts</Typography>
-          <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
-            Back to insights
-          </Button>
-        </Box>
+        {header}
         <Alert severity="error">Failed to load data: {loadError}</Alert>
       </Box>
     );
   }
 
   if (filteredTransactions.length === 0) {
-    const hasPeriodFilter = period !== 'all';
-    const hasCustomDateFilter = period === 'custom' && Boolean(customStartDate || customEndDate);
-    const hasFilters = hasPeriodFilter || transactionType !== 'all' || hasCustomDateFilter;
+    const hasFilters = period !== 'all' || transactionType !== 'all' || hasCustomDates;
     return (
       <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-          <Typography variant="h4">Insights: Charts</Typography>
-          <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
-            Back to insights
-          </Button>
-        </Box>
-        <Card
-          sx={{
-            minHeight: '60vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            cursor: hasFilters ? 'default' : 'pointer',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': hasFilters ? {} : { transform: 'translateY(-3px)', boxShadow: theme.shadows[3] },
-          }}
-          onClick={hasFilters ? undefined : () => router.push('/upload')}
-        >
-          <CardContent sx={{ textAlign: 'center' }}>
-            <UploadFileIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
-            <Typography variant="h5" gutterBottom>
-              No transactions for this period
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 420, mx: 'auto' }}>
-              {hasFilters
-                ? 'Try adjusting your filters or selecting a different time period.'
-                : 'Upload bank statements to start seeing spending insights and trends.'}
-            </Typography>
-          </CardContent>
-        </Card>
+        {header}
+        <EmptyState
+          size="lg"
+          icon={hasFilters ? <CalendarIcon /> : <UploadFileIcon />}
+          title={hasFilters ? 'No transactions for this period' : 'No transactions yet'}
+          description={
+            hasFilters
+              ? 'Try a wider time period or clear the filters to see your charts.'
+              : 'Upload a statement or connect a bank to start seeing spending trends.'
+          }
+          actions={
+            hasFilters ? (
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => {
+                  setPeriod('all');
+                  setTransactionType('all');
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : (
+              <Button variant="contained" onClick={() => router.push('/upload')}>
+                Upload a statement
+              </Button>
+            )
+          }
+        />
       </Box>
     );
   }
+
+  const categoryTotal = categoryData.reduce((s, c) => s + c.amount, 0);
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
   return (
     <Box>
-      {/* ── Header ── */}
-      <Box mb={3}>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={2}
-          flexWrap="wrap"
-          gap={2}
-        >
-          <Box>
-            <Typography variant="h4">Insights: Charts</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Use charts when you want a visual read on the same data behind narrative insights.
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
-              Back to insights
-            </Button>
-            <Stack direction="row" spacing={0.5}>
-              {PERIOD_OPTIONS.map((opt) => (
-                <Chip
-                  key={opt.value}
-                  label={opt.label}
-                  onClick={() => {
-                    setPeriod(opt.value);
-                    if (opt.value !== 'custom') {
-                      setCustomStartDate('');
-                      setCustomEndDate('');
-                    }
-                  }}
-                  color={period === opt.value ? 'primary' : 'default'}
-                  variant={period === opt.value ? 'filled' : 'outlined'}
-                  sx={{ fontWeight: period === opt.value ? 600 : 400 }}
-                />
-              ))}
-            </Stack>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<FilterListIcon />}
-              endIcon={showAdvancedFilters ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            >
-              Filters
-            </Button>
-          </Stack>
-        </Box>
-
-        {/* ── Advanced Filters ── */}
-        <Collapse in={showAdvancedFilters}>
-          <Card sx={{ mb: 2 }}>
-            <CardContent>
-              <Grid container spacing={2} alignItems="center">
-                {period === 'custom' && (
-                  <>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        fullWidth
-                        label="Start Date"
-                        type="date"
-                        size="small"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        fullWidth
-                        label="End Date"
-                        type="date"
-                        size="small"
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                  </>
-                )}
-                <Grid item xs={12} sm={6} md={period === 'custom' ? 6 : 12}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Transaction Type</InputLabel>
-                    <Select
-                      value={transactionType}
-                      label="Transaction Type"
-                      onChange={(e) => setTransactionType(e.target.value as TransactionType)}
-                    >
-                      <MenuItem value="all">All Transactions</MenuItem>
-                      <MenuItem value="income">Income Only</MenuItem>
-                      <MenuItem value="expenses">Expenses Only</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Collapse>
-      </Box>
+      {header}
 
       {/* ── KPI cards ── */}
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
-                <TrendingDownIcon color="success" />
-                <Typography variant="h6" color="success.main">
-                  ${fmt(stats.totalIncome)}
-                </Typography>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Total Income
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
-                <TrendingUpIcon color="error" />
-                <Typography variant="h6" color="error.main">
-                  ${fmt(stats.totalExpenses)}
-                </Typography>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Total Expenses
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography
-                variant="h6"
-                color={stats.net >= 0 ? 'success.main' : 'error.main'}
-              >
-                {stats.net >= 0 ? '+' : ''}${fmt(stats.net)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Net Cash Flow
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h6" color="primary">
-                ${fmt(stats.avgMonthlyExpense)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Avg Monthly Spend
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <StatCard
+          label="Income"
+          value={formatMoney(stats.totalIncome)}
+          tone="positive"
+          icon={<TrendingUpIcon />}
+          hint={`${plural(filteredTransactions.filter((t) => t.amount < 0).length, 'deposit')}`}
+        />
+        <StatCard
+          label="Spending"
+          value={formatMoney(stats.totalExpenses)}
+          icon={<TrendingDownIcon />}
+          hint={`${plural(filteredTransactions.filter((t) => t.amount > 0).length, 'expense')}`}
+        />
+        <StatCard
+          label="Net cash flow"
+          value={formatSignedMoney(stats.net)}
+          tone={stats.net >= 0 ? 'positive' : 'negative'}
+          icon={<WalletIcon />}
+          hint={stats.net >= 0 ? 'You kept more than you spent' : 'Spending exceeded income'}
+        />
+        <StatCard
+          label="Avg monthly spend"
+          value={formatMoney(stats.avgMonthlyExpense)}
+          icon={<CalendarIcon />}
+          hint={`Across ${plural(stats.monthCount, 'month')}`}
+        />
+      </Box>
 
       {/* ── Insights ── */}
       {insights.length > 0 && (
-        <Box mb={3}>
-          <Box display="flex" alignItems="center" gap={1} mb={1.5}>
-            <LightbulbIcon color="primary" fontSize="small" />
-            <Typography variant="subtitle1" fontWeight={600}>
-              Insights
-            </Typography>
-          </Box>
-          <Stack spacing={1}>
+        <SectionCard
+          title="What stands out"
+          icon={<LightbulbIcon />}
+          sx={{ mb: 3 }}
+          disablePadding
+        >
+          <Stack divider={<Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />}>
             {insights.map((insight, i) => (
-              <Alert
-                key={i}
-                severity={insight.severity}
-                icon={
-                  insight.severity === 'success' ? (
-                    <CheckCircleIcon />
-                  ) : insight.severity === 'warning' ? (
-                    <WarningIcon />
-                  ) : undefined
-                }
-              >
-                {insight.message}
-              </Alert>
+              <Stack key={i} direction="row" spacing={1.5} alignItems="flex-start" sx={{ px: 2.5, py: 1.5 }}>
+                <InsightIcon severity={insight.severity} />
+                <Typography variant="body2" sx={{ pt: 0.4 }}>
+                  {insight.message}
+                </Typography>
+              </Stack>
             ))}
           </Stack>
-        </Box>
+        </SectionCard>
       )}
 
       {/* ── Charts row 1: monthly bar + category donut ── */}
-      <Grid container spacing={2} mb={2}>
-        <Grid item xs={12} md={7}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                Monthly Income vs Expenses
-              </Typography>
-              <ResponsiveContainer width="100%" height={270}>
-                <BarChart data={monthlyData} barGap={4} barCategoryGap="28%">
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={alpha(theme.palette.divider, 0.7)}
-                  />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 12 }} />
-                  <ReTooltip content={<ChartTooltip />} />
-                  <Legend />
-                  <Bar dataKey="Income" fill={incomeColor} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Expenses" fill={expenseColor} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </Grid>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '7fr 5fr' },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <SectionCard title="Income vs. spending" description="By month">
+          <LegendRow
+            items={[
+              { label: 'Income', color: incomeColor },
+              { label: 'Spending', color: expenseColor },
+            ]}
+          />
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={monthlyData} barGap={4} barCategoryGap="28%">
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={gridStroke} />
+              <XAxis dataKey="month" tick={tickStyle} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={formatCompactMoney} tick={tickStyle} axisLine={false} tickLine={false} width={56} />
+              <ReTooltip content={<ChartTooltip />} cursor={{ fill: alpha(theme.palette.text.primary, 0.04) }} />
+              <Bar dataKey="Income" fill={incomeColor} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Expenses" name="Spending" fill={expenseColor} radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </SectionCard>
 
-        <Grid item xs={12} md={5}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                Spending by Category
+        <SectionCard title="Spending by category" description="Share of total spending">
+          {categoryData.length === 0 ? (
+            <Box display="flex" alignItems="center" justifyContent="center" height={260}>
+              <Typography variant="body2" color="text.secondary">
+                No expense data
               </Typography>
-              {categoryData.length === 0 ? (
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  height={270}
-                >
-                  <Typography variant="body2" color="text.secondary">
-                    No expense data
-                  </Typography>
-                </Box>
-              ) : (
-                <ResponsiveContainer width="100%" height={270}>
+            </Box>
+          ) : (
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+              <Box sx={{ position: 'relative', width: 220, height: 220, flexShrink: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
@@ -728,225 +662,203 @@ export default function AnalyticsPage() {
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      innerRadius={68}
-                      outerRadius={108}
+                      innerRadius={70}
+                      outerRadius={100}
                       paddingAngle={2}
+                      stroke="none"
                     >
                       {categoryData.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}
-                        />
+                        <Cell key={i} fill={chartPalette[i % chartPalette.length]} />
                       ))}
                     </Pie>
                     <ReTooltip content={<ChartTooltip />} />
-                    <Legend
-                      formatter={(value, entry: any) =>
-                        `${value} (${Math.round(entry.payload?.pct ?? 0)}%)`
-                      }
-                      iconSize={10}
-                      wrapperStyle={{ fontSize: 12 }}
-                    />
                   </PieChart>
                 </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* ── Spending trend area chart ── */}
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="subtitle1" fontWeight={600} mb={2}>
-            Monthly Spending Trend
-          </Typography>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={monthlyData}>
-              <defs>
-                <linearGradient id="expGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={expenseColor} stopOpacity={0.28} />
-                  <stop offset="95%" stopColor={expenseColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={alpha(theme.palette.divider, 0.7)}
-              />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 12 }} />
-              <ReTooltip content={<ChartTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="Expenses"
-                stroke={expenseColor}
-                strokeWidth={2}
-                fill="url(#expGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* ── Bottom row: top categories bar + largest expenses ── */}
-      <Grid container spacing={2} mb={2}>
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                Top Spending Categories
-              </Typography>
-              {categoryData.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No data
-                </Typography>
-              ) : (
-                <ResponsiveContainer width="100%" height={230}>
-                  <BarChart
-                    layout="vertical"
-                    data={categoryData.slice(0, 6)}
-                    margin={{ left: 8, right: 24 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      horizontal={false}
-                      stroke={alpha(theme.palette.divider, 0.7)}
-                    />
-                    <XAxis type="number" tickFormatter={fmtAxis} tick={{ fontSize: 12 }} />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={96}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <ReTooltip content={<ChartTooltip />} />
-                    <Bar dataKey="amount" name="Spent" radius={[0, 4, 4, 0]}>
-                      {categoryData.slice(0, 6).map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                Largest Expenses
-              </Typography>
-              <Stack spacing={1}>
-                {topExpenses.map((t) => (
-                  <Box
-                    key={t.id}
-                    display="flex"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    sx={{
-                      px: 1.5,
-                      py: 1,
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.action.hover, 0.5),
-                    }}
-                  >
-                    <Box minWidth={0} mr={1}>
-                      <Typography variant="body2" fontWeight={500} noWrap>
-                        {t.description}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(t.date).toLocaleDateString()} ·{' '}
-                        {t.category_name ?? 'Uncategorized'}
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      fontWeight={700}
-                      color="error.main"
-                      sx={{ whiteSpace: 'nowrap' }}
-                    >
-                      ${fmt(t.amount)}
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* ── Category breakdown table ── */}
-      {categoryData.length > 0 && (
-        <Card>
-          <CardContent>
-            <Typography variant="subtitle1" fontWeight={600} mb={2}>
-              Category Breakdown
-            </Typography>
-            <Grid container spacing={2}>
-              {categoryData.map((cat, i) => (
-                <Grid item xs={12} sm={6} md={4} key={cat.name}>
-                  <Box display="flex" alignItems="flex-start" gap={1.5} py={0.5}>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <Typography variant="overline" color="text.secondary">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" className="tabular-nums" sx={{ fontWeight: 650, letterSpacing: '-0.02em' }}>
+                    {formatCompactMoney(categoryTotal)}
+                  </Typography>
+                </Box>
+              </Box>
+              <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+                {categoryData.map((cat, i) => (
+                  <Stack key={cat.name} direction="row" alignItems="center" spacing={1}>
                     <Box
                       sx={{
-                        width: 10,
-                        height: 10,
+                        width: 8,
+                        height: 8,
                         borderRadius: '50%',
-                        bgcolor: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+                        bgcolor: chartPalette[i % chartPalette.length],
                         flexShrink: 0,
-                        mt: 0.5,
                       }}
                     />
-                    <Box flex={1} minWidth={0}>
-                      <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                      >
-                        <Typography variant="body2" noWrap>
-                          {cat.name}
-                        </Typography>
-                        <Typography variant="body2" fontWeight={600} ml={1}>
-                          ${fmt(cat.amount)}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          height: 4,
-                          borderRadius: 2,
-                          bgcolor: alpha(
-                            CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-                            0.18,
-                          ),
-                          mt: 0.5,
-                          position: 'relative',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            inset: 0,
-                            width: `${cat.pct}%`,
-                            bgcolor: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-                            borderRadius: 2,
-                          }}
-                        />
-                      </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {Math.round(cat.pct)}% of spending
+                    <Typography variant="body2" noWrap title={cat.name} sx={{ flex: 1, minWidth: 0 }}>
+                      {cat.name}
+                    </Typography>
+                    <Money value={cat.amount} cents={false} sx={{ fontWeight: 600 }} />
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      className="tabular-nums"
+                      sx={{ width: 36, textAlign: 'right' }}
+                    >
+                      {Math.round(cat.pct)}%
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Stack>
+          )}
+        </SectionCard>
+      </Box>
+
+      {/* ── Spending trend area chart ── */}
+      <SectionCard title="Monthly spending trend" sx={{ mb: 2 }}>
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={monthlyData}>
+            <defs>
+              <linearGradient id="expGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={theme.palette.error.main} stopOpacity={0.28} />
+                <stop offset="95%" stopColor={theme.palette.error.main} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={gridStroke} />
+            <XAxis dataKey="month" tick={tickStyle} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={formatCompactMoney} tick={tickStyle} axisLine={false} tickLine={false} width={56} />
+            <ReTooltip content={<ChartTooltip hideName />} />
+            <Area
+              type="monotone"
+              dataKey="Expenses"
+              name="Spending"
+              stroke={theme.palette.error.main}
+              strokeWidth={2}
+              fill="url(#expGradient)"
+              activeDot={{ r: 4, strokeWidth: 0 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </SectionCard>
+
+      {/* ── Bottom row: top categories bar + largest expenses ── */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <SectionCard title="Top spending categories">
+          {categoryData.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No data
+            </Typography>
+          ) : (
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart layout="vertical" data={categoryData.slice(0, 6)} margin={{ left: 8, right: 24 }}>
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={gridStroke} />
+                <XAxis type="number" tickFormatter={formatCompactMoney} tick={tickStyle} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={100} tick={tickStyle} axisLine={false} tickLine={false} />
+                <ReTooltip content={<ChartTooltip hideName />} cursor={{ fill: alpha(theme.palette.text.primary, 0.04) }} />
+                <Bar dataKey="amount" name="Spent" radius={[0, 6, 6, 0]}>
+                  {categoryData.slice(0, 6).map((_, i) => (
+                    <Cell key={i} fill={chartPalette[i % chartPalette.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Largest expenses" disablePadding>
+          <Stack divider={<Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />}>
+            {topExpenses.map((t) => (
+              <Stack
+                key={t.id}
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                spacing={2}
+                sx={{ px: 2.5, py: 1.25 }}
+              >
+                <Box minWidth={0}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                    {t.description}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                    {formatDate(t.date)} · {t.category_name ?? 'Uncategorized'}
+                  </Typography>
+                </Box>
+                <Money stored={t.amount} sx={{ fontWeight: 650 }} />
+              </Stack>
+            ))}
+          </Stack>
+        </SectionCard>
+      </Box>
+
+      {/* ── Category breakdown ── */}
+      {categoryData.length > 0 && (
+        <SectionCard title="Category breakdown" description="Share of spending per category">
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' },
+              gap: 2.5,
+            }}
+          >
+            {categoryData.map((cat, i) => {
+              const color = chartPalette[i % chartPalette.length];
+              return (
+                <Box key={cat.name}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
+                      <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                        {cat.name}
                       </Typography>
-                    </Box>
+                    </Stack>
+                    <Money value={cat.amount} sx={{ ml: 1 }} />
+                  </Stack>
+                  <Box
+                    sx={{
+                      height: 6,
+                      borderRadius: 999,
+                      bgcolor: alpha(color, 0.16),
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: `${cat.pct}%`,
+                        bgcolor: color,
+                        borderRadius: 999,
+                      }}
+                    />
                   </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    {Math.round(cat.pct)}% of spending
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+        </SectionCard>
       )}
     </Box>
   );

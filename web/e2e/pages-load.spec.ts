@@ -30,11 +30,15 @@ test.describe('pages load', () => {
     await signInWithEmail(page, { next: '/' });
 
     const routes: Array<{ path: string; heading: string | RegExp }> = [
-      { path: '/', heading: 'Dashboard' },
-      { path: '/accounts', heading: 'Manage Accounts' },
-      { path: '/upload', heading: 'Upload statements' },
+      { path: '/', heading: /^Good (morning|afternoon|evening)/ },
+      { path: '/accounts', heading: 'Accounts' },
+      { path: '/upload', heading: 'Upload statement' },
+      { path: '/uploads', heading: 'Upload history' },
       { path: '/transactions', heading: 'Transactions' },
-      { path: '/visualizations', heading: 'Analytics' },
+      { path: '/transactions/review', heading: 'Review suggestions' },
+      { path: '/visualizations', heading: 'Charts' },
+      { path: '/insights', heading: 'Summaries' },
+      { path: '/chat', heading: 'Assistant' },
       { path: '/categorization', heading: 'Categories' },
       { path: '/rules', heading: 'Rules' },
       { path: '/help', heading: 'Help' },
@@ -43,7 +47,7 @@ test.describe('pages load', () => {
 
     for (const r of routes) {
       await page.goto(r.path);
-      await expect(page.getByRole('heading', { name: r.heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: r.heading, level: 1 })).toBeVisible();
     }
   });
 });

@@ -6,6 +6,8 @@ import { getTheme } from '../lib/theme';
 import { ThemeModeProvider, useThemeMode } from '../lib/themeMode';
 import { AuthProvider } from '../lib/auth/AuthContext';
 import AppShell from './components/AppShell';
+import { ToastProvider } from './components/ToastProvider';
+import { ConfirmProvider } from './components/ConfirmProvider';
 
 function InnerProviders(props: { children: React.ReactNode }) {
   const { mode } = useThemeMode();
@@ -14,7 +16,11 @@ function InnerProviders(props: { children: React.ReactNode }) {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppShell>{props.children}</AppShell>
+      <ToastProvider>
+        <ConfirmProvider>
+          <AppShell>{props.children}</AppShell>
+        </ConfirmProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }
@@ -28,4 +34,3 @@ export default function Providers(props: { children: React.ReactNode }) {
     </AuthProvider>
   );
 }
-

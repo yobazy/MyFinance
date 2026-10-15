@@ -27,6 +27,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { getSafeNextPath } from '../../lib/auth/redirect';
 import { useThemeMode } from '../../lib/themeMode';
+import { SegmentedControl } from '../components/ui';
 
 export default function PublicLanding(props: { redirectIfAuthenticated?: boolean }) {
   const { signInWithOAuth, signInWithPassword, signUpWithPassword, loading, isAuthenticated } = useAuth();
@@ -159,15 +160,10 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <Box
-              component="img"
-              src={mode === 'dark' ? '/logo_dark.svg' : '/logo_light.svg'}
-              alt="MyFinance"
-              sx={{
-                height: 72,
-                width: 'auto',
-              }}
-            />
+            <Box component="img" src="/logo_mini.svg" alt="" sx={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <Typography variant="h6" component="span" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
+              MyFinance
+            </Typography>
           </Box>
 
           <IconButton
@@ -314,46 +310,29 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
             elevation={0}
             sx={{
               p: { xs: 3, sm: 3.5 },
-              borderRadius: 2,
-              border: `1px solid ${alpha(theme.palette.divider, mode === 'dark' ? 0.9 : 0.7)}`,
-              bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.52 : 0.82),
+              borderRadius: 4,
+              border: `1px solid ${theme.palette.divider}`,
+              bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.72 : 0.92),
               backdropFilter: 'blur(12px)',
-              boxShadow:
-                mode === 'dark'
-                  ? '0 20px 60px rgba(0,0,0,0.45)'
-                  : '0 18px 50px rgba(15,23,42,0.10)',
+              boxShadow: mode === 'dark' ? 'none' : `0 1px 2px ${alpha('#0F172A', 0.04)}`,
             }}
           >
-            <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
-              <Button
-                fullWidth
-                variant={emailMode === 'signup' ? 'contained' : 'text'}
-                onClick={() => {
-                  setMessage(null);
-                  setPassword('');
-                  setConfirmPassword('');
-                  setEmailMode('signup');
-                }}
-                disabled={emailSubmitting || !!loggingIn}
-                sx={{ textTransform: 'none' }}
-              >
-                Create account
-              </Button>
-              <Button
-                fullWidth
-                variant={emailMode === 'signin' ? 'contained' : 'text'}
-                onClick={() => {
-                  setMessage(null);
-                  setPassword('');
-                  setConfirmPassword('');
-                  setEmailMode('signin');
-                }}
-                disabled={emailSubmitting || !!loggingIn}
-                sx={{ textTransform: 'none' }}
-              >
-                Sign in
-              </Button>
-            </Stack>
+            <SegmentedControl
+              value={emailMode}
+              onChange={(next) => {
+                if (emailSubmitting || !!loggingIn) return;
+                setMessage(null);
+                setPassword('');
+                setConfirmPassword('');
+                setEmailMode(next);
+              }}
+              options={[
+                { value: 'signup', label: 'Create account', disabled: emailSubmitting || !!loggingIn },
+                { value: 'signin', label: 'Sign in', disabled: emailSubmitting || !!loggingIn },
+              ]}
+              aria-label="Email mode"
+              sx={{ mb: 3, width: '100%', '& .MuiToggleButton-root': { flex: 1 } }}
+            />
             <Typography variant="h5" component="h2" sx={{ mb: 0.75 }}>
               {emailMode === 'signin' ? 'Welcome back' : 'Create your account'}
             </Typography>
@@ -367,16 +346,14 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
               <Button
                 fullWidth
                 size="large"
-                variant="contained"
+                variant="outlined"
+                color="inherit"
                 startIcon={
                   loggingIn === 'google' ? <CircularProgress size={18} color="inherit" /> : <GoogleIcon />
                 }
                 onClick={() => handleLogin('google')}
                 disabled={!!loggingIn || emailSubmitting}
-                sx={{
-                  justifyContent: 'center',
-                  py: 1.25,
-                }}
+                sx={{ justifyContent: 'center', py: 1.25 }}
               >
                 {loggingIn === 'google' ? 'Signing in…' : emailMode === 'signup' ? 'Continue with Google' : 'Sign in with Google'}
               </Button>
@@ -385,21 +362,13 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
                 fullWidth
                 size="large"
                 variant="outlined"
+                color="inherit"
                 startIcon={
                   loggingIn === 'github' ? <CircularProgress size={18} color="inherit" /> : <GitHubIcon />
                 }
                 onClick={() => handleLogin('github')}
                 disabled={!!loggingIn || emailSubmitting}
-                sx={{
-                  py: 1.25,
-                  borderColor: alpha(theme.palette.text.primary, mode === 'dark' ? 0.28 : 0.18),
-                  color: 'text.primary',
-                  bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.18 : 0.35),
-                  '&:hover': {
-                    borderColor: alpha(theme.palette.text.primary, mode === 'dark' ? 0.40 : 0.26),
-                    bgcolor: alpha(theme.palette.background.paper, mode === 'dark' ? 0.24 : 0.48),
-                  },
-                }}
+                sx={{ justifyContent: 'center', py: 1.25 }}
               >
                 {loggingIn === 'github' ? 'Signing in…' : emailMode === 'signup' ? 'Continue with GitHub' : 'Sign in with GitHub'}
               </Button>
@@ -473,7 +442,7 @@ export default function PublicLanding(props: { redirectIfAuthenticated?: boolean
               </Stack>
             </Box>
 
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
               Imported data stays in your own workspace.
             </Typography>
           </Paper>

@@ -1,37 +1,37 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import NextLink from 'next/link';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
   Divider,
   FormControl,
-  Grid,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   type SelectChangeEvent,
   Typography,
 } from '@mui/material';
 import {
-  AccountBalance as AccountIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Category as CategoryIcon,
-  Link as LinkIcon,
-  TrendingUp as TrendingUpIcon,
-  Upload as UploadIcon,
+  AccountBalanceRounded as AccountIcon,
+  ArrowForwardRounded as ArrowForwardIcon,
+  AutoAwesomeRounded as AutoAwesomeIcon,
+  CategoryRounded as CategoryIcon,
+  ChevronRightRounded as ChevronRightIcon,
+  LinkRounded as LinkIcon,
+  ReceiptLongRounded as ReceiptIcon,
+  TrendingDownRounded as TrendingDownIcon,
+  TrendingUpRounded as TrendingUpIcon,
+  UploadFileRounded as UploadIcon,
+  WalletRounded as WalletIcon,
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -44,12 +44,25 @@ import { formatUnknownError } from '../lib/errors';
 import type { Account } from '../lib/types';
 import { useAuth } from '../lib/auth/AuthContext';
 import PublicLanding from './components/PublicLanding';
+import {
+  ChartTooltip,
+  EmptyState,
+  Money,
+  PageHeader,
+  PageSkeleton,
+  SectionCard,
+  SegmentedControl,
+  StatCard,
+  CategoryChip,
+} from './components/ui';
+import { formatCompactMoney, formatDate, formatMoney, formatShortDate, plural } from '../lib/format';
 
 type RecentTx = {
   date: string;
   description: string;
   amount: number;
   category_name?: string | null;
+  category_color?: string | null;
   account_name?: string | null;
   account_bank?: string | null;
 };
@@ -57,6 +70,7 @@ type RecentTx = {
 type DashboardData = {
   totalBalance: number;
   monthlySpending: number;
+  monthlyIncome: number;
   lastMonthTransactionDate: string | null;
   hasAnyTransactions: boolean;
   hasMonthTransactions: boolean;
@@ -69,6 +83,20 @@ type BalanceOverTime = {
 };
 
 type BalancePeriod = '1m' | '3m' | '6m' | '1y' | 'all';
+
+type NextStepAction = {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  path: string;
+};
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -190,7 +218,7 @@ export default function DashboardPage() {
         let recentTxQuery = supabase
           .from('transactions')
           .select(
-            'date,description,amount,accounts(name,bank),categories:categories!transactions_category_id_fkey(name)'
+            'date,description,amount,accounts(name,bank),categories:categories!transactions_category_id_fkey(name,color)'
           )
           .order('date', { ascending: false })
           .limit(8);
@@ -216,19 +244,25 @@ export default function DashboardPage() {
           return amt > 0 ? sum + amt : sum;
         }, 0);
 
+        const monthlyIncome = (monthRows ?? []).reduce((sum, r) => {
+          const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
+          return amt < 0 ? sum + Math.abs(amt) : sum;
+        }, 0);
+
         const lastMonthTransactionDate = hasMonthTransactions
           ? ((monthRows?.[0]?.date as string | undefined) ?? null)
           : null;
 
         const recentTransactions: RecentTx[] = (recentRows ?? []).map((r) => {
           const account = (r.accounts ?? null) as null | { name?: string; bank?: string };
-          const category = (r.categories ?? null) as null | { name?: string };
+          const category = (r.categories ?? null) as null | { name?: string; color?: string };
           const amt = typeof r.amount === 'number' ? r.amount : parseFloat(String(r.amount));
           return {
             date: String(r.date),
             description: String(r.description ?? ''),
             amount: amt,
             category_name: category?.name ?? null,
+            category_color: category?.color ?? null,
             account_name: account?.name ?? null,
             account_bank: account?.bank ?? null,
           };
@@ -237,6 +271,7 @@ export default function DashboardPage() {
         setDashboardData({
           totalBalance,
           monthlySpending,
+          monthlyIncome,
           lastMonthTransactionDate,
           hasAnyTransactions,
           hasMonthTransactions,
@@ -354,7 +389,7 @@ export default function DashboardPage() {
         // Convert to array and format for chart
         const balanceArray: BalanceOverTime[] = Array.from(balanceMap.entries())
           .map(([date, balance]) => ({
-            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            date: formatShortDate(date),
             balance: parseFloat(balance.toFixed(2)),
           }));
 
@@ -386,8 +421,8 @@ export default function DashboardPage() {
 
   if (authLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
+      <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+        <PageSkeleton stats={4} rows={4} chart />
       </Box>
     );
   }
@@ -397,11 +432,7 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
+    return <PageSkeleton stats={4} rows={5} chart />;
   }
 
   const hasAccounts = accounts.length > 0;
@@ -411,11 +442,11 @@ export default function DashboardPage() {
   const homeState: 'no_accounts' | 'no_data' | 'review' | 'active' =
     !hasAccounts ? 'no_accounts' : !hasTransactions ? 'no_data' : hasSuggestions ? 'review' : 'active';
 
-  const nextStepActions =
+  const nextStepActions: NextStepAction[] =
     homeState === 'no_accounts'
       ? [
           {
-            icon: <AccountIcon color="primary" />,
+            icon: <AccountIcon />,
             title: 'Add your first account',
             description: 'Create an account before you connect Plaid or upload a statement.',
             path: '/accounts?create=true',
@@ -424,135 +455,110 @@ export default function DashboardPage() {
       : homeState === 'no_data'
         ? [
             {
-              icon: <LinkIcon color="primary" />,
+              icon: <LinkIcon />,
               title: 'Connect a bank',
-              description: 'Use Plaid from Accounts to bring in transactions automatically.',
+              description: 'Plaid keeps transactions flowing in automatically.',
               path: '/accounts',
             },
             {
-              icon: <UploadIcon color="primary" />,
+              icon: <UploadIcon />,
               title: 'Upload an Amex statement',
-              description: 'Manual statement upload is ready for Amex accounts today.',
+              description: 'Import a CSV or XLSX export right now.',
               path: '/upload',
             },
           ]
         : homeState === 'review'
           ? [
               {
-                icon: <CategoryIcon color="primary" />,
+                icon: <CategoryIcon />,
                 title: 'Review suggestions',
-                description: 'Apply suggested categories before you dive into reports.',
+                description: `${plural(reviewSuggestionCount, 'transaction')} waiting for a category.`,
                 path: '/transactions/review',
               },
               {
-                icon: <UploadIcon color="primary" />,
-                title: 'Add more data',
-                description: 'Upload another statement or connect another account.',
-                path: '/upload',
+                icon: <AutoAwesomeIcon />,
+                title: 'Open insights',
+                description: 'Read a narrative summary of the month.',
+                path: '/insights',
+              },
+              {
+                icon: <ReceiptIcon />,
+                title: 'Browse transactions',
+                description: 'Search, filter, and export your activity.',
+                path: '/transactions',
               },
             ]
           : [
               {
-                icon: <CategoryIcon color="primary" />,
-                title: 'Review transactions',
-                description: 'Search, filter, and clean up recent activity.',
-                path: '/transactions',
-              },
-              {
-                icon: <AutoAwesomeIcon color="primary" />,
+                icon: <AutoAwesomeIcon />,
                 title: 'Open insights',
-                description: 'See charts, summaries, and the finance assistant in one place.',
+                description: 'Read a narrative summary of the month.',
                 path: '/insights',
               },
               {
-                icon: <UploadIcon color="primary" />,
-                title: 'Add more data',
-                description: 'Keep the dashboard current with another import.',
+                icon: <ReceiptIcon />,
+                title: 'Browse transactions',
+                description: 'Search, filter, and export your activity.',
+                path: '/transactions',
+              },
+              {
+                icon: <UploadIcon />,
+                title: 'Import more data',
+                description: 'Upload a statement or sync a connected bank.',
                 path: '/upload',
               },
             ];
 
-  return (
-    <Box sx={{ py: 2 }}>
-      {errorMessage ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {errorMessage}
-        </Alert>
-      ) : null}
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4} flexWrap="wrap" gap={2}>
-        <Box>
-          <Typography variant="h3" component="h1" gutterBottom>
-            Home
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {homeState === 'no_accounts'
-              ? 'Set up one account first, then bring in your data.'
-              : homeState === 'no_data'
-                ? 'Your accounts are ready. The next step is importing transactions.'
-                : homeState === 'review'
-                  ? 'You have fresh category suggestions waiting for review.'
-                  : 'Your financial overview is ready.'}
-          </Typography>
-        </Box>
+  const today = formatDate(new Date(), { weekday: 'long', month: 'long', day: 'numeric' });
+  const filteredSuffix = selectedAccountId !== 'all' ? ' · filtered' : '';
 
-        {hasTransactions && accounts.length > 1 ? (
-          <FormControl sx={{ minWidth: 240 }}>
-            <InputLabel id="account-filter-label">Filter by account</InputLabel>
-            <Select
-              labelId="account-filter-label"
-              id="account-filter"
-              value={selectedAccountId}
-              label="Filter by account"
-              onChange={handleAccountChange}
-            >
-              <MenuItem value="all">All accounts</MenuItem>
-              {accounts.map((account) => (
-                <MenuItem key={account.id} value={account.id}>
-                  {account.bank} - {account.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+  const accountFilter =
+    hasTransactions && accounts.length > 1 ? (
+      <FormControl size="small" sx={{ minWidth: 220 }}>
+        <InputLabel id="account-filter-label">Account</InputLabel>
+        <Select
+          labelId="account-filter-label"
+          id="account-filter"
+          value={selectedAccountId}
+          label="Account"
+          onChange={handleAccountChange}
+        >
+          <MenuItem value="all">All accounts</MenuItem>
+          {accounts.map((account) => (
+            <MenuItem key={account.id} value={account.id}>
+              {account.name} · {account.bank}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    ) : null;
+
+  // ── Onboarding hero (no accounts / no data) ──────────────────────────────
+  if (homeState === 'no_accounts' || homeState === 'no_data') {
+    const isNoAccounts = homeState === 'no_accounts';
+    return (
+      <Box>
+        <PageHeader title={greeting()} description={today} />
+        {errorMessage ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {errorMessage}
+          </Alert>
         ) : null}
-      </Box>
-
-      <Paper
-        sx={{
-          p: { xs: 3, md: 4 },
-          mb: 4,
-          borderRadius: 4,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.24 : 0.14)}`,
-        }}
-      >
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="h4" gutterBottom>
-              {homeState === 'no_accounts'
-                ? 'Start with your first account'
-                : homeState === 'no_data'
-                  ? 'Bring in your first transactions'
-                  : homeState === 'review'
-                    ? 'Review suggestions before anything else'
-                    : 'Everything is in place'}
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 760 }}>
-              {homeState === 'no_accounts'
-                ? 'Accounts anchor the rest of the app. Once you add one, you can either connect Plaid or upload an Amex statement.'
-                : homeState === 'no_data'
-                  ? 'The fastest way in is Plaid from Accounts. If you use Amex, you can also upload a statement right now.'
-                  : homeState === 'review'
-                    ? `${reviewSuggestionCount} transaction${reviewSuggestionCount === 1 ? '' : 's'} have suggested categories. Clear those first so your reports stay useful.`
-                    : 'Use this page for the overview, then head to transactions or insights when you want to dig in.'}
-            </Typography>
-          </Box>
-
-          <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-            {homeState === 'no_accounts' ? (
+        <EmptyState
+          size="lg"
+          icon={isNoAccounts ? <AccountIcon /> : <UploadIcon />}
+          title={isNoAccounts ? 'Start with your first account' : 'Bring in your first transactions'}
+          description={
+            isNoAccounts
+              ? 'Accounts anchor the rest of the app. Once you add one, you can either connect Plaid or upload an Amex statement.'
+              : 'The fastest way in is Plaid from Accounts. If you use Amex, you can also upload a statement right now.'
+          }
+          actions={
+            isNoAccounts ? (
               <Button variant="contained" size="large" startIcon={<AccountIcon />} onClick={() => router.push('/accounts?create=true')}>
                 Add account
               </Button>
-            ) : homeState === 'no_data' ? (
+            ) : (
               <>
                 <Button variant="contained" size="large" startIcon={<LinkIcon />} onClick={() => router.push('/accounts')}>
                   Connect bank
@@ -561,213 +567,276 @@ export default function DashboardPage() {
                   Upload Amex statement
                 </Button>
               </>
-            ) : homeState === 'review' ? (
-              <>
-                <Button variant="contained" size="large" startIcon={<CategoryIcon />} onClick={() => router.push('/transactions/review')}>
-                  Review suggestions
-                </Button>
-                <Button variant="outlined" size="large" startIcon={<TrendingUpIcon />} onClick={() => router.push('/insights')}>
-                  Open insights
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="contained" size="large" startIcon={<TrendingUpIcon />} onClick={() => router.push('/insights')}>
-                  Open insights
-                </Button>
-                <Button variant="outlined" size="large" startIcon={<CategoryIcon />} onClick={() => router.push('/transactions')}>
-                  Review transactions
-                </Button>
-              </>
-            )}
-          </Stack>
-        </Stack>
-      </Paper>
-
-      <Box mb={4}>
-        <Typography variant="h5" gutterBottom>
-          Next step
-        </Typography>
-        <Grid container spacing={3}>
-          {nextStepActions.map((action) => (
-            <Grid item xs={12} md={12 / nextStepActions.length} key={action.path}>
-              <Card
-                sx={{
-                  height: '100%',
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': { transform: 'translateY(-3px)', boxShadow: 3 },
-                }}
-                onClick={() => router.push(action.path)}
-              >
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
-                    {action.icon}
-                    <Typography variant="h6">{action.title}</Typography>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {action.description}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+            )
+          }
+        />
+        <Box sx={{ mt: 3 }}>
+          <NextStepsList actions={nextStepActions} onNavigate={(p) => router.push(p)} />
+        </Box>
       </Box>
+    );
+  }
 
-      {dashboardData && hasTransactions ? (
-        <>
-          <Grid container spacing={3} mb={4}>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: '100%' }}>
-                <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  <Typography variant="h6" gutterBottom>
-                    Total Balance {selectedAccountId !== 'all' && '(Filtered)'}
-                  </Typography>
-                  <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'flex-end' }}>
-                    <Typography variant="h3">${dashboardData.totalBalance.toLocaleString()}</Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: '100%' }}>
-                <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  <Typography variant="h6" gutterBottom>
-                    Monthly spending (this month) {selectedAccountId !== 'all' && '(Filtered)'}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {dashboardData.hasMonthTransactions && dashboardData.lastMonthTransactionDate
-                      ? `Updated ${new Date(dashboardData.lastMonthTransactionDate).toLocaleDateString()}`
-                      : dashboardData.hasAnyTransactions
-                        ? 'No transactions this month'
-                        : 'No transactions yet'}
-                  </Typography>
-                  <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'flex-end' }}>
-                    <Typography variant="h3" color={dashboardData.hasAnyTransactions ? 'text.primary' : 'text.secondary'}>
-                      {dashboardData.hasAnyTransactions
-                        ? `$${dashboardData.monthlySpending.toLocaleString()}`
-                        : '—'}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+  // ── Active dashboard ─────────────────────────────────────────────────────
+  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long' });
+  const netThisMonth = (dashboardData?.monthlyIncome ?? 0) - (dashboardData?.monthlySpending ?? 0);
 
-          {balanceOverTime.length > 0 && (
-            <Card sx={{ mb: 4 }}>
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6">
-                    Balance Over Time {selectedAccountId !== 'all' && '(Filtered)'}
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    {(['1m', '3m', '6m', '1y', 'all'] as BalancePeriod[]).map((period) => (
-                      <Chip
-                        key={period}
-                        label={period === '1m' ? '1M' : period === '3m' ? '3M' : period === '6m' ? '6M' : period === '1y' ? '1Y' : 'All'}
-                        onClick={() => setBalancePeriod(period)}
-                        color={balancePeriod === period ? 'primary' : 'default'}
-                        variant={balancePeriod === period ? 'filled' : 'outlined'}
-                        sx={{ fontWeight: balancePeriod === period ? 600 : 400 }}
-                      />
-                    ))}
-                  </Stack>
-                </Box>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={balanceOverTime}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={alpha(theme.palette.divider, 0.7)}
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => {
-                        if (Math.abs(value) >= 1000) {
-                          const sign = value < 0 ? '-' : '';
-                          return `${sign}$${(Math.abs(value) / 1000).toFixed(1)}k`;
-                        }
-                        return `$${value}`;
-                      }}
-                    />
-                    <ReTooltip
-                      contentStyle={{
-                        backgroundColor: theme.palette.background.paper,
-                        border: `1px solid ${theme.palette.divider}`,
-                        borderRadius: theme.shape.borderRadius,
-                      }}
-                      formatter={(value: number | undefined) => {
-                        if (value === undefined) return '$0.00';
-                        const formatted = value.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        });
-                        return `$${formatted}`;
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="balance"
-                      stroke={theme.palette.primary.main}
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-        </>
+  return (
+    <Box>
+      <PageHeader title={greeting()} description={today} actions={accountFilter} />
+
+      {errorMessage ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {errorMessage}
+        </Alert>
       ) : null}
 
+      {/* KPI row */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <StatCard
+          label={`Total balance${filteredSuffix}`}
+          value={formatMoney(dashboardData?.totalBalance ?? 0)}
+          icon={<WalletIcon />}
+          hint={plural(selectedAccountId === 'all' ? accounts.length : 1, 'account')}
+        />
+        <StatCard
+          label={`Spending · ${monthLabel}`}
+          value={dashboardData?.hasMonthTransactions ? formatMoney(dashboardData.monthlySpending) : '—'}
+          icon={<TrendingDownIcon />}
+          hint={
+            dashboardData?.hasMonthTransactions && dashboardData.lastMonthTransactionDate
+              ? `Updated ${formatShortDate(dashboardData.lastMonthTransactionDate)}`
+              : 'No transactions this month'
+          }
+        />
+        <StatCard
+          label={`Income · ${monthLabel}`}
+          value={dashboardData?.hasMonthTransactions ? formatMoney(dashboardData.monthlyIncome) : '—'}
+          icon={<TrendingUpIcon />}
+          tone={dashboardData?.hasMonthTransactions && dashboardData.monthlyIncome > 0 ? 'positive' : 'default'}
+          hint={
+            dashboardData?.hasMonthTransactions
+              ? `Net ${netThisMonth >= 0 ? '+' : '−'}${formatMoney(Math.abs(netThisMonth))}`
+              : 'No transactions this month'
+          }
+        />
+        <StatCard
+          label="Needs review"
+          value={reviewSuggestionCount}
+          icon={<CategoryIcon />}
+          tone={hasSuggestions ? 'warning' : 'default'}
+          hint={hasSuggestions ? 'Suggested categories to confirm' : 'All caught up'}
+          onClick={hasSuggestions ? () => router.push('/transactions/review') : undefined}
+        />
+      </Box>
+
+      {/* Chart + next steps */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2fr) minmax(0, 1fr)' },
+          gap: 2,
+          mb: 3,
+          alignItems: 'stretch',
+        }}
+      >
+        <SectionCard
+          title={`Balance over time${filteredSuffix}`}
+          action={
+            <SegmentedControl<BalancePeriod>
+              value={balancePeriod}
+              onChange={setBalancePeriod}
+              aria-label="Balance period"
+              options={[
+                { value: '1m', label: '1M' },
+                { value: '3m', label: '3M' },
+                { value: '6m', label: '6M' },
+                { value: '1y', label: '1Y' },
+                { value: 'all', label: 'All' },
+              ]}
+            />
+          }
+        >
+          {balanceOverTime.length > 0 ? (
+            <Box sx={{ mt: 1, mx: -1 }}>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={balanceOverTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={theme.palette.primary.main} stopOpacity={0.32} />
+                      <stop offset="100%" stopColor={theme.palette.primary.main} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} stroke={alpha(theme.palette.text.primary, 0.08)} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={24}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={56}
+                    tickFormatter={(value: number) => formatCompactMoney(value)}
+                  />
+                  <ReTooltip
+                    content={<ChartTooltip hideName format={(v) => (v < 0 ? `−${formatMoney(Math.abs(v))}` : formatMoney(v))} />}
+                    cursor={{ stroke: alpha(theme.palette.text.primary, 0.2), strokeDasharray: '3 3' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="balance"
+                    name="Balance"
+                    stroke={theme.palette.primary.main}
+                    strokeWidth={2}
+                    fill="url(#balanceGradient)"
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 2, stroke: theme.palette.background.paper }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
+          ) : (
+            <EmptyState
+              variant="plain"
+              size="sm"
+              title="No activity in this period"
+              description="Try a longer period, or import more transactions."
+            />
+          )}
+        </SectionCard>
+
+        <NextStepsList actions={nextStepActions} onNavigate={(p) => router.push(p)} />
+      </Box>
+
+      {/* Recent transactions */}
       {dashboardData?.recentTransactions?.length ? (
-        <>
-          <Typography variant="h5" gutterBottom mb={2}>
-            Recent Transactions {selectedAccountId !== 'all' && '(Filtered)'}
-          </Typography>
-          <Card>
-            <CardContent>
-              {dashboardData.recentTransactions.map((transaction, idx) => (
-                <React.Fragment key={`${transaction.date}-${idx}`}>
-                  <Box display="flex" justifyContent="space-between" py={1} gap={2}>
-                    <Box flex={1}>
-                      <Typography variant="body1" fontWeight="medium" mb={0.5}>
-                        {transaction.description}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(transaction.date).toLocaleDateString()} •{' '}
-                        {transaction.category_name || 'Uncategorized'}
-                        {transaction.account_bank && transaction.account_name
-                          ? ` • ${transaction.account_bank} - ${transaction.account_name}`
-                          : ''}
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="body1"
-                      fontWeight="medium"
-                      sx={{ color: transaction.amount > 0 ? 'error.main' : 'success.main' }}
-                    >
-                      {transaction.amount > 0 ? '-' : ''}$
-                      {Math.abs(transaction.amount).toLocaleString()}
-                    </Typography>
-                  </Box>
-                  {idx < dashboardData.recentTransactions.length - 1 ? <Divider /> : null}
-                </React.Fragment>
-              ))}
-            </CardContent>
-          </Card>
-        </>
+        <SectionCard
+          title={`Recent transactions${filteredSuffix}`}
+          description="The latest activity across your accounts."
+          disablePadding
+          divider
+          action={
+            <Button component={NextLink} href="/transactions" size="small" endIcon={<ArrowForwardIcon fontSize="small" />}>
+              View all
+            </Button>
+          }
+        >
+          <Stack divider={<Divider />}>
+            {dashboardData.recentTransactions.map((transaction, idx) => (
+              <Stack
+                key={`${transaction.date}-${idx}`}
+                direction="row"
+                alignItems="center"
+                gap={2}
+                sx={{
+                  px: 2.5,
+                  py: 1.5,
+                  transition: 'background-color 120ms ease',
+                  '&:hover': { bgcolor: alpha(theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.05 : 0.03) },
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  className="tabular-nums"
+                  sx={{ width: 56, flexShrink: 0, fontWeight: 600 }}
+                >
+                  {formatShortDate(transaction.date)}
+                </Typography>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                    {transaction.description}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                    {transaction.account_name
+                      ? `${transaction.account_name}${transaction.account_bank ? ` · ${transaction.account_bank}` : ''}`
+                      : '—'}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                  <CategoryChip name={transaction.category_name} color={transaction.category_color} />
+                </Box>
+                <Money stored={transaction.amount} colored sx={{ minWidth: 88, textAlign: 'right' }} />
+              </Stack>
+            ))}
+          </Stack>
+        </SectionCard>
       ) : null}
     </Box>
   );
 }
 
+function NextStepsList(props: { actions: NextStepAction[]; onNavigate: (path: string) => void }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  return (
+    <SectionCard title="Next steps" description="Suggested based on where your data is." disablePadding divider>
+      <Stack divider={<Divider />}>
+        {props.actions.map((action) => (
+          <Box
+            key={action.path}
+            role="button"
+            tabIndex={0}
+            onClick={() => props.onNavigate(action.path)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                props.onNavigate(action.path);
+              }
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              px: 2.5,
+              py: 1.75,
+              cursor: 'pointer',
+              transition: 'background-color 120ms ease',
+              '&:hover': { bgcolor: alpha(theme.palette.text.primary, isDark ? 0.05 : 0.03) },
+              '&:hover .mf-chevron': { transform: 'translateX(2px)', color: theme.palette.text.primary },
+            }}
+          >
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 2.5,
+                display: 'grid',
+                placeItems: 'center',
+                flexShrink: 0,
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.16 : 0.1),
+                '& svg': { fontSize: 20 },
+              }}
+            >
+              {action.icon}
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ fontWeight: 620 }}>
+                {action.title}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                {action.description}
+              </Typography>
+            </Box>
+            <ChevronRightIcon
+              className="mf-chevron"
+              sx={{ color: 'text.disabled', fontSize: 20, transition: 'transform 120ms ease, color 120ms ease' }}
+            />
+          </Box>
+        ))}
+      </Stack>
+    </SectionCard>
+  );
+}

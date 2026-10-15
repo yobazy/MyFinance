@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, CircularProgress, Container, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CircularProgress, Stack, Typography } from '@mui/material';
 import { createBrowserSupabaseClient } from '../../../lib/supabase';
 import { getSafeNextPath } from '../../../lib/auth/redirect';
 
@@ -54,25 +54,33 @@ export default function AuthCallbackPage() {
   }, [router, supabase]);
 
   return (
-    <Container maxWidth="sm" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
-      <Box sx={{ width: '100%' }}>
-        {error ? (
-          <Stack spacing={2}>
-            <Alert severity="error">{error}</Alert>
-            <Button variant="contained" onClick={() => router.replace('/login')}>
-              Back to login
-            </Button>
-          </Stack>
-        ) : (
-          <Stack spacing={2} alignItems="center" sx={{ py: 8 }}>
-            <CircularProgress />
-            <Typography variant="body1" color="text.secondary">
-              Finishing sign-in…
-            </Typography>
-          </Stack>
-        )}
-      </Box>
-    </Container>
+    <Box component="main" sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', px: 2, bgcolor: 'background.default' }}>
+      <Card sx={{ width: '100%', maxWidth: 400, p: 4 }}>
+        <Stack spacing={2.5} alignItems="center" textAlign="center">
+          <Box component="img" src="/logo_mini.svg" alt="MyFinance" sx={{ width: 40, height: 40 }} />
+          {error ? (
+            <>
+              <Typography variant="h5">Sign-in didn’t complete</Typography>
+              <Alert severity="error" sx={{ width: '100%', textAlign: 'left' }}>
+                {error}
+              </Alert>
+              <Button variant="contained" fullWidth onClick={() => router.replace('/login')}>
+                Back to login
+              </Button>
+            </>
+          ) : (
+            <>
+              <CircularProgress size={28} />
+              <Box>
+                <Typography variant="h6">Finishing sign-in…</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  You’ll be redirected in a moment.
+                </Typography>
+              </Box>
+            </>
+          )}
+        </Stack>
+      </Card>
+    </Box>
   );
 }
-

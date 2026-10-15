@@ -6,15 +6,12 @@ import {
   Box,
   Button,
   Card,
-  CardContent,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
   FormControlLabel,
-  Grid,
   IconButton,
   InputLabel,
   List,
@@ -22,12 +19,23 @@ import {
   ListItemText,
   MenuItem,
   Select,
+  Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { DeleteOutline as DeleteIcon } from '@mui/icons-material';
+import { alpha, useTheme } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/AddRounded';
+import DeleteIcon from '@mui/icons-material/DeleteOutlineRounded';
+import CategoryIcon from '@mui/icons-material/CategoryRounded';
+import CheckIcon from '@mui/icons-material/CheckRounded';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
+import { chartPalette } from '../../lib/theme';
+import { plural } from '../../lib/format';
+import { PageHeader, SectionCard, EmptyState, StatusChip } from '../components/ui';
+import { useToast } from '../components/ToastProvider';
+import { useConfirm } from '../components/ConfirmProvider';
 
 type Category = {
   id: string;
@@ -46,8 +54,18 @@ type CategoryPreset = {
   version: number;
 };
 
+const DEFAULT_COLOR = '#2196F3';
+
+function isHex(value: string): boolean {
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+}
+
 export default function CategorizationPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const theme = useTheme();
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [presets, setPresets] = useState<CategoryPreset[]>([]);
   const [selectedPresetKey, setSelectedPresetKey] = useState<string>('');
@@ -56,12 +74,11 @@ export default function CategorizationPage() {
     Record<string, { canonical_key: string; name: string; description: string }[]>
   >({});
   const [presetDialogKey, setPresetDialogKey] = useState<string | null>(null);
-  const [presetCategoriesLoadingKey, setPresetCategoriesLoadingKey] = useState<string | null>(
-    null,
-  );
+  const [presetCategoriesLoadingKey, setPresetCategoriesLoadingKey] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
-  const [color, setColor] = useState('#2196F3');
-  const [message, setMessage] = useState<string>('');
+  const [color, setColor] = useState(DEFAULT_COLOR);
+  const [loadError, setLoadError] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
@@ -70,7 +87,7 @@ export default function CategorizationPage() {
       .select('id,name,parent_id,description,color,is_active')
       .order('name', { ascending: true });
     if (error) {
-      setMessage(`Failed to load categories: ${error.message}`);
+      setLoadError(`Failed to load categories: ${error.message}`);
       setCategories([]);
       return;
     }
@@ -84,9 +101,7 @@ export default function CategorizationPage() {
       .eq('is_active', true)
       .order('name', { ascending: true });
     if (error) {
-      if (!message) {
-        setMessage(`Failed to load presets: ${error.message}`);
-      }
+      setLoadError((prev) => prev || `Failed to load presets: ${error.message}`);
       setPresets([]);
       return;
     }
@@ -107,11 +122,14 @@ export default function CategorizationPage() {
 
   const createCategory = async () => {
     if (!name.trim()) {
-      setMessage('Please enter a category name.');
+      toast.warning('Please enter a category name.');
+      return;
+    }
+    if (!isHex(color)) {
+      toast.warning('Colour must be a hex value like #2196F3.');
       return;
     }
     setBusy(true);
-    setMessage('');
     const { error } = await supabase.from('categories').insert({
       name: name.trim(),
       color,
@@ -120,49 +138,53 @@ export default function CategorizationPage() {
       is_active: true,
     });
     setBusy(false);
-    if (error) setMessage(`Failed to create category: ${error.message}`);
-    else {
-      setName('');
-      await refresh();
-      setMessage('Category created.');
+    if (error) {
+      toast.error(`Failed to create category: ${error.message}`);
+      return;
     }
+    setName('');
+    setColor(DEFAULT_COLOR);
+    setCreateOpen(false);
+    await refresh();
+    toast.success('Category created.');
   };
 
   const applyPreset = async () => {
     if (!selectedPresetKey) {
-      setMessage('Please select a preset to apply.');
+      toast.warning('Please select a preset to apply.');
       return;
     }
     setBusy(true);
-    setMessage('');
     const { error } = await supabase.rpc('apply_category_preset', {
       p_preset_key: selectedPresetKey,
       p_overwrite: overwritePreset,
     });
     setBusy(false);
     if (error) {
-      setMessage(`Failed to apply preset: ${error.message}`);
+      toast.error(`Failed to apply preset: ${error.message}`);
       return;
     }
     await refresh();
-    setMessage('Preset categories applied.');
+    toast.success('Preset categories applied.');
   };
 
-  const deleteCategory = async (id: string, name: string) => {
-    const confirmed = window.confirm(
-      `Delete category "${name}"?\n\nAny transactions using it will become Uncategorized.`,
-    );
-    if (!confirmed) return;
+  const deleteCategory = async (id: string, catName: string) => {
+    const ok = await confirm({
+      title: `Delete “${catName}”?`,
+      description: 'Any transactions using it will become Uncategorized.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
-    setMessage('');
     const { error } = await supabase.from('categories').delete().eq('id', id);
     setBusy(false);
     if (error) {
-      setMessage(`Failed to delete category: ${error.message}`);
+      toast.error(`Failed to delete category: ${error.message}`);
       return;
     }
     await refresh();
-    setMessage('Category deleted.');
+    toast.success('Category deleted.');
   };
 
   const ensurePresetCategoriesLoaded = async (presetKey: string) => {
@@ -178,187 +200,221 @@ export default function CategorizationPage() {
       .order('name', { ascending: true });
     setPresetCategoriesLoadingKey(null);
     if (error) {
-      setMessage(`Failed to load preset categories: ${error.message}`);
+      toast.error(`Failed to load preset categories: ${error.message}`);
       return;
     }
     const rows = (data ?? []) as { canonical_key: string; name: string; description: string }[];
-    setPresetCategories((prev) => ({
-      ...prev,
-      [presetKey]: rows,
-    }));
+    setPresetCategories((prev) => ({ ...prev, [presetKey]: rows }));
   };
 
   const handleViewPresetCategories = async () => {
     if (!selectedPresetKey) {
-      setMessage('Please select a preset to preview.');
+      toast.warning('Please select a preset to preview.');
       return;
     }
     await ensurePresetCategoriesLoaded(selectedPresetKey);
     setPresetDialogKey(selectedPresetKey);
   };
 
+  const selectedPreset = presets.find((p) => p.key === selectedPresetKey);
+
   return (
     <Box>
-      <Box mb={4}>
-        <Typography variant="h4" gutterBottom>
-          Categories
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Create and manage categories used for transaction classification.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Categories"
+        description="The labels used to classify transactions. Start from a preset or build your own."
+        actions={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+            New category
+          </Button>
+        }
+      />
 
-      {presets.length > 0 ? (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Category presets
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Quickly load a recommended category set instead of creating everything manually.
-            </Typography>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel id="preset-select-label">Preset</InputLabel>
-                  <Select
-                    labelId="preset-select-label"
-                    label="Preset"
-                    value={selectedPresetKey}
-                    onChange={(e) => setSelectedPresetKey(e.target.value)}
-                  >
-                    {presets.map((p) => (
-                      <MenuItem key={p.key} value={p.key}>
-                        <Box display="flex" flexDirection="column">
-                          <Typography variant="body1">{p.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            v{p.version} • {p.description}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={overwritePreset}
-                      onChange={(e) => setOverwritePreset(e.target.checked)}
-                    />
-                  }
-                  label="Overwrite existing preset categories"
-                />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <Box display="flex" flexDirection="column" gap={1}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleViewPresetCategories}
-                    disabled={!selectedPresetKey}
-                    fullWidth
-                  >
-                    View categories
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={applyPreset}
-                    disabled={busy || !selectedPresetKey}
-                    fullWidth
-                  >
-                    Apply preset
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+      {loadError ? (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {loadError}
+        </Alert>
       ) : null}
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Create category
-          </Typography>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+      {presets.length > 0 ? (
+        <SectionCard
+          title="Presets"
+          description="Load a recommended category set instead of creating everything by hand."
+          sx={{ mb: 3 }}
+        >
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' }, gap: 2, alignItems: 'center' }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="preset-select-label">Preset</InputLabel>
+              <Select
+                labelId="preset-select-label"
+                label="Preset"
+                value={selectedPresetKey}
+                onChange={(e) => setSelectedPresetKey(e.target.value)}
+                renderValue={(value) => presets.find((p) => p.key === value)?.name ?? ''}
+              >
+                {presets.map((p) => (
+                  <MenuItem key={p.key} value={p.key}>
+                    <ListItemText primary={p.name} secondary={`v${p.version} · ${p.description}`} />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <FormControlLabel
+                control={<Switch size="small" checked={overwritePreset} onChange={(e) => setOverwritePreset(e.target.checked)} />}
+                label={<Typography variant="body2">Overwrite existing</Typography>}
+                sx={{ mr: 1 }}
               />
-            </Grid>
-            <Grid item xs={12} md={3}>
+              <Button variant="outlined" color="inherit" onClick={handleViewPresetCategories} disabled={!selectedPresetKey}>
+                Preview
+              </Button>
+              <Button variant="contained" onClick={applyPreset} disabled={busy || !selectedPresetKey}>
+                Apply preset
+              </Button>
+            </Stack>
+          </Box>
+          {selectedPreset?.description ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+              {selectedPreset.description}
+            </Typography>
+          ) : null}
+        </SectionCard>
+      ) : null}
+
+      {categories.length === 0 ? (
+        <EmptyState
+          icon={<CategoryIcon />}
+          title="No categories yet"
+          description="Apply a preset above or create your first category to start classifying transactions."
+          actions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+              New category
+            </Button>
+          }
+        />
+      ) : (
+        <SectionCard title="Your categories" description={plural(categories.length, 'category', 'categories')}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 1.5 }}>
+            {categories.map((c) => (
+              <Card
+                key={c.id}
+                sx={{
+                  px: 1.75,
+                  py: 1.25,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  boxShadow: 'none',
+                  transition: 'border-color 120ms ease',
+                  '&:hover': { borderColor: alpha(theme.palette.text.primary, 0.2) },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    bgcolor: isHex(c.color) ? c.color : DEFAULT_COLOR,
+                    boxShadow: `0 0 0 3px ${alpha(isHex(c.color) ? c.color : DEFAULT_COLOR, 0.2)}`,
+                  }}
+                />
+                <Typography variant="body2" noWrap sx={{ fontWeight: 600, flex: 1, minWidth: 0 }}>
+                  {c.name}
+                </Typography>
+                <StatusChip status={c.is_active ? 'active' : 'inactive'} />
+                <Tooltip title="Delete category">
+                  <span>
+                    <IconButton size="small" color="inherit" disabled={busy} onClick={() => void deleteCategory(c.id, c.name)} aria-label={`Delete ${c.name}`} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Card>
+            ))}
+          </Box>
+        </SectionCard>
+      )}
+
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>New category</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ pt: 1 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void createCategory();
+              }}
+            />
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                Colour
+              </Typography>
+              <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+                {chartPalette.map((swatch) => {
+                  const selected = swatch.toLowerCase() === color.toLowerCase();
+                  return (
+                    <Box
+                      key={swatch}
+                      role="button"
+                      aria-label={`Use colour ${swatch}`}
+                      aria-pressed={selected}
+                      tabIndex={0}
+                      onClick={() => setColor(swatch)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') setColor(swatch);
+                      }}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        bgcolor: swatch,
+                        cursor: 'pointer',
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: '#fff',
+                        boxShadow: selected ? `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${swatch}` : 'none',
+                        transition: 'transform 100ms ease',
+                        '&:hover': { transform: 'scale(1.08)' },
+                      }}
+                    >
+                      {selected ? <CheckIcon sx={{ fontSize: 16 }} /> : null}
+                    </Box>
+                  );
+                })}
+              </Stack>
               <TextField
                 fullWidth
-                label="Color"
+                size="small"
+                label="Hex colour"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                helperText="Hex color"
+                error={color.length > 0 && !isHex(color)}
+                helperText={color.length > 0 && !isHex(color) ? 'Use a hex value like #2196F3' : ' '}
+                InputProps={{
+                  startAdornment: (
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', mr: 1, bgcolor: isHex(color) ? color : 'transparent', border: '1px solid', borderColor: 'divider', flexShrink: 0 }} />
+                  ),
+                }}
               />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Button variant="contained" onClick={createCategory} disabled={busy} fullWidth>
-                Create
-              </Button>
-            </Grid>
-          </Grid>
-          {message ? (
-            <Alert sx={{ mt: 2 }} severity={message.toLowerCase().includes('failed') ? 'error' : 'info'}>
-              {message}
-            </Alert>
-          ) : null}
-        </CardContent>
-      </Card>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setCreateOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={() => void createCategory()} disabled={busy || !name.trim()}>
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      <Grid container spacing={2}>
-        {categories.map((c) => (
-          <Grid key={c.id} item xs={12} sm={6} md={4}>
-            <Card>
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" gap={1}>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="h6">{c.name}</Typography>
-                    <Box
-                      sx={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: '50%',
-                        background: c.color,
-                        border: '1px solid rgba(0,0,0,0.2)',
-                      }}
-                    />
-                  </Box>
-                  <Tooltip title="Delete category">
-                    <span>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        disabled={busy}
-                        onClick={() => deleteCategory(c.id, c.name)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {c.is_active ? 'Active' : 'Inactive'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      <Dialog
-        open={!!presetDialogKey}
-        onClose={() => setPresetDialogKey(null)}
-        fullWidth
-        maxWidth="sm"
-      >
+      <Dialog open={!!presetDialogKey} onClose={() => setPresetDialogKey(null)} fullWidth maxWidth="sm">
         <DialogTitle>
           {(() => {
             const p = presets.find((preset) => preset.key === presetDialogKey);
@@ -372,13 +428,10 @@ export default function CategorizationPage() {
             </Typography>
           ) : null}
           {presetDialogKey && presetCategories[presetDialogKey]?.length ? (
-            <List dense>
+            <List dense disablePadding>
               {presetCategories[presetDialogKey]!.map((cat) => (
-                <ListItem key={cat.canonical_key}>
-                  <ListItemText
-                    primary={cat.name}
-                    secondary={cat.description || undefined}
-                  />
+                <ListItem key={cat.canonical_key} disableGutters>
+                  <ListItemText primary={cat.name} secondary={cat.description || undefined} />
                 </ListItem>
               ))}
             </List>
@@ -395,4 +448,3 @@ export default function CategorizationPage() {
     </Box>
   );
 }
-

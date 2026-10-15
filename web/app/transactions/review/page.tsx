@@ -5,15 +5,10 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
   FormControl,
-  InputLabel,
   MenuItem,
   Pagination,
-  Paper,
   Select,
   Stack,
   Table,
@@ -24,15 +19,17 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
-  CheckCircle as CheckCircleIcon,
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/CheckRounded';
+import CloseIcon from '@mui/icons-material/CloseRounded';
+import DoneAllIcon from '@mui/icons-material/DoneAllRounded';
+import RateReviewIcon from '@mui/icons-material/RateReviewRounded';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase';
 import { formatUnknownError } from '../../../lib/errors';
+import { formatCount, formatDate, plural } from '../../../lib/format';
+import { EmptyState, Money, PageHeader, PageSkeleton, SectionCard, StatusChip } from '../../components/ui';
+import { useToast } from '../../components/ToastProvider';
+import { useConfirm } from '../../components/ConfirmProvider';
 
 type SuggestionTransaction = {
   id: string;
@@ -51,9 +48,23 @@ type Category = {
   name: string;
 };
 
+function confidenceTone(score: number): 'success' | 'info' | 'warning' {
+  if (score >= 0.8) return 'success';
+  if (score >= 0.6) return 'info';
+  return 'warning';
+}
+
+function formatTxDate(date: string): string {
+  const year = new Date().getFullYear();
+  const isCurrentYear = date.startsWith(String(year));
+  return formatDate(date, isCurrentYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default function ReviewSuggestionsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [transactions, setTransactions] = useState<SuggestionTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -134,15 +145,15 @@ export default function ReviewSuggestionsPage() {
     })();
   }, [supabase]);
 
+  const pageCount = Math.max(1, Math.ceil(transactions.length / rowsPerPage));
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
   const paginatedTransactions = useMemo(() => {
     const startIndex = (page - 1) * rowsPerPage;
     return transactions.slice(startIndex, startIndex + rowsPerPage);
   }, [transactions, page]);
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      amount
-    );
 
   const handleApply = async (tx: SuggestionTransaction) => {
     const categoryId = reviewSelections[tx.id] ?? tx.suggested_category_id;
@@ -181,7 +192,7 @@ export default function ReviewSuggestionsPage() {
       });
     } catch (e) {
       const msg = formatUnknownError(e);
-      alert(`Failed to apply category: ${msg}`);
+      toast.error(`Failed to apply category: ${msg}`);
     } finally {
       setApplyingIds((prev) => {
         const next = new Set(prev);
@@ -210,7 +221,7 @@ export default function ReviewSuggestionsPage() {
       });
     } catch (e) {
       const msg = formatUnknownError(e);
-      alert(`Failed to skip suggestion: ${msg}`);
+      toast.error(`Failed to skip suggestion: ${msg}`);
     } finally {
       setSkippingIds((prev) => {
         const next = new Set(prev);
@@ -223,11 +234,18 @@ export default function ReviewSuggestionsPage() {
   const handleApplyAllOnPage = async () => {
     if (paginatedTransactions.length === 0) return;
 
+    const ok = await confirm({
+      title: `Apply ${plural(paginatedTransactions.length, 'suggestion')}?`,
+      description: 'Each transaction on this page will be categorized with its selected category. You can re-categorize later from Transactions.',
+      confirmLabel: 'Apply all',
+    });
+    if (!ok) return;
+
     setApplyingAllOnPage(true);
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     if (!token) {
-      alert('Missing user session');
+      toast.error('Missing user session');
       setApplyingAllOnPage(false);
       return;
     }
@@ -238,7 +256,7 @@ export default function ReviewSuggestionsPage() {
     })).filter((item) => item.categoryId);
 
     if (toApply.length === 0) {
-      alert('No valid suggestions to apply on this page');
+      toast.warning('No valid suggestions to apply on this page');
       setApplyingAllOnPage(false);
       return;
     }
@@ -292,34 +310,50 @@ export default function ReviewSuggestionsPage() {
       }
 
       if (failed.length > 0) {
-        alert(`Failed to apply ${failed.length} suggestion(s). Check console for details.`);
+        toast.error(`Failed to apply ${failed.length} suggestion(s). Check console for details.`);
       } else if (succeeded.length > 0) {
-        // Success message is optional, but we could show a snackbar here
+        toast.success(`Applied ${plural(succeeded.length, 'suggestion')}.`);
       }
     } catch (e) {
       const msg = formatUnknownError(e);
-      alert(`Failed to apply suggestions: ${msg}`);
+      toast.error(`Failed to apply suggestions: ${msg}`);
     } finally {
       setApplyingAllOnPage(false);
     }
   };
 
   if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
+    return <PageSkeleton stats={0} rows={8} />;
   }
+
+  const pageStart = (page - 1) * rowsPerPage + 1;
+  const pageEnd = Math.min(page * rowsPerPage, transactions.length);
 
   return (
     <Box>
-      <Box display="flex" alignItems="center" gap={2} mb={3}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => router.push('/transactions')}>
-          Back to Transactions
-        </Button>
-        <Typography variant="h4">Review Suggestions</Typography>
-      </Box>
+      <PageHeader
+        backHref="/transactions"
+        backLabel="Transactions"
+        title="Review suggestions"
+        description={
+          transactions.length > 0
+            ? `${plural(transactions.length, 'transaction')} with a suggested category. Confirm or adjust each one before applying.`
+            : 'Suggested categories from your rules and presets show up here for approval.'
+        }
+        actions={
+          transactions.length > 0 ? (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={applyingAllOnPage ? <CircularProgress size={16} color="inherit" /> : <DoneAllIcon />}
+              onClick={handleApplyAllOnPage}
+              disabled={applyingAllOnPage || paginatedTransactions.length === 0}
+            >
+              {applyingAllOnPage ? 'Applying…' : `Apply all on page (${formatCount(paginatedTransactions.length)})`}
+            </Button>
+          ) : null
+        }
+      />
 
       {error ? (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -328,95 +362,81 @@ export default function ReviewSuggestionsPage() {
       ) : null}
 
       {transactions.length === 0 ? (
-        <Card>
-          <CardContent sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              No suggestions to review
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Generate suggestions from the Transactions page, then return here to review them.
-            </Typography>
+        <EmptyState
+          size="lg"
+          icon={<RateReviewIcon />}
+          title="No suggestions to review"
+          description="Generate suggestions from the Transactions page, then come back here to approve them in bulk."
+          actions={
             <Button variant="contained" onClick={() => router.push('/transactions')}>
               Go to Transactions
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
-        <>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-                <Typography variant="body2" color="text.secondary">
-                  {transactions.length} suggestion{transactions.length !== 1 ? 's' : ''} to review.
-                  Confirm or adjust suggested categories before applying them.
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={applyingAllOnPage ? <CircularProgress size={16} /> : <CheckCircleIcon />}
-                  onClick={handleApplyAllOnPage}
-                  disabled={applyingAllOnPage || paginatedTransactions.length === 0}
-                >
-                  {applyingAllOnPage ? 'Applying...' : `Apply all on page (${paginatedTransactions.length})`}
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <TableContainer component={Paper}>
-            <Table>
+        <SectionCard
+          disablePadding
+          footer={
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" justifyContent="space-between" gap={1}>
+              <Typography variant="caption" color="text.secondary">
+                Showing {formatCount(pageStart)}–{formatCount(pageEnd)} of {formatCount(transactions.length)}
+              </Typography>
+              {transactions.length > rowsPerPage ? (
+                <Pagination
+                  count={pageCount}
+                  page={page}
+                  onChange={(_, p) => setPage(p)}
+                  color="primary"
+                  size="small"
+                  siblingCount={0}
+                />
+              ) : null}
+            </Stack>
+          }
+        >
+          <TableContainer sx={{ borderRadius: 0 }}>
+            <Table size="small" sx={{ minWidth: 720 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell>Date</TableCell>
+                  <TableCell sx={{ width: 110 }}>Date</TableCell>
                   <TableCell>Description</TableCell>
-                  <TableCell align="right">Amount</TableCell>
-                  <TableCell>Source</TableCell>
-                  <TableCell>Account</TableCell>
-                  <TableCell>Suggested category</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell align="right" sx={{ width: 120 }}>
+                    Amount
+                  </TableCell>
+                  <TableCell sx={{ width: 300 }}>Suggested category</TableCell>
+                  <TableCell align="right" sx={{ width: 170 }}>
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedTransactions.map((tx) => {
                   const selectedCategoryId = reviewSelections[tx.id] ?? tx.suggested_category_id;
-                  const confidencePct =
-                    tx.confidence_score != null
-                      ? `${Math.round(tx.confidence_score * 100)}%`
-                      : null;
                   const isApplying = applyingIds.has(tx.id);
                   const isSkipping = skippingIds.has(tx.id);
                   const isBusy = isApplying || isSkipping || applyingAllOnPage;
+                  const changed = selectedCategoryId !== tx.suggested_category_id;
 
                   return (
-                    <TableRow key={tx.id}>
-                      <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ maxWidth: 300, wordWrap: 'break-word' }}>
+                    <TableRow key={tx.id} hover>
+                      <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }} className="tabular-nums">
+                        {formatTxDate(tx.date)}
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 320 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {tx.description}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                          {tx.account_name}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          fontWeight="medium"
-                          color={tx.amount > 0 ? 'error.main' : 'success.main'}
-                        >
-                          {tx.amount > 0 ? '-' : ''}${formatCurrency(Math.abs(tx.amount))}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={tx.source} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{tx.account_name}</Typography>
+                        <Money stored={tx.amount} colored />
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <FormControl size="small" sx={{ minWidth: 200 }}>
-                            <InputLabel id={`review-cat-${tx.id}`}>Category</InputLabel>
+                          <FormControl size="small" sx={{ minWidth: 180, flex: 1 }}>
                             <Select
-                              labelId={`review-cat-${tx.id}`}
-                              label="Category"
                               value={selectedCategoryId}
                               onChange={(e) =>
                                 setReviewSelections((prev) => ({
@@ -425,6 +445,7 @@ export default function ReviewSuggestionsPage() {
                                 }))
                               }
                               disabled={isBusy}
+                              inputProps={{ 'aria-label': `Category for ${tx.description}` }}
                             >
                               {categories.map((c) => (
                                 <MenuItem key={c.id} value={c.id}>
@@ -433,35 +454,36 @@ export default function ReviewSuggestionsPage() {
                               ))}
                             </Select>
                           </FormControl>
-                          {confidencePct ? (
-                            <Chip
-                              label={confidencePct}
-                              size="small"
-                              color="info"
-                              variant="outlined"
+                          {changed ? (
+                            <StatusChip status="edited" tone="neutral" label="Edited" dot={false} />
+                          ) : tx.confidence_score != null ? (
+                            <StatusChip
+                              status="confidence"
+                              tone={confidenceTone(tx.confidence_score)}
+                              label={`${Math.round(tx.confidence_score * 100)}%`}
+                              dot={false}
                             />
                           ) : null}
                         </Stack>
                       </TableCell>
                       <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                           <Button
                             variant="contained"
-                            color="success"
                             size="small"
-                            startIcon={isApplying ? <CircularProgress size={16} /> : <CheckIcon />}
+                            startIcon={isApplying ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
                             onClick={() => handleApply(tx)}
                             disabled={isBusy || !selectedCategoryId}
                           >
                             Apply
                           </Button>
                           <Button
-                            variant="outlined"
-                            color="error"
                             size="small"
-                            startIcon={isSkipping ? <CircularProgress size={16} /> : <CloseIcon />}
+                            color="inherit"
+                            startIcon={isSkipping ? <CircularProgress size={14} color="inherit" /> : <CloseIcon />}
                             onClick={() => handleSkip(tx)}
                             disabled={isBusy}
+                            sx={{ color: 'text.secondary' }}
                           >
                             Skip
                           </Button>
@@ -473,20 +495,7 @@ export default function ReviewSuggestionsPage() {
               </TableBody>
             </Table>
           </TableContainer>
-
-          {transactions.length > rowsPerPage ? (
-            <Box display="flex" justifyContent="center" mt={3}>
-              <Pagination
-                count={Math.ceil(transactions.length / rowsPerPage)}
-                page={page}
-                onChange={(_, p) => setPage(p)}
-                color="primary"
-                showFirstButton
-                showLastButton
-              />
-            </Box>
-          ) : null}
-        </>
+        </SectionCard>
       )}
     </Box>
   );

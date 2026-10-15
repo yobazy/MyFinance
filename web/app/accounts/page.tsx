@@ -2,47 +2,80 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Card,
-  CardContent,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   FormControl,
-  Grid,
+  FormHelperText,
   IconButton,
   InputLabel,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Select,
-  Snackbar,
+  Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import {
-  AccountBalance as AccountIcon,
-  ArrowDownward as ArrowDownwardIcon,
-  ArrowUpward as ArrowUpwardIcon,
-  UploadFile as UploadFileIcon,
-  CreditCard as CreditCardIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Refresh as RefreshIcon,
-  Savings as SavingsIcon,
-  Sort as SortIcon,
-  Link as LinkIcon,
+  AccountBalanceRounded as AccountIcon,
+  AddRounded as AddIcon,
+  CreditCardRounded as CreditCardIcon,
+  DeleteOutlineRounded as DeleteIcon,
+  EditOutlined as EditIcon,
+  LinkRounded as LinkIcon,
+  MoreHorizRounded as MoreIcon,
+  RefreshRounded as RefreshIcon,
+  SavingsRounded as SavingsIcon,
+  TrendingDownRounded as TrendingDownIcon,
+  TrendingUpRounded as TrendingUpIcon,
+  UploadFileRounded as UploadFileIcon,
+  WalletRounded as WalletIcon,
 } from '@mui/icons-material';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import type { Account } from '../../lib/types';
 import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from 'react-plaid-link';
+import { useToast } from '../components/ToastProvider';
+import { useConfirm } from '../components/ConfirmProvider';
+import {
+  BankLogo,
+  EmptyState,
+  Money,
+  PageHeader,
+  PageSkeleton,
+  StatCard,
+  StatusChip,
+  bankDisplayName,
+} from '../components/ui';
+import { formatMoney, formatRelative, humanize, plural } from '../../lib/format';
 
 type SortField = 'balance' | 'name' | 'bank' | 'type';
 type SortOrder = 'asc' | 'desc';
+type AccountType = 'checking' | 'savings' | 'credit';
+
+const SORT_OPTIONS: { value: `${SortField}:${SortOrder}`; label: string }[] = [
+  { value: 'name:asc', label: 'Name (A–Z)' },
+  { value: 'name:desc', label: 'Name (Z–A)' },
+  { value: 'balance:desc', label: 'Balance (high to low)' },
+  { value: 'balance:asc', label: 'Balance (low to high)' },
+  { value: 'bank:asc', label: 'Bank' },
+  { value: 'type:asc', label: 'Type' },
+];
+
+const BANK_OPTIONS: { value: string; label: string }[] = [
+  { value: 'TD', label: 'Toronto-Dominion Bank' },
+  { value: 'AMEX', label: 'American Express' },
+  { value: 'SCOTIA', label: 'Scotiabank' },
+];
 
 function describeInvalidSupabaseAccessToken(token: string): string | null {
   // Supabase user session access tokens are JWTs and should not contain whitespace.
@@ -75,24 +108,40 @@ function formatClientSideFetchAuthHeaderError(e: unknown): string | null {
   return null;
 }
 
+function accountTypeIcon(type: string) {
+  switch (type) {
+    case 'savings':
+      return <SavingsIcon />;
+    case 'credit':
+      return <CreditCardIcon />;
+    default:
+      return <AccountIcon />;
+  }
+}
+
+function accountTypeLabel(type: string | null | undefined): string {
+  if (type === 'credit') return 'Credit card';
+  return humanize(String(type ?? 'checking'));
+}
+
 export default function AccountsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const theme = useTheme();
+  const toast = useToast();
+  const confirm = useConfirm();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
   const [balanceRollupByAccountId, setBalanceRollupByAccountId] = useState<
     Record<string, { txSum: number; txCount: number; lastTxDate: string | null }>
   >({});
   const [bank, setBank] = useState<string>('');
   const [accountName, setAccountName] = useState<string>('');
-  const [accountType, setAccountType] = useState<'checking' | 'savings' | 'credit'>(
-    'checking'
-  );
-  const [message, setMessage] = useState<string>('');
+  const [accountType, setAccountType] = useState<AccountType>('checking');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sortBy, setSortBy] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -100,11 +149,15 @@ export default function AccountsPage() {
   const [plaidTargetAccount, setPlaidTargetAccount] = useState<Account | null>(null);
   const [plaidBusy, setPlaidBusy] = useState(false);
   const [plaidImporting, setPlaidImporting] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{ el: HTMLElement; account: Account } | null>(null);
 
-  const showMessage = (msg: string) => {
-    setMessage(msg);
-    setOpenSnackbar(true);
-  };
+  const showMessage = useCallback(
+    (msg: string) => {
+      if (msg.toLowerCase().includes('failed')) toast.error(msg);
+      else toast.success(msg);
+    },
+    [toast]
+  );
 
   const fetchAccounts = useCallback(async () => {
     const { data, error } = await supabase
@@ -117,7 +170,7 @@ export default function AccountsPage() {
       return;
     }
     setAccounts((data ?? []) as Account[]);
-  }, [supabase]);
+  }, [showMessage, supabase]);
 
   const fetchBalanceRollup = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_account_balance_rollup');
@@ -138,11 +191,14 @@ export default function AccountsPage() {
       };
     }
     setBalanceRollupByAccountId(map);
-  }, [supabase]);
+  }, [showMessage, supabase]);
 
   useEffect(() => {
-    fetchAccounts();
-    fetchBalanceRollup();
+    (async () => {
+      setLoading(true);
+      await Promise.all([fetchAccounts(), fetchBalanceRollup()]);
+      setLoading(false);
+    })();
   }, [fetchAccounts, fetchBalanceRollup]);
 
   useEffect(() => {
@@ -181,7 +237,7 @@ export default function AccountsPage() {
 
   const handleAddAccount = async () => {
     if (!bank || !accountName) {
-      showMessage('Please fill in all fields');
+      toast.warning('Please fill in all fields.');
       return;
     }
     setBusy(true);
@@ -194,13 +250,13 @@ export default function AccountsPage() {
       await fetchAccounts();
       await fetchBalanceRollup();
       resetDialog();
-      showMessage('Account created successfully!');
+      showMessage('Account created.');
     }
   };
 
   const handleUpdateAccount = async () => {
     if (!editingAccount || !bank || !accountName) {
-      showMessage('Please fill in all fields');
+      toast.warning('Please fill in all fields.');
       return;
     }
     setBusy(true);
@@ -214,19 +270,27 @@ export default function AccountsPage() {
       await fetchAccounts();
       await fetchBalanceRollup();
       resetDialog();
-      showMessage('Account updated successfully!');
+      showMessage('Account updated.');
     }
   };
 
-  const handleDeleteAccount = async (accountId: string) => {
+  const handleDeleteAccount = async (account: Account) => {
+    const ok = await confirm({
+      title: `Delete “${account.name}”?`,
+      description:
+        'This permanently removes the account and every transaction imported into it. This cannot be undone.',
+      confirmLabel: 'Delete account',
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
-    const { error } = await supabase.from('accounts').delete().eq('id', accountId);
+    const { error } = await supabase.from('accounts').delete().eq('id', account.id);
     setBusy(false);
     if (error) showMessage(`Failed to delete account: ${error.message}`);
     else {
       await fetchAccounts();
       await fetchBalanceRollup();
-      showMessage('Account deleted successfully!');
+      showMessage('Account deleted.');
     }
   };
 
@@ -234,55 +298,8 @@ export default function AccountsPage() {
     setEditingAccount(account);
     setBank(account.bank ?? '');
     setAccountName(account.name ?? '');
-    setAccountType((account.type as any) ?? 'checking');
+    setAccountType((account.type as AccountType) ?? 'checking');
     setOpenDialog(true);
-  };
-
-  const getAccountIcon = (type: string) => {
-    switch (type) {
-      case 'checking':
-        return <AccountIcon />;
-      case 'savings':
-        return <SavingsIcon />;
-      case 'credit':
-        return <CreditCardIcon />;
-      default:
-        return <AccountIcon />;
-    }
-  };
-
-  const getBankIcon = (bank: string): React.ReactElement | undefined => {
-    const b = bank.toUpperCase();
-    switch (b) {
-      case 'AMEX':
-      case 'AMERICAN EXPRESS':
-        return (
-          <img
-            src="/bank_amex_icon.svg"
-            alt="American Express Logo"
-            style={{ width: 24, height: 24, objectFit: 'contain' }}
-          />
-        );
-      case 'TD':
-        return (
-          <img
-            src="/bank_td_icon.svg"
-            alt="TD Bank Logo"
-            style={{ width: 24, height: 24, objectFit: 'contain' }}
-          />
-        );
-      case 'SCOTIA':
-      case 'SCOTIABANK':
-        return (
-          <img
-            src="/bank_scotia_icon.svg"
-            alt="Scotiabank Logo"
-            style={{ width: 24, height: 24, objectFit: 'contain' }}
-          />
-        );
-      default:
-        return undefined;
-    }
   };
 
   const sortAccounts = (list: Account[], field: SortField, order: SortOrder): Account[] => {
@@ -304,19 +321,6 @@ export default function AccountsPage() {
       }
       return order === 'asc' ? comparison : -comparison;
     });
-  };
-
-  const handleSortChange = (field: SortField) => {
-    if (sortBy === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-  };
-
-  const getSortIcon = (field: SortField) => {
-    if (sortBy !== field) return <SortIcon />;
-    return sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
   };
 
   const importPlaidTransactions = useCallback(
@@ -374,6 +378,8 @@ export default function AccountsPage() {
             body.rowsProcessed ?? 0
           } rows processed.`
         );
+        await fetchAccounts();
+        await fetchBalanceRollup();
       } catch (e) {
         const friendly = formatClientSideFetchAuthHeaderError(e);
         showMessage(
@@ -385,14 +391,14 @@ export default function AccountsPage() {
         setPlaidTargetAccount(null);
       }
     },
-    [plaidTargetAccount, supabase]
+    [fetchAccounts, fetchBalanceRollup, plaidTargetAccount, showMessage, supabase]
   );
 
   const { open: openPlaid, ready: plaidReady } = usePlaidLink({
     token: plaidLinkToken,
     onSuccess: importPlaidTransactions,
     onExit: (err) => {
-      if (err?.error_message) showMessage(`Plaid closed: ${err.error_message}`);
+      if (err?.error_message) toast.info(`Plaid closed: ${err.error_message}`);
       setPlaidLinkToken(null);
       setPlaidTargetAccount(null);
     },
@@ -442,255 +448,353 @@ export default function AccountsPage() {
         setPlaidBusy(false);
       }
     },
-    [supabase]
+    [showMessage, supabase]
   );
+
+  // ── Derived summary ─────────────────────────────────────────────────────
+  const summary = useMemo(() => {
+    let total = 0;
+    let assets = 0;
+    let liabilities = 0;
+    for (const a of accounts) {
+      const v = getDisplayedBalance(a).value;
+      total += v;
+      if (v >= 0) assets += v;
+      else liabilities += Math.abs(v);
+    }
+    return { total, assets, liabilities };
+  }, [accounts, getDisplayedBalance]);
+
+  const sortedAccounts = useMemo(
+    () => sortAccounts(accounts, sortBy, sortOrder),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [accounts, sortBy, sortOrder, getDisplayedBalance]
+  );
+
+  const openCreateDialog = () => {
+    setEditingAccount(null);
+    setOpenDialog(true);
+  };
+
+  const headerActions = (
+    <>
+      <Tooltip title="Refresh balances">
+        <span>
+          <IconButton onClick={fetchBalanceRollup} disabled={busy} aria-label="Refresh balances">
+            <RefreshIcon />
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => router.push('/upload')}>
+        Upload statement
+      </Button>
+      <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateDialog}>
+        Add account
+      </Button>
+    </>
+  );
+
+  if (loading) {
+    return <PageSkeleton stats={4} rows={3} />;
+  }
 
   return (
     <Box>
-      <Box mb={4}>
-        <Typography variant="h4" gutterBottom>
-          Accounts
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Add an account first, then either connect it with Plaid or upload an Amex statement.
-        </Typography>
-      </Box>
-
-      <Box sx={{ mb: 4, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => {
-            setEditingAccount(null);
-            setOpenDialog(true);
-          }}
-        >
-          Add New Account
-        </Button>
-
-        <Button
-          variant="outlined"
-          startIcon={<UploadFileIcon />}
-          onClick={() => router.push('/upload')}
-        >
-          Upload Amex statement
-        </Button>
-
-        <Button
-          variant="outlined"
-          color="secondary"
-          startIcon={<RefreshIcon />}
-          onClick={fetchBalanceRollup}
-          disabled={busy}
-        >
-          Refresh Balances
-        </Button>
-
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto', flexWrap: 'wrap' }}>
-          <Typography variant="body2" color="text.secondary">
-            Sort by:
-          </Typography>
-          <Button
-            variant={sortBy === 'name' ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => handleSortChange('name')}
-            startIcon={getSortIcon('name')}
-          >
-            Account Name
-          </Button>
-          <Button
-            variant={sortBy === 'bank' ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => handleSortChange('bank')}
-            startIcon={getSortIcon('bank')}
-          >
-            Bank
-          </Button>
-          <Button
-            variant={sortBy === 'balance' ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => handleSortChange('balance')}
-            startIcon={getSortIcon('balance')}
-          >
-            Balance
-          </Button>
-          <Button
-            variant={sortBy === 'type' ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => handleSortChange('type')}
-            startIcon={getSortIcon('type')}
-          >
-            Type
-          </Button>
-        </Box>
-      </Box>
-
-      <Alert severity="info" sx={{ mb: 4 }}>
-        Plaid is the main path for ongoing imports. Manual statement upload is currently available for Amex accounts.
-      </Alert>
+      <PageHeader
+        title="Accounts"
+        description="Every account you track. Connect a bank with Plaid, or upload an Amex statement manually."
+        actions={headerActions}
+      />
 
       {accounts.length === 0 ? (
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Start here
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Create your first account so you have somewhere to connect Plaid or attach an Amex statement.
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={() => {
-                setEditingAccount(null);
-                setOpenDialog(true);
-              }}
-            >
-              Add first account
+        <EmptyState
+          size="lg"
+          icon={<AccountIcon />}
+          title="Add your first account"
+          description="Accounts are where transactions live. Create one, then connect it to Plaid for ongoing imports or upload an Amex statement."
+          actions={
+            <Button variant="contained" size="large" startIcon={<AddIcon />} onClick={openCreateDialog}>
+              Add account
             </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+          }
+        />
+      ) : (
+        <>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+              gap: 2,
+              mb: 3,
+            }}
+          >
+            <StatCard
+              label="Total balance"
+              value={formatMoney(summary.total)}
+              icon={<WalletIcon />}
+              hint="Across all accounts"
+            />
+            <StatCard
+              label="Assets"
+              value={formatMoney(summary.assets)}
+              icon={<TrendingUpIcon />}
+              tone="positive"
+              hint="Positive balances"
+            />
+            <StatCard
+              label="Liabilities"
+              value={formatMoney(summary.liabilities)}
+              icon={<TrendingDownIcon />}
+              tone={summary.liabilities > 0 ? 'negative' : 'default'}
+              hint="Credit and negative balances"
+            />
+            <StatCard
+              label="Accounts"
+              value={accounts.length}
+              icon={<AccountIcon />}
+              hint={plural(accounts.length, 'account')}
+            />
+          </Box>
 
-      <Grid container spacing={3}>
-        {sortAccounts(accounts, sortBy, sortOrder).map((account) => (
-          <Grid item xs={12} sm={6} md={4} key={account.id}>
-            <Card
-              sx={{
-                height: '100%',
-                transition: 'transform 0.2s',
-                '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Box display="flex" alignItems="center">
-                    {getAccountIcon(account.type)}
-                    <Typography variant="h6" sx={{ ml: 1 }}>
-                      {account.name}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <IconButton size="small" onClick={() => handleEditAccount(account)}>
-                      <EditIcon />
-                    </IconButton>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            flexWrap="wrap"
+            gap={1.5}
+            sx={{ mb: 2 }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Plaid is the main path for ongoing imports. Manual statement upload is available for Amex accounts.
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel id="account-sort-label">Sort by</InputLabel>
+              <Select
+                labelId="account-sort-label"
+                label="Sort by"
+                value={`${sortBy}:${sortOrder}`}
+                onChange={(e) => {
+                  const [field, order] = String(e.target.value).split(':') as [SortField, SortOrder];
+                  setSortBy(field);
+                  setSortOrder(order);
+                }}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+              gap: 2,
+            }}
+          >
+            {sortedAccounts.map((account) => {
+              const balance = getDisplayedBalance(account);
+              const rollup = balanceRollupByAccountId[account.id];
+              const connecting = plaidTargetAccount?.id === account.id && (plaidBusy || plaidImporting);
+              return (
+                <Card
+                  key={account.id}
+                  sx={{
+                    p: 2.25,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    transition: 'border-color 120ms ease, transform 120ms ease',
+                    '&:hover': {
+                      borderColor: alpha(theme.palette.text.primary, 0.2),
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  <Stack direction="row" alignItems="flex-start" gap={1.5}>
+                    <BankLogo bank={account.bank} size={40} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle1" noWrap sx={{ lineHeight: 1.25 }}>
+                        {account.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                        {bankDisplayName(account.bank)}
+                      </Typography>
+                    </Box>
                     <IconButton
                       size="small"
-                      onClick={() => handleDeleteAccount(account.id)}
+                      aria-label={`Actions for ${account.name}`}
+                      onClick={(e) => setMenuAnchor({ el: e.currentTarget, account })}
                       disabled={busy}
+                      sx={{ mt: -0.5, mr: -0.5, color: 'text.secondary' }}
                     >
-                      <DeleteIcon />
+                      <MoreIcon fontSize="small" />
                     </IconButton>
+                  </Stack>
+
+                  <Box>
+                    <Money
+                      value={balance.value}
+                      variant="h4"
+                      component="div"
+                      sx={{ fontWeight: 650, letterSpacing: '-0.03em', color: balance.value < 0 ? 'error.main' : 'text.primary' }}
+                    />
+                    <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.75 }}>
+                      <StatusChip
+                        status={String(account.type ?? 'checking')}
+                        label={accountTypeLabel(account.type)}
+                        tone="neutral"
+                        dot={false}
+                        icon={accountTypeIcon(String(account.type ?? ''))}
+                        sx={{ '& .MuiChip-icon': { fontSize: 14, ml: 0.75, color: 'inherit' } }}
+                      />
+                      {balance.source === 'computed' ? (
+                        <Tooltip title="Calculated from imported transactions; no stored balance yet.">
+                          <Typography variant="caption" color="text.secondary">
+                            computed
+                          </Typography>
+                        </Tooltip>
+                      ) : null}
+                    </Stack>
                   </Box>
-                </Box>
 
-                <Chip
-                  label={account.bank}
-                  size="small"
-                  sx={{ mb: 2 }}
-                  icon={getBankIcon(account.bank)}
-                />
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 'auto' }}>
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {rollup?.lastTxDate
+                        ? `Last activity ${formatRelative(rollup.lastTxDate)}`
+                        : rollup?.txCount
+                          ? plural(rollup.txCount, 'transaction')
+                          : 'No transactions yet'}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<LinkIcon />}
+                      onClick={() => handleConnectPlaid(account)}
+                      disabled={busy || plaidBusy || plaidImporting}
+                    >
+                      {connecting ? 'Connecting…' : 'Connect bank'}
+                    </Button>
+                  </Stack>
+                </Card>
+              );
+            })}
+          </Box>
+        </>
+      )}
 
-                <Typography variant="body2" color="text.secondary">
-                  Account Type:{' '}
-                  {String(account.type ?? '').charAt(0).toUpperCase() + String(account.type ?? '').slice(1)}
-                </Typography>
+      <Menu
+        anchorEl={menuAnchor?.el ?? null}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            const a = menuAnchor?.account;
+            setMenuAnchor(null);
+            if (a) handleEditAccount(a);
+          }}
+        >
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const a = menuAnchor?.account;
+            setMenuAnchor(null);
+            if (a) void handleDeleteAccount(a);
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon sx={{ color: 'inherit' }}>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
 
-                <Typography variant="body2" color="text.secondary">
-                  {(() => {
-                    const b = getDisplayedBalance(account);
-                    const suffix = b.source === 'computed' ? ' (computed)' : '';
-                    return `Balance: $${Number(b.value ?? 0).toLocaleString()}${suffix}`;
-                  })()}
-                </Typography>
-
-                <Button
-                  sx={{ mt: 2 }}
-                  size="small"
-                  variant="outlined"
-                  startIcon={<LinkIcon />}
-                  onClick={() => handleConnectPlaid(account)}
-                  disabled={busy || plaidBusy || plaidImporting}
-                >
-                  Connect bank
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      <Dialog open={openDialog} onClose={resetDialog} fullWidth>
-        <DialogTitle>{editingAccount ? 'Edit Account' : 'Add New Account'}</DialogTitle>
+      <Dialog open={openDialog} onClose={resetDialog} fullWidth maxWidth="xs">
+        <DialogTitle>{editingAccount ? 'Edit account' : 'Add account'}</DialogTitle>
         <DialogContent>
-          <FormControl fullWidth sx={{ mt: 2 }}>
-            <InputLabel>Bank</InputLabel>
-            <Select value={bank} label="Bank" onChange={(e) => setBank(e.target.value)}>
-              <MenuItem value="TD">
-                <Box display="flex" alignItems="center" gap={1}>
-                  {getBankIcon('TD')}
-                  Toronto-Dominion Bank
-                </Box>
-              </MenuItem>
-              <MenuItem value="AMEX">
-                <Box display="flex" alignItems="center" gap={1}>
-                  {getBankIcon('AMEX')}
-                  American Express
-                </Box>
-              </MenuItem>
-              <MenuItem value="SCOTIA">
-                <Box display="flex" alignItems="center" gap={1}>
-                  {getBankIcon('SCOTIA')}
-                  Scotiabank
-                </Box>
-              </MenuItem>
-            </Select>
-          </FormControl>
+          <DialogContentText sx={{ mb: 2, fontSize: '0.875rem' }}>
+            {editingAccount
+              ? 'Update the details for this account.'
+              : 'Pick the bank and give the account a name you will recognise.'}
+          </DialogContentText>
+          <Stack spacing={2}>
+            <FormControl fullWidth>
+              <InputLabel id="account-bank-label">Bank</InputLabel>
+              <Select
+                labelId="account-bank-label"
+                value={bank}
+                label="Bank"
+                onChange={(e) => setBank(e.target.value)}
+                renderValue={(v) => {
+                  const opt = BANK_OPTIONS.find((o) => o.value === v);
+                  return (
+                    <Stack direction="row" alignItems="center" gap={1}>
+                      <BankLogo bank={String(v)} size={22} />
+                      <span>{opt?.label ?? String(v)}</span>
+                    </Stack>
+                  );
+                }}
+              >
+                {BANK_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    <Stack direction="row" alignItems="center" gap={1}>
+                      <BankLogo bank={o.value} size={24} />
+                      <span>{o.label}</span>
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>Amex supports manual statement uploads; other banks import via Plaid.</FormHelperText>
+            </FormControl>
 
-          <TextField
-            fullWidth
-            label="Account Name"
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            sx={{ mt: 2 }}
-          />
+            <TextField
+              fullWidth
+              label="Account name"
+              placeholder="e.g. Everyday Chequing"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              autoFocus
+            />
 
-          <FormControl fullWidth sx={{ mt: 2 }}>
-            <InputLabel>Account Type</InputLabel>
-            <Select
-              value={accountType}
-              label="Account Type"
-              onChange={(e) =>
-                setAccountType(e.target.value as 'checking' | 'savings' | 'credit')
-              }
-            >
-              <MenuItem value="checking">Checking</MenuItem>
-              <MenuItem value="savings">Savings</MenuItem>
-              <MenuItem value="credit">Credit Card</MenuItem>
-            </Select>
-          </FormControl>
+            <FormControl fullWidth>
+              <InputLabel id="account-type-label">Account type</InputLabel>
+              <Select
+                labelId="account-type-label"
+                value={accountType}
+                label="Account type"
+                onChange={(e) => setAccountType(e.target.value as AccountType)}
+              >
+                <MenuItem value="checking">Checking</MenuItem>
+                <MenuItem value="savings">Savings</MenuItem>
+                <MenuItem value="credit">Credit card</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={resetDialog}>Cancel</Button>
+          <Button onClick={resetDialog} color="inherit">
+            Cancel
+          </Button>
           <Button
             onClick={editingAccount ? handleUpdateAccount : handleAddAccount}
             variant="contained"
-            disabled={busy}
+            disabled={busy || !bank || !accountName.trim()}
           >
-            {editingAccount ? 'Save Changes' : 'Add Account'}
+            {editingAccount ? 'Save changes' : 'Add account'}
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={() => setOpenSnackbar(false)}>
-        <Alert
-          onClose={() => setOpenSnackbar(false)}
-          severity={message.toLowerCase().includes('failed') ? 'error' : 'success'}
-          sx={{ width: '100%' }}
-        >
-          {message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }
-

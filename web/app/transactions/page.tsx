@@ -3,19 +3,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Badge,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
+  CircularProgress,
   Collapse,
   FormControl,
-  Grid,
+  InputAdornment,
   InputLabel,
   LinearProgress,
   MenuItem,
   Pagination,
-  Paper,
   Select,
   Stack,
   Table,
@@ -28,23 +27,25 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import {
-  Clear as ClearIcon,
-  DateRange as DateIcon,
-  FilterList as FilterIcon,
-  GetApp as DownloadIcon,
-  Search as SearchIcon,
-  TrendingDown as TrendingDownIcon,
-  TrendingUp as TrendingUpIcon,
-  Category as CategoryIcon,
-  AccountBalance as AccountIcon,
-  UploadFile as UploadFileIcon,
-  RateReview as ReviewIcon,
-} from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
+import SearchIcon from '@mui/icons-material/SearchRounded';
+import FilterListIcon from '@mui/icons-material/FilterListRounded';
+import DownloadIcon from '@mui/icons-material/DownloadRounded';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeRounded';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLongRounded';
+import ArrowDownwardIcon from '@mui/icons-material/SouthRounded';
+import ArrowUpwardIcon from '@mui/icons-material/NorthRounded';
+import CategoryIcon from '@mui/icons-material/CategoryRounded';
+import RateReviewIcon from '@mui/icons-material/RateReviewRounded';
+import UploadFileIcon from '@mui/icons-material/UploadFileRounded';
+import LinkIcon from '@mui/icons-material/LinkRounded';
+import CloseIcon from '@mui/icons-material/CloseRounded';
+import RuleIcon from '@mui/icons-material/RuleRounded';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
 import { formatUnknownError } from '../../lib/errors';
+import { formatCount, formatDate, formatMoney, formatRelative, plural } from '../../lib/format';
+import { CategoryChip, EmptyState, Money, PageHeader, PageSkeleton, SectionCard, SegmentedControl, StatCard } from '../components/ui';
 
 type Transaction = {
   id: string;
@@ -75,6 +76,38 @@ type Filters = {
 
 type SortField = 'date' | 'amount' | 'description' | 'category';
 type SortDirection = 'asc' | 'desc';
+type QuickFilter = 'uncategorized' | 'last30days' | 'expenses' | 'income';
+
+const EMPTY_FILTERS: Filters = {
+  search: '',
+  source: '',
+  account: '',
+  category: '',
+  amountMin: '',
+  amountMax: '',
+  dateFrom: '',
+  dateTo: '',
+};
+
+function last30DaysISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatTxDate(date: string): string {
+  const year = new Date().getFullYear();
+  const isCurrentYear = date.startsWith(String(year));
+  return formatDate(date, isCurrentYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function sourceLabel(source: string): string {
+  const s = source.toLowerCase();
+  if (s.includes('plaid')) return 'Plaid';
+  if (s.includes('amex')) return 'Amex upload';
+  if (s.includes('upload')) return 'Upload';
+  return source;
+}
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -98,22 +131,13 @@ export default function TransactionsPage() {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  const [filters, setFilters] = useState<Filters>({
-    search: '',
-    source: '',
-    account: '',
-    category: '',
-    amountMin: '',
-    amountMax: '',
-    dateFrom: '',
-    dateTo: '',
-  });
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
   useEffect(() => {
     (async () => {
       try {
         setLoadError(null);
-        
+
         // Supabase PostgREST has a default max limit of 1000 rows per query.
         // We need to fetch in batches to get all transactions.
         const batchSize = 1000;
@@ -131,9 +155,9 @@ export default function TransactionsPage() {
             )
             .order('date', { ascending: false })
             .range(offset, offset + batchSize - 1);
-          
+
           if (error) throw error;
-          
+
           if (!data || data.length === 0) {
             hasMore = false;
           } else {
@@ -187,7 +211,6 @@ export default function TransactionsPage() {
     })();
   }, [supabase]);
 
-
   const uniqueSources = useMemo(
     () => [...new Set(allTransactions.map((t) => t.source).filter(Boolean))].sort(),
     [allTransactions]
@@ -203,7 +226,7 @@ export default function TransactionsPage() {
   );
 
   const filteredAndSortedTransactions = useMemo(() => {
-    let filtered = allTransactions.filter((t) => {
+    const filtered = allTransactions.filter((t) => {
       if (filters.search && !t.description.toLowerCase().includes(filters.search.toLowerCase()))
         return false;
       if (filters.source && t.source !== filters.source) return false;
@@ -267,10 +290,16 @@ export default function TransactionsPage() {
     return { totalTransactions, totalIncome, totalExpenses, netAmount, uncategorized };
   }, [filteredAndSortedTransactions]);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      amount
-    );
+  const pendingSuggestionCount = useMemo(
+    () => allTransactions.filter((t) => !t.category_name && t.suggested_category_id).length,
+    [allTransactions]
+  );
+
+  const latestDate = useMemo(() => {
+    let latest: string | null = null;
+    for (const t of allTransactions) if (!latest || t.date > latest) latest = t.date;
+    return latest;
+  }, [allTransactions]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -286,16 +315,7 @@ export default function TransactionsPage() {
   };
 
   const clearFilters = () => {
-    setFilters({
-      search: '',
-      source: '',
-      account: '',
-      category: '',
-      amountMin: '',
-      amountMax: '',
-      dateFrom: '',
-      dateTo: '',
-    });
+    setFilters(EMPTY_FILTERS);
     setPage(1);
   };
 
@@ -331,95 +351,95 @@ export default function TransactionsPage() {
     setAutoCatBusy(true);
     setAutoCatProgress(0);
     setAutoCatLogs([]);
-    
+
     let success = false;
-    
+
     const addLog = (message: string) => {
       setAutoCatLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
     };
-    
+
     const updateProgress = (progress: number) => {
       setAutoCatProgress(Math.min(100, Math.max(0, progress)));
     };
-    
+
     try {
       addLog('Starting auto-categorization...');
       updateProgress(5);
-      
+
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
       if (!token) {
         throw new Error('Missing user session');
       }
-      
+
       addLog('Fetching uncategorized transactions...');
       updateProgress(15);
-      
+
       // Get count of uncategorized transactions for progress estimation
       const { count } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
         .is('category_id', null);
-      
+
       const totalUncategorized = count ?? 0;
       addLog(`Found ${totalUncategorized} uncategorized transaction${totalUncategorized !== 1 ? 's' : ''} to process`);
       updateProgress(25);
-      
+
       if (totalUncategorized === 0) {
         addLog('No uncategorized transactions found. Nothing to process.');
         setAutoCatMessage('No uncategorized transactions found.');
         setAutoCatBusy(false);
         return;
       }
-      
+
       addLog('Processing transactions and applying categorization rules...');
       updateProgress(30);
-      
+
       // Use streaming API for real-time progress updates
       const res = await fetch('/api/auto-categorization/apply', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'accept': 'text/event-stream',
+          accept: 'text/event-stream',
           authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ mode: autoCatMode }),
       });
-      
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
-      
+
       if (!res.body) {
         throw new Error('No response body');
       }
-      
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let totalTransactions = totalUncategorized;
       let processed = 0;
       let matched = 0;
-      
+
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          
+
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || ''; // Keep incomplete line in buffer
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
-                
+
                 if (data.type === 'progress') {
                   totalTransactions = data.total;
                   processed = data.current;
                   matched = data.matched;
-                  const progressPercent = 30 + (data.progress * 0.6); // 30% to 90% for processing
+                  const progressPercent = 30 + data.progress * 0.6; // 30% to 90% for processing
                   updateProgress(progressPercent);
                   addLog(data.message || `Processing transaction ${data.current} of ${data.total}${data.matched > 0 ? ` (${data.matched} matched)` : ''}`);
                 } else if (data.type === 'status') {
@@ -444,11 +464,12 @@ export default function TransactionsPage() {
       } finally {
         reader.releaseLock();
       }
-      
+      void totalTransactions;
+
       if (!success) {
         throw new Error('Stream completed without success message');
       }
-      
+
       setAutoCatMessage(
         `Suggestions updated for ${processed} transaction${processed !== 1 ? 's' : ''}. Review and apply them on the review page.`,
       );
@@ -468,14 +489,23 @@ export default function TransactionsPage() {
     }
   };
 
-  const setQuickFilter = (filterType: 'uncategorized' | 'last30days' | 'expenses' | 'income') => {
+  const quickFilterActive: Record<QuickFilter, boolean> = {
+    uncategorized: filters.category === 'uncategorized',
+    last30days: filters.dateFrom === last30DaysISO() && !filters.dateTo,
+    expenses: filters.amountMin === '0.01',
+    income: filters.amountMax === '-0.01',
+  };
+
+  const setQuickFilter = (filterType: QuickFilter) => {
+    if (quickFilterActive[filterType]) {
+      clearFilters();
+      return;
+    }
     clearFilters();
     if (filterType === 'uncategorized') {
       setFilters((prev) => ({ ...prev, category: 'uncategorized' }));
     } else if (filterType === 'last30days') {
-      const d = new Date();
-      d.setDate(d.getDate() - 30);
-      setFilters((prev) => ({ ...prev, dateFrom: d.toISOString().slice(0, 10) }));
+      setFilters((prev) => ({ ...prev, dateFrom: last30DaysISO() }));
     } else if (filterType === 'expenses') {
       setFilters((prev) => ({ ...prev, amountMin: '0.01' }));
     } else if (filterType === 'income') {
@@ -483,26 +513,29 @@ export default function TransactionsPage() {
     }
   };
 
+  const advancedFilterCount = (['source', 'account', 'category', 'amountMin', 'amountMax', 'dateFrom', 'dateTo'] as const).filter(
+    (k) => filters[k] !== ''
+  ).length;
+  const anyFilterActive = Object.values(filters).some((f) => f !== '');
+
   if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <Typography color="text.secondary">Loading…</Typography>
-      </Box>
-    );
+    return <PageSkeleton stats={5} rows={8} />;
   }
 
   if (loadError) {
     return (
       <Box>
-        <Typography variant="h4" gutterBottom>
-          Transactions
-        </Typography>
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <PageHeader title="Transactions" />
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          }
+        >
           Failed to load transactions: {loadError}
         </Alert>
-        <Button variant="outlined" onClick={() => window.location.reload()}>
-          Retry
-        </Button>
       </Box>
     );
   }
@@ -510,567 +543,469 @@ export default function TransactionsPage() {
   if (allTransactions.length === 0) {
     return (
       <Box>
-        <Typography variant="h4" gutterBottom>
-          Transactions
-        </Typography>
-        <Card
-          sx={{
-            minHeight: '60vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: theme.palette.background.paper,
-            cursor: 'pointer',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': { transform: 'translateY(-3px)', boxShadow: theme.shadows[3] },
-          }}
-          onClick={() => router.push('/upload')}
-        >
-          <CardContent sx={{ textAlign: 'center' }}>
-            <UploadFileIcon sx={{ fontSize: 80, color: theme.palette.primary.main, mb: 2 }} />
-            <Typography variant="h5" gutterBottom>
-              No transactions yet
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 450, mx: 'auto', mb: 3 }}>
-              Start by uploading your bank statements to track and manage your transactions.
-            </Typography>
-            <Button variant="contained" color="primary" onClick={() => router.push('/upload')}>
-              Upload Your First Statement
-            </Button>
-          </CardContent>
-        </Card>
+        <PageHeader title="Transactions" description="Every transaction across your accounts, in one searchable list." />
+        <EmptyState
+          size="lg"
+          icon={<ReceiptLongIcon />}
+          title="No transactions yet"
+          description="Connect a bank through Plaid or upload an Amex statement to start tracking where your money goes."
+          actions={
+            <>
+              <Button variant="contained" startIcon={<LinkIcon />} onClick={() => router.push('/accounts')}>
+                Connect bank
+              </Button>
+              <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => router.push('/upload')}>
+                Upload statement
+              </Button>
+            </>
+          }
+        />
       </Box>
     );
   }
 
+  const pageStart = (page - 1) * rowsPerPage + 1;
+  const pageEnd = Math.min(page * rowsPerPage, filteredAndSortedTransactions.length);
+  const isDark = theme.palette.mode === 'dark';
+
+  const sortLabel = (field: SortField, label: string) => (
+    <TableSortLabel
+      active={sortField === field}
+      direction={sortField === field ? sortDirection : 'desc'}
+      onClick={() => handleSort(field)}
+    >
+      {label}
+    </TableSortLabel>
+  );
+
   return (
     <Box>
-      <Typography variant="h4" mb={3}>Transactions</Typography>
+      <PageHeader
+        title="Transactions"
+        description={
+          <>
+            {plural(allTransactions.length, 'transaction')}
+            {latestDate ? ` · updated ${formatRelative(latestDate)}` : ''}
+          </>
+        }
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<DownloadIcon />}
+              onClick={exportToCSV}
+              disabled={filteredAndSortedTransactions.length === 0}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={() => setShowAutomation((v) => !v)}
+            >
+              Generate suggestions
+            </Button>
+          </>
+        }
+      />
 
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={2.4 as any}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h6" color="primary">
-                {summaryStats.totalTransactions}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total Transactions
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4 as any}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
-                <TrendingDownIcon color="success" />
-                <Typography variant="h6" color="success.main">
-                  ${formatCurrency(summaryStats.totalIncome)}
-                </Typography>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Total Income
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4 as any}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
-                <TrendingUpIcon color="error" />
-                <Typography variant="h6" color="error.main">
-                  ${formatCurrency(summaryStats.totalExpenses)}
-                </Typography>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Total Expenses
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4 as any}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h6" color={summaryStats.netAmount >= 0 ? 'success.main' : 'error.main'}>
-                ${formatCurrency(summaryStats.netAmount)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Net Amount
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4 as any}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h6" color="warning.main">
-                {summaryStats.uncategorized}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Uncategorized
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {allTransactions.some((t) => !t.category_name && t.suggested_category_id) ? (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-              <Box>
-                <Typography variant="h6" gutterBottom>
-                  Suggestions ready for review
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {allTransactions.filter((t) => !t.category_name && t.suggested_category_id).length}{' '}
-                  transaction{allTransactions.filter((t) => !t.category_name && t.suggested_category_id).length !== 1 ? 's' : ''} with suggested categories
-                </Typography>
-              </Box>
-              <Button
-                variant="contained"
-                startIcon={<ReviewIcon />}
-                onClick={() => router.push('/transactions/review')}
-              >
-                Review suggestions
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
-      ) : null}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box
-            display="flex"
-            flexWrap="wrap"
-            alignItems="center"
-            justifyContent="space-between"
-            rowGap={2}
-            columnGap={2}
-          >
-            <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-              <Typography variant="subtitle1">Advanced automation</Typography>
-              <Button
-                variant={showAutomation ? 'contained' : 'outlined'}
-                onClick={() => setShowAutomation((value) => !value)}
-              >
-                {showAutomation ? 'Hide tools' : 'Show tools'}
-              </Button>
-              <Button variant="text" onClick={() => router.push('/rules')}>
-                Manage rules
-              </Button>
-            </Box>
-            <Typography variant="body2" color="text.secondary">
-              Browse transactions first. Open these tools when you want to generate suggestions in bulk.
-            </Typography>
-          </Box>
-
-          <Collapse in={showAutomation}>
-            <Box sx={{ mt: 3 }}>
-              <Box display="flex" alignItems="center" gap={2} flexWrap="wrap" mb={1.5}>
-                <Button
-                  variant="contained"
-                  disabled={autoCatBusy || allTransactions.length === 0}
-                  onClick={runAutoCategorization}
-                >
-                  {autoCatBusy ? 'Running…' : 'Generate suggestions'}
-                </Button>
-                <Typography variant="body2" color="text.secondary">
-                  Generates suggestions for uncategorized transactions using your rules and presets.
-                </Typography>
-              </Box>
-
-              {autoCatBusy && (
-                <Box sx={{ mt: 2 }}>
-                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" color="text.secondary">
-                      Processing transactions...
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {Math.round(autoCatProgress)}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={autoCatProgress}
-                    sx={{
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: (theme) => theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.1)'
-                        : 'rgba(0, 0, 0, 0.1)',
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 4,
-                      },
-                    }}
-                  />
-
-                  {autoCatLogs.length > 0 && (
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        mt: 2,
-                        p: 2,
-                        maxHeight: 200,
-                        overflow: 'auto',
-                        backgroundColor: (theme) => theme.palette.mode === 'dark'
-                          ? 'rgba(255, 255, 255, 0.05)'
-                          : 'rgba(0, 0, 0, 0.02)',
-                      }}
-                    >
-                      <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                        Activity log:
-                      </Typography>
-                      <Stack spacing={0.5}>
-                        {autoCatLogs.map((log, index) => (
-                          <Typography
-                            key={index}
-                            variant="caption"
-                            sx={{
-                              fontFamily: 'monospace',
-                              fontSize: '0.75rem',
-                              color: 'text.secondary',
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            {log}
-                          </Typography>
-                        ))}
-                      </Stack>
-                    </Paper>
-                  )}
-                </Box>
-              )}
-
-              {autoCatMessage && !autoCatBusy && (
-                <Alert
-                  severity={autoCatMessage.toLowerCase().startsWith('failed') ? 'error' : 'info'}
-                  sx={{ mt: 2 }}
-                >
-                  {autoCatMessage}
-                </Alert>
-              )}
-            </Box>
-          </Collapse>
-        </CardContent>
-      </Card>
-
-      <Box mb={2}>
-        <Typography variant="subtitle2" gutterBottom>
-          Quick Filters:
-        </Typography>
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <Chip label="Uncategorized" variant="outlined" size="small" icon={<CategoryIcon />} onClick={() => setQuickFilter('uncategorized')} />
-          <Chip label="Last 30 Days" variant="outlined" size="small" icon={<DateIcon />} onClick={() => setQuickFilter('last30days')} />
-          <Chip label="Expenses Only" variant="outlined" size="small" icon={<TrendingUpIcon />} onClick={() => setQuickFilter('expenses')} />
-          <Chip label="Income Only" variant="outlined" size="small" icon={<TrendingDownIcon />} onClick={() => setQuickFilter('income')} />
-          <Chip label="Clear All Filters" variant="outlined" size="small" icon={<ClearIcon />} onClick={clearFilters} color="secondary" />
-        </Stack>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <StatCard label="Transactions" value={formatCount(summaryStats.totalTransactions)} icon={<ReceiptLongIcon />} />
+        <StatCard label="Income" value={formatMoney(summaryStats.totalIncome)} tone="positive" icon={<ArrowDownwardIcon />} />
+        <StatCard label="Spending" value={formatMoney(summaryStats.totalExpenses)} tone="negative" icon={<ArrowUpwardIcon />} />
+        <StatCard
+          label="Net"
+          value={`${summaryStats.netAmount < 0 ? '−' : ''}${formatMoney(Math.abs(summaryStats.netAmount))}`}
+          tone={summaryStats.netAmount >= 0 ? 'positive' : 'negative'}
+        />
+        <StatCard
+          label="Uncategorized"
+          value={formatCount(summaryStats.uncategorized)}
+          tone="warning"
+          icon={<CategoryIcon />}
+          hint={quickFilterActive.uncategorized ? 'Showing only these' : 'Click to filter'}
+          onClick={() => setQuickFilter('uncategorized')}
+        />
       </Box>
 
-      <Collapse in={showFilters}>
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Advanced Filters
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  label="Search Description"
-                  size="small"
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
-                  InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Source</InputLabel>
-                  <Select value={filters.source} label="Source" onChange={(e) => handleFilterChange('source', e.target.value)}>
-                    <MenuItem value="">All Sources</MenuItem>
-                    {uniqueSources.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Account</InputLabel>
-                  <Select value={filters.account} label="Account" onChange={(e) => handleFilterChange('account', e.target.value)}>
-                    <MenuItem value="">All Accounts</MenuItem>
-                    {uniqueAccounts.map((a) => (
-                      <MenuItem key={a} value={a}>
-                        {a}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Category</InputLabel>
-                  <Select value={filters.category} label="Category" onChange={(e) => handleFilterChange('category', e.target.value)}>
-                    <MenuItem value="">All Categories</MenuItem>
-                    <MenuItem value="uncategorized">Uncategorized</MenuItem>
-                    {uniqueCategories.map((c) => (
-                      <MenuItem key={c} value={c}>
-                        {c}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField fullWidth label="Min Amount" size="small" type="number" value={filters.amountMin} onChange={(e) => handleFilterChange('amountMin', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField fullWidth label="Max Amount" size="small" type="number" value={filters.amountMax} onChange={(e) => handleFilterChange('amountMax', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField fullWidth label="From Date" size="small" type="date" value={filters.dateFrom} onChange={(e) => handleFilterChange('dateFrom', e.target.value)} InputLabelProps={{ shrink: true }} />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField fullWidth label="To Date" size="small" type="date" value={filters.dateTo} onChange={(e) => handleFilterChange('dateTo', e.target.value)} InputLabelProps={{ shrink: true }} />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+      <Collapse in={showAutomation} unmountOnExit>
+        <SectionCard
+          title="Auto-categorization"
+          description="Match uncategorized transactions against your rules and presets."
+          icon={<AutoAwesomeIcon />}
+          action={
+            <Button size="small" startIcon={<RuleIcon />} onClick={() => router.push('/rules')}>
+              Manage rules
+            </Button>
+          }
+          sx={{ mb: 3 }}
+        >
+          <Stack spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} gap={1.5} flexWrap="wrap">
+              <SegmentedControl
+                aria-label="Categorization mode"
+                value={autoCatMode}
+                onChange={(v) => setAutoCatMode(v)}
+                options={[
+                  { value: 'suggestions_only', label: 'Suggestions only' },
+                  { value: 'auto', label: 'Auto-apply' },
+                ]}
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                {autoCatMode === 'auto'
+                  ? 'Confident matches are applied immediately.'
+                  : 'Matches become suggestions you review before applying.'}
+              </Typography>
+              <Button
+                variant="contained"
+                disabled={autoCatBusy || allTransactions.length === 0}
+                onClick={runAutoCategorization}
+                startIcon={autoCatBusy ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
+              >
+                {autoCatBusy ? 'Running…' : 'Run now'}
+              </Button>
+            </Stack>
+
+            {autoCatBusy || autoCatProgress > 0 ? (
+              <Box>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {autoCatBusy ? 'Processing transactions…' : 'Done'}
+                  </Typography>
+                  <Typography variant="caption" className="tabular-nums" sx={{ fontWeight: 600 }}>
+                    {Math.round(autoCatProgress)}%
+                  </Typography>
+                </Stack>
+                <LinearProgress variant="determinate" value={autoCatProgress} />
+              </Box>
+            ) : null}
+
+            {autoCatLogs.length > 0 ? (
+              <Box
+                sx={{
+                  maxHeight: 180,
+                  overflow: 'auto',
+                  px: 1.5,
+                  py: 1.25,
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: isDark ? alpha('#000', 0.25) : alpha(theme.palette.text.primary, 0.03),
+                  fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+                  fontSize: '0.74rem',
+                  lineHeight: 1.6,
+                  color: 'text.secondary',
+                }}
+              >
+                {autoCatLogs.map((log, index) => (
+                  <div key={index}>{log}</div>
+                ))}
+              </Box>
+            ) : null}
+
+            {autoCatMessage && !autoCatBusy ? (
+              <Alert severity={autoCatMessage.toLowerCase().startsWith('failed') ? 'error' : 'success'}>
+                {autoCatMessage}
+              </Alert>
+            ) : null}
+          </Stack>
+        </SectionCard>
       </Collapse>
 
-      <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" justifyContent="flex-end" mb={2}>
+      {pendingSuggestionCount > 0 ? (
+        <SectionCard
+          sx={{
+            mb: 3,
+            bgcolor: alpha(theme.palette.primary.main, isDark ? 0.1 : 0.05),
+            borderColor: alpha(theme.palette.primary.main, isDark ? 0.3 : 0.2),
+          }}
+          bodySx={{ py: 2 }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" gap={1.5}>
+            <Stack direction="row" gap={1.5} alignItems="center">
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 2,
+                  display: 'grid',
+                  placeItems: 'center',
+                  color: 'primary.main',
+                  bgcolor: alpha(theme.palette.primary.main, isDark ? 0.18 : 0.12),
+                }}
+              >
+                <RateReviewIcon fontSize="small" />
+              </Box>
+              <Box>
+                <Typography variant="subtitle1">Suggestions ready for review</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {plural(pendingSuggestionCount, 'transaction')} have a suggested category waiting for your approval.
+                </Typography>
+              </Box>
+            </Stack>
+            <Button variant="contained" onClick={() => router.push('/transactions/review')} sx={{ flexShrink: 0 }}>
+              Review {formatCount(pendingSuggestionCount)} suggestion{pendingSuggestionCount === 1 ? '' : 's'}
+            </Button>
+          </Stack>
+        </SectionCard>
+      ) : null}
+
+      <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} alignItems={{ md: 'center' }} sx={{ mb: 1.5 }}>
         <TextField
           size="small"
-          placeholder="Search description…"
+          placeholder="Search descriptions…"
           value={filters.search}
           onChange={(e) => handleFilterChange('search', e.target.value)}
           InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              </InputAdornment>
+            ),
           }}
-          sx={{ minWidth: { xs: '100%', sm: 220 } }}
+          sx={{ flex: 1, minWidth: { md: 260 } }}
         />
-        <Button
-          variant="outlined"
-          startIcon={<FilterIcon />}
-          onClick={() => setShowFilters(!showFilters)}
-          color={showFilters ? 'primary' : 'inherit'}
-        >
-          Filters
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={exportToCSV}
-          disabled={filteredAndSortedTransactions.length === 0}
-        >
-          Export CSV
-        </Button>
-      </Box>
+        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap alignItems="center">
+          {(
+            [
+              ['uncategorized', 'Uncategorized'],
+              ['last30days', 'Last 30 days'],
+              ['expenses', 'Expenses'],
+              ['income', 'Income'],
+            ] as [QuickFilter, string][]
+          ).map(([key, label]) => (
+            <Chip
+              key={key}
+              label={label}
+              size="small"
+              clickable
+              color={quickFilterActive[key] ? 'primary' : 'default'}
+              variant={quickFilterActive[key] ? 'filled' : 'outlined'}
+              onClick={() => setQuickFilter(key)}
+            />
+          ))}
+          <Badge badgeContent={advancedFilterCount} color="primary" overlap="rectangular">
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              startIcon={<FilterListIcon />}
+              onClick={() => setShowFilters((v) => !v)}
+              sx={showFilters ? { borderColor: 'primary.main', color: 'primary.main' } : undefined}
+            >
+              Filters
+            </Button>
+          </Badge>
+          {anyFilterActive ? (
+            <Button size="small" color="inherit" startIcon={<CloseIcon />} onClick={clearFilters}>
+              Clear
+            </Button>
+          ) : null}
+        </Stack>
+      </Stack>
 
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
-        <Typography variant="body2" color="text.secondary">
-          Showing {paginatedTransactions.length} of {filteredAndSortedTransactions.length} transactions
-          {filteredAndSortedTransactions.length !== allTransactions.length ? ` (filtered from ${allTransactions.length} total)` : ''}
-        </Typography>
-        {filteredAndSortedTransactions.length === 0 && Object.values(filters).some((f) => f !== '') ? (
-          <Alert severity="info">No transactions match your filters.</Alert>
-        ) : null}
-      </Box>
+      <Collapse in={showFilters} unmountOnExit>
+        <SectionCard sx={{ mb: 2 }} bodySx={{ pt: 2 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' },
+              gap: 1.5,
+            }}
+          >
+            <FormControl fullWidth size="small">
+              <InputLabel>Source</InputLabel>
+              <Select value={filters.source} label="Source" onChange={(e) => handleFilterChange('source', e.target.value)}>
+                <MenuItem value="">All sources</MenuItem>
+                {uniqueSources.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {sourceLabel(s)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Account</InputLabel>
+              <Select value={filters.account} label="Account" onChange={(e) => handleFilterChange('account', e.target.value)}>
+                <MenuItem value="">All accounts</MenuItem>
+                {uniqueAccounts.map((a) => (
+                  <MenuItem key={a} value={a}>
+                    {a}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Category</InputLabel>
+              <Select value={filters.category} label="Category" onChange={(e) => handleFilterChange('category', e.target.value)}>
+                <MenuItem value="">All categories</MenuItem>
+                <MenuItem value="uncategorized">Uncategorized</MenuItem>
+                {uniqueCategories.map((c) => (
+                  <MenuItem key={c} value={c}>
+                    {c}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+              <TextField
+                fullWidth
+                label="Min amount"
+                size="small"
+                type="number"
+                value={filters.amountMin}
+                onChange={(e) => handleFilterChange('amountMin', e.target.value)}
+              />
+              <TextField
+                fullWidth
+                label="Max amount"
+                size="small"
+                type="number"
+                value={filters.amountMax}
+                onChange={(e) => handleFilterChange('amountMax', e.target.value)}
+              />
+            </Box>
+            <TextField
+              fullWidth
+              label="From date"
+              size="small"
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              fullWidth
+              label="To date"
+              size="small"
+              type="date"
+              value={filters.dateTo}
+              onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
+        </SectionCard>
+      </Collapse>
 
-      <TableContainer
-        component={Paper}
-        sx={{
-          boxShadow: 'none',
-          borderRadius: 3,
-          overflow: 'hidden',
-        }}
-      >
-        <Table stickyHeader size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>
-                <TableSortLabel active={sortField === 'date'} direction={sortField === 'date' ? sortDirection : 'asc'} onClick={() => handleSort('date')}>
-                  Date
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>
-                <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDirection : 'asc'} onClick={() => handleSort('description')}>
-                  Description
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right">
-                <TableSortLabel active={sortField === 'amount'} direction={sortField === 'amount' ? sortDirection : 'asc'} onClick={() => handleSort('amount')}>
-                  Amount
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>Source</TableCell>
-              <TableCell>Account</TableCell>
-              <TableCell>
-                <TableSortLabel active={sortField === 'category'} direction={sortField === 'category' ? sortDirection : 'asc'} onClick={() => handleSort('category')}>
-                  Category
-                </TableSortLabel>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedTransactions.map((t) => {
-              const isExpense = t.amount > 0;
-              return (
-                <TableRow key={t.id} sx={{ '&:hover': { backgroundColor: theme.palette.action.hover } }}>
-                  <TableCell>{new Date(t.date).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ maxWidth: 300, wordWrap: 'break-word' }}>
-                      {t.description}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight="medium" color={isExpense ? 'error.main' : 'success.main'}>
-                      {isExpense ? '-' : ''}${formatCurrency(Math.abs(t.amount))}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={t.source} size="small" variant="outlined" color="primary" />
-                  </TableCell>
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <AccountIcon fontSize="small" color="action" />
-                      <Typography variant="body2">{t.account_name}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
-                      {t.category_name ? (
-                        <Chip
-                          label={t.category_name}
-                          size="small"
-                          variant="outlined"
-                          sx={(theme) => {
-                            const categoryColor = t.category_color || '#2196F3';
-                            const isDark = theme.palette.mode === 'dark';
-                            // Convert hex to rgba for better contrast
-                            const hexToRgb = (hex: string) => {
-                              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                              return result
-                                ? {
-                                    r: parseInt(result[1], 16),
-                                    g: parseInt(result[2], 16),
-                                    b: parseInt(result[3], 16),
-                                  }
-                                : null;
-                            };
-                            const rgb = hexToRgb(categoryColor);
-                            if (rgb) {
-                              return {
-                                backgroundColor: isDark
-                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
-                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`,
-                                borderColor: isDark
-                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`
-                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`,
-                                color: categoryColor,
-                                '&:hover': {
-                                  backgroundColor: isDark
-                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
-                                    : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`,
-                                },
-                              };
-                            }
-                            return {
-                              borderColor: categoryColor,
-                              color: categoryColor,
-                            };
-                          }}
-                        />
-                      ) : (
-                        <Chip
-                          label="Uncategorized"
-                          size="small"
-                          color="warning"
-                          variant="outlined"
-                        />
-                      )}
-                      {t.category_name && t.auto_categorized ? (
-                        <Chip label="Auto" size="small" variant="outlined" />
-                      ) : null}
-                      {!t.category_name && t.suggested_category_name ? (
-                        <Chip
-                          label={
-                            t.confidence_score != null
-                              ? `Suggested: ${t.suggested_category_name} (${Math.round(
-                                  t.confidence_score * 100,
-                                )}%)`
-                              : `Suggested: ${t.suggested_category_name}`
-                          }
-                          size="small"
-                          variant="outlined"
-                          sx={(theme) => {
-                            const suggestedColor = t.suggested_category_color || '#2196F3';
-                            const isDark = theme.palette.mode === 'dark';
-                            const hexToRgb = (hex: string) => {
-                              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                              return result
-                                ? {
-                                    r: parseInt(result[1], 16),
-                                    g: parseInt(result[2], 16),
-                                    b: parseInt(result[3], 16),
-                                  }
-                                : null;
-                            };
-                            const rgb = hexToRgb(suggestedColor);
-                            if (rgb) {
-                              return {
-                                backgroundColor: isDark
-                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
-                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.05)`,
-                                borderColor: isDark
-                                  ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`
-                                  : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`,
-                                color: suggestedColor,
-                                borderStyle: 'dashed',
-                                '&:hover': {
-                                  backgroundColor: isDark
-                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
-                                    : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`,
-                                },
-                              };
-                            }
-                            return {
-                              borderColor: suggestedColor,
-                              color: suggestedColor,
-                              borderStyle: 'dashed',
-                            };
-                          }}
-                        />
-                      ) : null}
-                    </Stack>
+      {filteredAndSortedTransactions.length === 0 ? (
+        <EmptyState
+          icon={<SearchIcon />}
+          title="No transactions match"
+          description="Try a different search or clear the active filters."
+          actions={
+            <Button variant="outlined" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          }
+        />
+      ) : (
+        <SectionCard
+          disablePadding
+          footer={
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" justifyContent="space-between" gap={1}>
+              <Typography variant="caption" color="text.secondary">
+                Showing {formatCount(pageStart)}–{formatCount(pageEnd)} of {formatCount(filteredAndSortedTransactions.length)}
+                {filteredAndSortedTransactions.length !== allTransactions.length
+                  ? ` (filtered from ${formatCount(allTransactions.length)})`
+                  : ''}
+              </Typography>
+              {filteredAndSortedTransactions.length > rowsPerPage ? (
+                <Pagination
+                  count={Math.ceil(filteredAndSortedTransactions.length / rowsPerPage)}
+                  page={page}
+                  onChange={(_, p) => setPage(p)}
+                  color="primary"
+                  size="small"
+                  siblingCount={0}
+                />
+              ) : null}
+            </Stack>
+          }
+        >
+          <TableContainer sx={{ borderRadius: 0 }}>
+            <Table size="small" sx={{ minWidth: 640 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 110 }}>{sortLabel('date', 'Date')}</TableCell>
+                  <TableCell>{sortLabel('description', 'Description')}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Account</TableCell>
+                  <TableCell>{sortLabel('category', 'Category')}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Source</TableCell>
+                  <TableCell align="right" sx={{ width: 130 }}>
+                    {sortLabel('amount', 'Amount')}
                   </TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {filteredAndSortedTransactions.length > rowsPerPage ? (
-        <Box display="flex" justifyContent="center" mt={3}>
-          <Pagination
-            count={Math.ceil(filteredAndSortedTransactions.length / rowsPerPage)}
-            page={page}
-            onChange={(_, p) => setPage(p)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
-      ) : null}
+              </TableHead>
+              <TableBody>
+                {paginatedTransactions.map((t) => (
+                  <TableRow key={t.id} hover>
+                    <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }} className="tabular-nums">
+                      {formatTxDate(t.date)}
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 360 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.description}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: { xs: 'block', md: 'none' } }}
+                        noWrap
+                      >
+                        {t.account_name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, whiteSpace: 'nowrap' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {t.account_name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" gap={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                        {t.category_name ? (
+                          <CategoryChip name={t.category_name} color={t.category_color} />
+                        ) : t.suggested_category_name ? (
+                          <CategoryChip
+                            name={t.suggested_category_name}
+                            color={t.suggested_category_color}
+                            suggested
+                            confidence={t.confidence_score}
+                          />
+                        ) : (
+                          <CategoryChip name={null} />
+                        )}
+                        {t.category_name && t.auto_categorized ? (
+                          <Chip
+                            label="Auto"
+                            size="small"
+                            sx={{ height: 18, fontSize: '0.64rem', '& .MuiChip-label': { px: 0.75 } }}
+                          />
+                        ) : null}
+                      </Stack>
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' }, whiteSpace: 'nowrap' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {sourceLabel(t.source)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Money stored={t.amount} colored />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </SectionCard>
+      )}
     </Box>
   );
 }
-

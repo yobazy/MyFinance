@@ -1,24 +1,23 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import NextLink from 'next/link';
 import {
   Alert,
   Box,
   Button,
-  CircularProgress,
-  Divider,
+  Chip,
   IconButton,
-  InputAdornment,
-  Paper,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import SendIcon from '@mui/icons-material/Send';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import PersonIcon from '@mui/icons-material/Person';
-import { useRouter } from 'next/navigation';
+import SendIcon from '@mui/icons-material/ArrowUpwardRounded';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeRounded';
+import ArrowBackIcon from '@mui/icons-material/ArrowBackRounded';
 import { createBrowserSupabaseClient } from '../../lib/supabase';
+import { PageHeader } from '../components/ui';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 
@@ -29,8 +28,58 @@ const STARTERS = [
   'What accounts do I have?',
 ];
 
+function AssistantAvatar() {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        width: 30,
+        height: 30,
+        borderRadius: 2,
+        flexShrink: 0,
+        display: 'grid',
+        placeItems: 'center',
+        color: 'primary.main',
+        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.1),
+        '& svg': { fontSize: 16 },
+      }}
+    >
+      <AutoAwesomeIcon />
+    </Box>
+  );
+}
+
+function TypingDots() {
+  return (
+    <Stack
+      direction="row"
+      spacing={0.5}
+      alignItems="center"
+      sx={{
+        height: 20,
+        '@keyframes mf-typing': {
+          '0%, 80%, 100%': { opacity: 0.25, transform: 'translateY(0)' },
+          '40%': { opacity: 1, transform: 'translateY(-3px)' },
+        },
+        '& span': {
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          bgcolor: 'text.secondary',
+          animation: 'mf-typing 1.2s ease-in-out infinite',
+        },
+        '& span:nth-of-type(2)': { animationDelay: '0.15s' },
+        '& span:nth-of-type(3)': { animationDelay: '0.3s' },
+      }}
+    >
+      <span />
+      <span />
+      <span />
+    </Stack>
+  );
+}
+
 export default function ChatPage() {
-  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const theme = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -90,151 +139,159 @@ export default function ChatPage() {
   };
 
   const isDark = theme.palette.mode === 'dark';
+  const canSend = input.trim().length > 0 && !loading;
 
   return (
-    <Box sx={{ maxWidth: 760, mx: 'auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-        <SmartToyIcon color="primary" />
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h5" fontWeight={700}>
-            Insights: Ask
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Ask follow-up questions about the data behind your insights.
-          </Typography>
-        </Box>
-        <Button variant="outlined" size="small" onClick={() => router.push('/insights')}>
-          Back to insights
-        </Button>
-      </Box>
+    <Box
+      sx={{
+        maxWidth: 820,
+        mx: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        height: { xs: 'calc(100vh - 56px - 40px)', md: 'calc(100vh - 140px)' },
+        minHeight: 420,
+      }}
+    >
+      <PageHeader
+        eyebrow="Insights"
+        title="Assistant"
+        description="Ask follow-up questions about the data behind your summaries."
+        actions={
+          <Button component={NextLink} href="/insights" startIcon={<ArrowBackIcon />} color="inherit">
+            Summaries
+          </Button>
+        }
+        sx={{ mb: 2 }}
+      />
 
       {/* Message area */}
-      <Paper
-        variant="outlined"
+      <Box
         sx={{
           flex: 1,
+          minHeight: 0,
           overflow: 'auto',
-          p: 2,
-          borderRadius: 3,
+          p: { xs: 1.5, sm: 2.5 },
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 3.5,
+          bgcolor: 'background.paper',
           display: 'flex',
           flexDirection: 'column',
-          gap: 1.5,
-          minHeight: 0,
+          gap: 2,
         }}
       >
         {messages.length === 0 && (
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, py: 4 }}>
-            <SmartToyIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
-            <Typography color="text.secondary" variant="body1">
-              Ask anything about your finances
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', maxWidth: 480 }}>
+          <Stack
+            sx={{ flex: 1, py: 4 }}
+            alignItems="center"
+            justifyContent="center"
+            spacing={2}
+            textAlign="center"
+          >
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: 3,
+                display: 'grid',
+                placeItems: 'center',
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.16 : 0.1),
+                '& svg': { fontSize: 28 },
+              }}
+            >
+              <AutoAwesomeIcon />
+            </Box>
+            <Box>
+              <Typography variant="h5" component="h2" sx={{ mb: 0.5 }}>
+                Ask anything about your finances
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Try one of these to get started.
+              </Typography>
+            </Box>
+            <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={1} useFlexGap sx={{ maxWidth: 520 }}>
               {STARTERS.map((s) => (
-                <Box
+                <Chip
                   key={s}
+                  label={s}
+                  variant="outlined"
                   onClick={() => sendMessage(s)}
                   sx={{
-                    px: 1.5,
-                    py: 0.75,
-                    borderRadius: 2,
-                    border: `1px solid ${theme.palette.divider}`,
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    color: 'text.secondary',
-                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: 'primary.main', color: 'primary.main' },
+                    height: 32,
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
+                      bgcolor: alpha(theme.palette.primary.main, 0.06),
+                    },
                   }}
-                >
-                  {s}
-                </Box>
+                />
               ))}
-            </Box>
-          </Box>
+            </Stack>
+          </Stack>
         )}
 
-          {messages.map((msg, idx) => {
-            const isUser = msg.role === 'user';
-            return (
+        {messages.map((msg, idx) => {
+          const isUser = msg.role === 'user';
+          return (
+            <Stack
+              key={idx}
+              direction={isUser ? 'row-reverse' : 'row'}
+              alignItems="flex-start"
+              spacing={1.25}
+            >
+              {!isUser ? <AssistantAvatar /> : null}
               <Box
-                key={idx}
                 sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 1.25,
-                  flexDirection: isUser ? 'row-reverse' : 'row',
+                  maxWidth: { xs: '88%', sm: '76%' },
+                  px: 1.75,
+                  py: 1.25,
+                  borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
+                  bgcolor: isUser
+                    ? alpha(theme.palette.primary.main, isDark ? 0.22 : 0.1)
+                    : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.035),
+                  border: `1px solid ${isUser ? alpha(theme.palette.primary.main, 0.22) : theme.palette.divider}`,
                 }}
               >
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: isUser ? 'primary.main' : isDark ? 'grey.800' : 'grey.100',
-                    color: isUser ? 'primary.contrastText' : 'text.secondary',
-                  }}
-                >
-                  {isUser ? <PersonIcon sx={{ fontSize: 18 }} /> : <SmartToyIcon sx={{ fontSize: 18 }} />}
-                </Box>
-                <Box
-                  sx={{
-                    maxWidth: '78%',
-                    px: 2,
-                    py: 1.25,
-                    borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                    bgcolor: isUser
-                      ? alpha(theme.palette.primary.main, isDark ? 0.22 : 0.1)
-                      : isDark
-                      ? 'grey.900'
-                      : 'grey.50',
-                    border: `1px solid ${isUser ? alpha(theme.palette.primary.main, 0.2) : theme.palette.divider}`,
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}
-                  >
-                    {msg.content}
-                  </Typography>
-                </Box>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+                  {msg.content}
+                </Typography>
               </Box>
-            );
-          })}
+            </Stack>
+          );
+        })}
 
-          {loading && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-              <Box
-                sx={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  bgcolor: isDark ? 'grey.800' : 'grey.100',
-                }}
-              >
-                <SmartToyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-              </Box>
-              <Box sx={{ px: 2, py: 1.25, borderRadius: '4px 16px 16px 16px', bgcolor: isDark ? 'grey.900' : 'grey.50', border: `1px solid ${theme.palette.divider}` }}>
-                <CircularProgress size={14} thickness={5} />
-              </Box>
+        {loading && (
+          <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+            <AssistantAvatar />
+            <Box
+              sx={{
+                px: 1.75,
+                py: 1.25,
+                borderRadius: '4px 16px 16px 16px',
+                bgcolor: alpha(theme.palette.text.primary, isDark ? 0.06 : 0.035),
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              <TypingDots />
             </Box>
-          )}
+          </Stack>
+        )}
         <div ref={bottomRef} />
-      </Paper>
+      </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mt: 1.5 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
-      <Divider sx={{ my: 1 }} />
-
-      {/* Input */}
-      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', gap: 1 }}>
+      {/* Composer */}
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1.5 }}>
         <TextField
           fullWidth
-          size="small"
+          multiline
+          maxRows={4}
           placeholder="Ask about your spending, accounts, or transactions…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -245,22 +302,43 @@ export default function ChatPage() {
               sendMessage(input);
             }
           }}
-          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 3.5,
+              pr: 1,
+              alignItems: 'flex-end',
+            },
+          }}
           InputProps={{
             endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  type="submit"
-                  disabled={!input.trim() || loading}
-                  size="small"
-                  color="primary"
-                >
-                  <SendIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
+              <IconButton
+                type="submit"
+                disabled={!canSend}
+                size="small"
+                aria-label="Send message"
+                sx={{
+                  ml: 1,
+                  mb: 0.25,
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  color: 'primary.contrastText',
+                  bgcolor: 'primary.main',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                  '&.Mui-disabled': {
+                    bgcolor: alpha(theme.palette.text.primary, 0.08),
+                    color: 'text.disabled',
+                  },
+                }}
+              >
+                <SendIcon sx={{ fontSize: 18 }} />
+              </IconButton>
             ),
           }}
         />
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+          Answers are based on your imported data. Press Enter to send, Shift+Enter for a new line.
+        </Typography>
       </Box>
     </Box>
   );
