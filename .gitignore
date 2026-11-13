@@ -14,6 +14,8 @@ lib/
 lib64/
 !web/lib/
 !web/lib/**
+!worker/src/lib/
+!worker/src/lib/**
 parts/
 sdist/
 var/
