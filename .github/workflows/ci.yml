@@ -41,7 +41,9 @@ jobs:
 
   web:
     name: Web (type check, build, e2e smoke)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest is 26.04, which Playwright 1.58 can't install Chromium on.
+    # Move back to ubuntu-latest after upgrading @playwright/test.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
