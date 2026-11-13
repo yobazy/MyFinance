@@ -18,8 +18,9 @@ async function signInWithEmail(page: import('@playwright/test').Page, opts?: { n
 test.describe('pages load', () => {
   test('public /login loads', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue with GitHub' })).toBeVisible();
+    // /login opens in sign-in mode; "Continue with ..." is the sign-up wording.
+    await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Password')).toBeVisible();
   });
