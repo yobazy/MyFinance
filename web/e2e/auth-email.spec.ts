@@ -11,8 +11,8 @@ test.describe('auth (email/password)', () => {
 
     await expect(page).toHaveURL(/\/login\?next=/);
 
-    await page.getByLabel('Email').fill(email!);
-    await page.getByLabel('Password').fill(password!);
+    await page.getByLabel('Email', { exact: true }).fill(email!);
+    await page.getByLabel('Password', { exact: true }).fill(password!);
     await page.getByRole('button', { name: 'Sign in with email' }).click();
 
     await expect(page).toHaveURL(/\/transactions\/?$/);
