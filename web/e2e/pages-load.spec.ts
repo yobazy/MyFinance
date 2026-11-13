@@ -7,8 +7,8 @@ async function signInWithEmail(page: import('@playwright/test').Page, opts?: { n
   const next = opts?.next ?? '/';
   await page.goto(`/login?next=${encodeURIComponent(next)}`);
 
-  await page.getByLabel('Email').fill(email!);
-  await page.getByLabel('Password').fill(password!);
+  await page.getByLabel('Email', { exact: true }).fill(email!);
+  await page.getByLabel('Password', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Sign in with email' }).click();
 
   // Wait for redirect away from /login (PublicLanding pushes to next on auth state change).
@@ -18,10 +18,12 @@ async function signInWithEmail(page: import('@playwright/test').Page, opts?: { n
 test.describe('pages load', () => {
   test('public /login loads', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue with GitHub' })).toBeVisible();
-    await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Password')).toBeVisible();
+    // /login opens in sign-in mode; "Continue with ..." is the sign-up wording.
+    await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
+    // exact: the "Email mode" toggle group also has "Email" in its label.
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
   });
 
   test('authenticated pages load (headings render)', async ({ page }) => {

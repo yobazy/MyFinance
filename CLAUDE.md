@@ -1,151 +1,35 @@
-# MyFinance Dashboard — CLAUDE.md
+# MyFinance
 
-## Project Overview
+Personal finance dashboard: Next.js app in `web/`, a polling job worker in `worker/`, Supabase (Postgres, Auth, Storage, RLS) behind both. The hosted Supabase project holds real users' bank transactions.
 
-Personal finance dashboard undergoing migration from a legacy Django + Create React App stack to a modern **Next.js 15 + Supabase + TypeScript worker** stack. The legacy stack lives in `legacy/` and is archived; all active development happens in `web/` and `worker/`.
+## Rules
 
-## Active Stack (use this)
+- `legacy/` is the archived Django + Create React App version, kept for reference. Don't modify it.
+- The repo is public. Never commit secrets: `SUPABASE_SERVICE_ROLE_KEY`, `PLAID_SECRET` and users' Anthropic keys stay server-side and out of git.
+- Migrations in `supabase/migrations/` are applied by hand to the hosted project (Supabase CLI or the dashboard SQL editor). Only do that, or any other write to the hosted project, when asked: it changes real user data. Same for deploys (Vercel hosts the web app).
+- For screenshots use `npm run preview:shots` in `web/`. It mocks Supabase and the API routes with demo data, so no real data ends up in images. Output goes to `web/.preview-shots/`.
 
-- **Frontend**: `web/` — Next.js 15, React 19, TypeScript, Material-UI 6, Supabase Auth
-- **Worker**: `worker/` — TypeScript polling worker, processes async jobs from Supabase queue
-- **Database**: Supabase (PostgreSQL + Auth + Storage + RLS)
-- **E2E Tests**: Playwright (`web/e2e/`)
+## Gotchas
 
-## Legacy Stack (do not modify)
+- Amounts: expenses are stored positive, income negative. `Money` takes `stored={amount}` and flips the sign for display.
+- The service-role clients (`web/lib/supabaseAdmin.ts`, `worker/src/supabase.ts`) bypass RLS, so filter every query by `user_id` yourself, and import `supabaseAdmin` only from route handlers in `web/app/api/`. The browser client is `web/lib/supabase.ts`.
+- Transactions are deduplicated by upsert on `(user_id, account_id, fingerprint)`. The fingerprint is computed in both `web/lib/fingerprint.ts` and `worker/src/fingerprint.ts`; keep them identical or re-imports create duplicates. `confidenceCalculator.ts` is also duplicated between `web/lib/` and `worker/src/lib/`.
+- Anthropic keys are per user (`user_settings.anthropic_api_key`, set on the settings page) and read with `getUserAnthropicKey`. Nothing reads the `ANTHROPIC_API_KEY` env var.
+- Two migrations share the `013_` prefix; the next one is `016_`.
+- The root `.gitignore` ignores every `lib/` directory (a Python leftover) except `web/lib/` and `worker/src/lib/`. A new `lib/` anywhere else needs its own exception or it silently stays out of git.
+- `next build` fails unless `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set. Any value works for a build; CI uses dummies.
 
-- `legacy/django-cra/` — Django 5.1 REST API + Create React App UI (SQLite, Pandas, Recharts)
-- Kept for reference and historical data only
+## Checks
 
-## Dev Commands
+- `web/` and `worker/` each have their own `package-lock.json`; run `npm ci` in each. The root `package.json` only holds the `web:dev` / `worker:dev` shortcuts and legacy scripts.
+- CI (`.github/workflows/ci.yml`) runs on every PR: worker `npm run build` (tsc); web `npx tsc --noEmit`, `npm run build`, `npm run test:e2e`.
+- ESLint isn't set up: `npm run lint` opens Next's interactive setup prompt.
+- The signed-in Playwright tests need `E2E_EMAIL` and `E2E_PASSWORD` in the environment (a real Supabase user) and skip themselves without them.
 
-```bash
-# From repo root
-npm run web:dev        # Start Next.js frontend (port 3000)
-npm run worker:dev     # Start TypeScript worker (tsx, auto-reload)
+## Code conventions
 
-# From web/
-npm run dev            # Next.js dev server
-npm run build          # Production build
-npm run lint           # ESLint
-npm run test:e2e       # Playwright E2E tests
-npm run test:e2e:ui    # Playwright UI mode
-npm run test:e2e:headed
-
-# From worker/
-npm run dev            # tsx watch mode
-npm run build          # tsc compile to dist/
-npm run start          # Run compiled worker
-```
-
-## Environment Variables
-
-**`web/.env.local`** (copy from `web/env.example`):
-```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-PLAID_CLIENT_ID
-PLAID_SECRET
-PLAID_ENV                   # sandbox | development | production
-E2E_EMAIL                   # Playwright test user
-E2E_PASSWORD
-```
-
-**`worker/.env`**:
-```
-SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
-WORKER_ID                   # e.g. worker-local-1
-POLL_INTERVAL_MS            # e.g. 1000
-```
-
-## Repository Structure
-
-```
-web/
-  app/              # Next.js App Router pages & API routes
-    api/            # Server-side route handlers
-  lib/              # Shared utilities (Supabase clients, parsers, theme, auth)
-  e2e/              # Playwright tests
-worker/
-  src/
-    jobs/           # Job handlers: ingestUpload, applyRules
-    parsers/        # Bank statement parsers (Amex XLSX)
-    supabase.ts     # Supabase service client
-    env.ts          # Zod env validation
-supabase/
-  migrations/       # 11 SQL migrations (schema → deduplication → categorization)
-legacy/             # Archived Django + CRA stack
-docs/               # Architecture docs & migration plan
-```
-
-## Architecture Notes
-
-### Frontend
-- **Routing**: Next.js App Router; key pages: `/accounts`, `/transactions`, `/upload`, `/visualizations`, `/review-suggestions`
-- **Auth**: Supabase Auth via `AuthContext` in `web/lib/auth-context.tsx`; `AppShell` wraps authenticated views, `PublicLanding` for unauthenticated
-- **Theming**: MUI `ThemeModeProvider` with light/dark mode toggle
-- **API calls**: Sensitive ops go through Next.js server route handlers in `app/api/`
-
-### Worker (Job Queue)
-- Polls Supabase for `processing_jobs` rows with `status = pending`
-- Uses an atomic `dequeue` RPC to claim jobs
-- Job types: `ingest_upload` (parse bank statements), `apply_rules` (auto-categorize)
-- Job lifecycle: `pending → processing → succeeded | failed`
-
-### Database
-- Row-Level Security (RLS) enforces per-user data isolation
-- Deduplication: upsert on `(user_id, account_id, fingerprint)` — fingerprint is a hash of transaction fields
-- Undo support via `uploads` and `uploads_undo` tables
-- Auto-categorization via `category_rules` and `categorization_feedback` tables
-
-### Key API Routes
-| Route | Purpose |
-|---|---|
-| `POST /api/ingest/amex` | Upload & parse Amex XLSX statement |
-| `POST /api/plaid/link-token` | Generate Plaid Link token |
-| `POST /api/plaid/import` | Import transactions from Plaid |
-| `POST /api/auto-categorization/apply` | Bulk apply categorization rules |
-| `POST /api/auto-categorization/apply-suggestion` | Accept a single suggestion |
-| `POST /api/uploads/[uploadId]/undo` | Undo an upload |
-
-## Database Migrations
-
-Migrations live in `supabase/migrations/`. Apply via Supabase CLI (`supabase db push`) or Supabase dashboard SQL editor. 11 migrations total:
-- `001` Core schema
-- `002` Job queue RPC
-- `003` Transaction deduplication fingerprint
-- `004–005` Storage & upsert policies
-- `006` Account balance rollup
-- `007–008` Upload undo support
-- `009–010` Category presets + seed data
-- `011` Categorization feedback
-
-## UI Conventions (web/)
-
-- **Shell**: `app/components/AppShell.tsx` renders a collapsible left sidebar (desktop) / drawer (mobile) with grouped nav, the user menu (theme: light/dark/system, sign out) and wraps authenticated routes in `RequireAuth`. `/login` and `/auth/*` render without the shell.
-- **Theme**: `lib/theme.ts` holds all design tokens and MUI component overrides (hairline borders, 12–14px radii, flat cards, uppercase table headers). `chartPalette` is exported for Recharts series. `lib/themeMode.tsx` persists a `light | dark | system` preference and exposes `themeInitScript` (inlined in `app/layout.tsx`) to avoid a theme flash.
-- **Shared primitives** live in `app/components/ui/` and should be used instead of ad-hoc markup: `PageHeader`, `StatCard`, `SectionCard`, `EmptyState`, `Money`, `CategoryChip`, `BankLogo`, `ChartTooltip`, `PageSkeleton`, `SegmentedControl`, `StatusChip`.
-- **Feedback**: `useToast()` (`app/components/ToastProvider.tsx`) for transient success/error; `useConfirm()` (`app/components/ConfirmProvider.tsx`) for confirmations. Never use `alert()` / `window.confirm()`.
-- **Formatting**: `lib/format.ts` (`formatMoney`, `formatSignedMoney`, `formatCompactMoney`, `formatDate`, `formatRelative`, `plural`, …). Amount convention: expenses are stored positive, income negative; `Money` accepts `stored={amount}` and flips the sign for display.
-- **Layout**: prefer `Box` with CSS grid over legacy MUI `Grid item`. Loading states use skeletons, not spinners. Empty states use `EmptyState`.
-
-## Coding Conventions
-
-- TypeScript strict mode throughout; no `any` unless unavoidable
-- Zod for runtime validation at boundaries (env vars, API inputs)
-- MUI components for all UI; custom styling via `sx` prop or Emotion
-- Supabase client usage:
-  - Browser client: `web/lib/supabase/client.ts`
-  - Server client: `web/lib/supabase/server.ts` (uses service role key for admin ops)
-  - Worker client: `worker/src/supabase.ts`
-- Do not modify `legacy/` — it is archived
-
-## Key Features
-
-- Upload Amex XLSX bank statements (sync) or connect via Plaid (async)
-- Transaction deduplication on upload
-- Manual and rule-based auto-categorization with feedback loop
-- Undo upload functionality
-- Financial visualizations and account balance tracking
-- Multi-user SaaS with Supabase Auth (email/password, Google OAuth, GitHub OAuth)
+- TypeScript strict; avoid `any`.
+- UI is MUI. Use the shared primitives in `web/app/components/ui/` instead of ad-hoc markup, and the tokens in `web/lib/theme.ts` (`chartPalette` for Recharts series) instead of one-off colors.
+- `useToast()` for success and error messages and `useConfirm()` for confirmations; never `alert()` or `window.confirm()`.
+- Format money and dates with `web/lib/format.ts`.
+- Lay out with `Box` and CSS grid, not MUI `Grid item`. Loading states are skeletons, not spinners; empty states use `EmptyState`.
